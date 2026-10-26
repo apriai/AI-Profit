@@ -6,9 +6,11 @@ Fuente, en este orden:
   propfarm-logo.png
   assets/propfarm-logo.png
 
-Los instaladores del cliente no dependen de este script:
-  Mac:     instalar-ai-profit.command  (sips + iconutil, incluidos en macOS)
-  Windows: instalar-ai-profit.bat      (System.Drawing)
+Los instaladores del cliente no ejecutan este script (en Mac, python3
+puede ser el aviso de las Command Line Tools).
+  Mac:     instalar-ai-profit.command aplica assets/abrir-granja-icon.icns
+  Windows: instalar-ai-profit.bat genera el .ico con System.Drawing si puede,
+           y si no usa el .ico que ya está en el repositorio.
 
 Hace falta Pillow solo en la máquina de quien actualiza estos binarios
 en el repositorio (pip install pillow). No se instala en la PC de la granja.

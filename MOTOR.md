@@ -21,8 +21,10 @@ Carpeta: `C:\Users\<usuario>\OneDrive\Escritorio\TradingLink` en HERO.
 | `Granja-de-Cuentas-v2.html` | La página «granja». Lleva un único bloque `<script>/* Prueba colch…` con la UI del colchón (la fuente está en `colchon-src\colchon-ui.html`). El pill del agente (`#botToggle`) abre/cierra siempre el panel `#prCard` (fase «choose»); clic en el agente = solo selector de color. Ya no existen el botón «Prueba» (`#prBtn`) ni el panel antiguo «TradingLink Simulation» (`#tlPanel`). |
 | `colchon-src\` | Fuentes de la UI y pruebas (`test-mock.mjs`). Su `colchon.mjs` es viejo: el bueno es el de la raíz. |
 | `node-win\node.exe` | Node portable v22. No hay Node instalado en el sistema. |
-| `Abrir Granja.bat` / `Abrir Granja.command` | Un clic: TradingView en 9222, servidor y `Granja-de-Cuentas-v2.html`. No envía órdenes. |
-| `instalar-ai-profit.bat` / `.command` | Crea el acceso de Escritorio **AI Profit** con `assets/abrir-granja-icon.png`. |
+| `AI Profit.command` | Mac (zsh, sin app ni Rosetta): TradingView en 9222, servidor y `Granja-de-Cuentas-v2.html`. No envía órdenes. |
+| `Abrir Granja.bat` | Windows: lo mismo, en un doble clic. |
+| `instalar-ai-profit.command` | Mac: enlace de Escritorio `AI Profit.command` con `assets/abrir-granja-icon.icns`. |
+| `instalar-ai-profit.bat` | Windows: acceso de Escritorio **AI Profit** con el `.ico`. |
 | `abrir-tradingview.bat` | Solo abre TradingView Desktop (Store) con `--remote-debugging-port=9222`. |
 | `iniciar-tradinglink.bat` | Arranca el servidor en una ventana visible y abre el navegador. |
 | `real-allowlist.json` | Lista de cuentas reales permitidas (sección 10). |
@@ -32,7 +34,7 @@ Carpeta: `C:\Users\<usuario>\OneDrive\Escritorio\TradingLink` en HERO.
 | `colchon.log`, `colchon-eventos.jsonl`, `colchon-latencia.log`, `colchon-resumen.json`, `tradinglink.log`, `reportes\` | Logs, eventos e informes (sección 12). |
 
 ## 3. Arranque
-El arranque de un clic es el acceso **AI Profit** (`instalar-ai-profit.bat` en Windows, `instalar-ai-profit.command` en Mac). Hace los pasos 1 y 2 y abre `http://localhost:8787/Granja-de-Cuentas-v2.html`. No envía órdenes. Los pasos de abajo siguen siendo la forma manual.
+El arranque de un clic es el acceso **AI Profit**. En Windows lo crea `instalar-ai-profit.bat`. En Mac, `instalar-ai-profit.command` deja en el Escritorio `AI Profit.command` (enlace zsh; no es una app y no pide Rosetta). Abre `http://localhost:8787/Granja-de-Cuentas-v2.html`. No envía órdenes. Los pasos de abajo siguen siendo la forma manual.
 
 1. **TradingView con CDP.** Cerrar TradingView del todo (todos los procesos `TradingView`) y ejecutar `abrir-tradingview.bat` (o **AI Profit**). Comprobar que 9222 escucha: `Get-NetTCPConnection -LocalPort 9222 -State Listen` o `http://127.0.0.1:9222/json/version`. Tarda unos 3 s. El panel de trading necesita unos 10 s más antes de que se puedan leer las cuentas.
 2. **Servidor.** Lanzarlo oculto, como hacen los agentes: `cmd /c node-win\node.exe tradinglink.mjs >> tradinglink.log 2>&1` desde la carpeta (`Start-Process -WindowStyle Hidden`). Otra opción es `iniciar-tradinglink.bat`.

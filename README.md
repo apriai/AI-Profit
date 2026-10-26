@@ -135,9 +135,10 @@ AI-Profit/
 ├── strategies.mjs              Registro de estrategias
 ├── negocio.mjs                 Copia del historial del Negocio (negocio.json)
 ├── probe.mjs · busy.mjs        Herramientas de lectura (¿está libre la cuenta?)
-├── Abrir Granja.command        Mac: TradingView 9222 + servidor + Granja
+├── AI Profit.command           Mac: zsh, TradingView 9222 + servidor + Granja
+├── Abrir Granja.command        Mac: abre "AI Profit.command" (nombre anterior)
 ├── Abrir Granja.bat            Windows: lo mismo, en un doble clic
-├── instalar-ai-profit.command  Mac: crea el acceso de Escritorio AI Profit
+├── instalar-ai-profit.command  Mac: enlace de Escritorio AI Profit.command (sin app)
 ├── instalar-ai-profit.bat/.ps1 Windows: crea el acceso de Escritorio AI Profit
 ├── abrir-tradingview.bat       Solo TradingView Desktop con el puerto 9222
 ├── iniciar-tradinglink.bat     Solo el servidor y la granja
@@ -169,7 +170,7 @@ Los archivos personales de cada PC (`accounts.json`, `sod.json`, `negocio.json`,
 
 El icono se llama **AI Profit** y el dibujo vive en el repositorio: `assets/abrir-granja-icon.png` (también `assets/abrir-granja-icon.icns` y `assets/abrir-granja-icon.ico`).
 
-- **Mac:** doble clic en `instalar-ai-profit.command`. Crea `AI Profit` en el Escritorio.
+- **Mac:** doble clic en `instalar-ai-profit.command`. Crea en el Escritorio `AI Profit.command` (enlace zsh al lanzador de esta carpeta, con el icono `.icns`). No crea una app y no pide Rosetta.
 - **Windows:** doble clic en `instalar-ai-profit.bat`. Crea el acceso `AI Profit` en el Escritorio.
 
 Después, cada día, un doble clic en **AI Profit** abre TradingView con el puerto 9222, enciende el servidor si hace falta y abre la Granja en Chrome (`http://localhost:8787/Granja-de-Cuentas-v2.html`). No envía órdenes. Si mueves la carpeta, vuelve a ejecutar el instalador. Para cambiar el dibujo, sustituye el PNG y ejecuta el instalador otra vez. Más detalle en [`AI-PROFIT-ACCESO.md`](AI-PROFIT-ACCESO.md).
@@ -178,7 +179,7 @@ Después, cada día, un doble clic en **AI Profit** abre TradingView con el puer
 
 Doble clic en **AI Profit** en el Escritorio.
 
-Sin ese acceso, en Windows: `abrir-tradingview.bat` y luego `iniciar-tradinglink.bat`. En Mac: `Abrir Granja.command`.
+Sin ese acceso, en Windows: `abrir-tradingview.bat` y luego `iniciar-tradinglink.bat`. En Mac: `AI Profit.command`.
 
 Comprueba `http://localhost:8787/api/colchon/conexion`: `tradingview` y `tradovate` deben salir conectados y `broker` verdadero.
 
