@@ -13,6 +13,10 @@ colchon-fuente.json
 colchon-eventos.jsonl
 pausa-lectura.flag
 historial/
+# Copia del historial del Negocio (personal, nunca se sube)
+negocio.json
+negocio.json.tmp-*
+backups-negocio/
 reportes/
 backups/
 # Registros

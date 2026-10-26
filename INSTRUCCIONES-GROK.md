@@ -52,6 +52,12 @@ Solo funciona la versión abierta con `abrir-tradingview.bat` (puerto 9222). Si 
 ## Cómo seguir recibiendo actualizaciones
 Cada vez que Bänéd avise que hay una versión nueva: repite los pasos 2, 3 y 5. Si hay cambios que tú quieras proponer, hazlos en la rama `caroline` y abre un pull request.
 
+## Cambios importantes (26 oct 2026)
+- **Historial del Negocio:** ahora se guarda también en `negocio.json`, junto al servidor (lo escribe `negocio.mjs`, que `tradinglink.mjs` importa: no lo borres). Hace una copia diaria en `backups-negocio/` (las últimas 30). Es personal: **nunca lo subas a GitHub** (está en `.gitignore`). Actualizar o reemplazar archivos nunca debe borrar `negocio.json` ni `backups-negocio/`.
+- **Cuentas viejas:** al arrancar, el servidor ya no resucita las cuentas de evaluación antiguas guardadas en `sod.json`. Cuando TradingView ya no lista una cuenta (no fondeada), se marca con `gone` en `sod.json` y no se siembra más; si vuelve a aparecer, se quita la marca. Las cuentas fondeadas (LFF) **nunca** se marcan `gone`, a propósito, para que la lógica de cuenta quemada siga funcionando.
+- **Error de la página:** se corrigió un fallo (`glow` indefinido) que rompía la página con los árboles de flores de voxels.
+- **Actualizar:** `actualizar.ps1` solo copia archivos que están en el repositorio y no debe tocar `negocio.json`, `sod.json`, `accounts.json`, `metas.json` ni `logros.json`.
+
 ## Si algo falla
 - "repository not found": falta aceptar la invitación o iniciar sesión con `karocerquera`.
 - La granja no abre: el servidor está apagado; usa `iniciar-tradinglink.bat`.
