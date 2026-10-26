@@ -355,7 +355,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
           setSrc('broker-lectura', pos.brokerPl, now); if (pos.chart && pos.chart.pnl != null) { S.chartPx = pos.chart.price; setSrc('grafica', pnlAt(pos.chart.price) ?? pos.chart.pnl, now); }
           if (now - lastLect >= 1000) { lastLect = now; ev('lectura', { brokerPl: pos.brokerPl ?? null, chartPl: pos.chart ? pos.chart.pnl : null, stop: sl, stopId: pos.stopId ?? null }); }
           const allowK = FZ.modo === 'grafica' ? ['grafica', 'bidask'] : FZ.modo === 'broker' ? ['broker-evento', 'broker-lectura'] : ['broker-evento', 'broker-lectura', 'grafica', 'bidask'];
-          const trig = (c.steps[st.step ?? 0] || c.steps[c.steps.length - 1] || { triggerUsd: 100 }).triggerUsd, lim = 20 * Math.max(Math.abs(trig), Math.abs((c.P && c.P.SL_USD) || 0), Math.abs((c.P && c.P.TP_USD) || 0), 1), okK = [];
+          const trig = (c.steps[st.step ?? 0] || c.steps[c.steps.length - 1] || { triggerUsd: 100 }).triggerUsd, lim = 2 * Math.max(Math.abs(trig), Math.abs((c.P && c.P.SL_USD) || 0), Math.abs((c.P && c.P.TP_USD) || 0), 1), okK = [];
           for (const k of allowK) { const x = SRC[k]; if (!x || x.v == null || now - x.readAt > FZ.frescoMs) continue; if (!isFinite(x.v) || Math.abs(x.v) > lim) { if (!x.badLogged || x.badLogged !== x.v) { x.badLogged = x.v; ev('anomalia', { kind: 'pnl_imposible', fuente: k, valor: x.v, limiteUSD: lim }); } continue; } okK.push(k); }
           okK.sort((a, b) => (SRC[b].v - SRC[a].v) || (SRC[b].changedAt - SRC[a].changedAt));
           const nl = okK[0] || null; if (nl !== lead) { ev('fuente_lider', { de: lead, a: nl, v: nl ? SRC[nl].v : null }); lead = nl; } if (nl) leadN[nl] = (leadN[nl] || 0) + 1;

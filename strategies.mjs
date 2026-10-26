@@ -6,13 +6,13 @@ export const STRATEGIES = {
     id: 'evaluacion-simple', name: 'Evaluación',
     short: "Operación: SL −$630 / TP +$630\nAI: el stop no se mueve",
     description: "Operación: entra a mercado con SL −$630 y TP +$630. AI: el stop no se mueve; termina en TP, en SL o si la cierras tú.",
-    params: { SL_USD: 630, TP_USD: 630, STEPS: [] },
+    params: { SL_USD: 630, TP_USD: 630, STEPS: [], DEFAULT_QTY: { MNQ: 5, NQ: 1 } },
   },
   'evaluacion': {
     id: 'evaluacion', name: 'Evaluación con trailing',
     short: "Operación: SL −$630 / TP +$630\n+$200 → protege $0 (entrada)\n+$300 → protege $100\n+$500 → protege $200",
     description: "Operación: entra a mercado con SL −$630 y TP +$630. AI: +$200 → el stop sube a la entrada (sin pérdida); +$300 → protege $100; +$500 → protege $200. Solo sube, nunca baja.",
-    params: { SL_USD: 630, TP_USD: 630, STEPS: [{ trigger: 200, lock: 0 }, { trigger: 300, lock: 100 }, { trigger: 500, lock: 200 }] },
+    params: { SL_USD: 630, TP_USD: 630, STEPS: [{ trigger: 200, lock: 0 }, { trigger: 300, lock: 100 }, { trigger: 500, lock: 200 }], DEFAULT_QTY: { MNQ: 5, NQ: 1 } },
   },
   'dia-minimo-colchon': {
     id: 'dia-minimo-colchon', name: 'Día mínimo + colchón',
