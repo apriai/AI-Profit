@@ -16,7 +16,7 @@
 
 **Prop Farm** es una aplicación web local que gestiona una *granja* de cuentas de evaluación de firmas de fondeo (Lucid, Tradovate) y trae un **motor de ejecución** que habla con TradingView Desktop y con Tradovate para abrir, ajustar y vigilar órdenes de **MNQ / NQ**.
 
-Todo corre en tu propia PC con Windows. La página se sirve en `http://localhost:8787`, los datos de las cuentas se quedan en tu carpeta y este repositorio **no contiene** saldos, cuentas, historial ni claves.
+Todo corre en tu propia PC (Windows, o Mac en el caso de Caroline). La página se sirve en `http://localhost:8787`, los datos de las cuentas se quedan en tu carpeta y este repositorio **no contiene** saldos, cuentas, historial ni claves.
 
 > **Quién la usa:** el equipo de Ai Profit Camp (Bänéd y Caroline), cada uno en su PC, y los agentes (Grok) que los ayudan. Las reglas para los agentes están en [`AGENTS.md`](AGENTS.md).
 
@@ -135,8 +135,13 @@ AI-Profit/
 ├── strategies.mjs              Registro de estrategias
 ├── negocio.mjs                 Copia del historial del Negocio (negocio.json)
 ├── probe.mjs · busy.mjs        Herramientas de lectura (¿está libre la cuenta?)
-├── abrir-tradingview.bat       Abre TradingView Desktop con el puerto 9222
-├── iniciar-tradinglink.bat     Arranca el servidor y abre la granja
+├── Abrir Granja.command        Mac: TradingView 9222 + servidor + Granja
+├── Abrir Granja.bat            Windows: lo mismo, en un doble clic
+├── instalar-ai-profit.command  Mac: crea el acceso de Escritorio AI Profit
+├── instalar-ai-profit.bat/.ps1 Windows: crea el acceso de Escritorio AI Profit
+├── abrir-tradingview.bat       Solo TradingView Desktop con el puerto 9222
+├── iniciar-tradinglink.bat     Solo el servidor y la granja
+├── AI-PROFIT-ACCESO.md         Cómo instalar el icono del Escritorio
 ├── actualizar.bat / .ps1       Actualización segura desde este repositorio
 ├── colchon-src/                Fuentes de la UI del motor y pruebas simuladas
 ├── tradingview-mcp/            Herramientas de apoyo para TradingView
@@ -156,18 +161,28 @@ Los archivos personales de cada PC (`accounts.json`, `sod.json`, `negocio.json`,
 
 ### Requisitos
 
-- Windows 10 u 11.
-- **TradingView Desktop** (Microsoft Store) con la cuenta de Tradovate conectada.
-- **Node.js 18 o superior.** Se recomienda la versión portátil: `node.exe` dentro de `node-win\`, sin instalar nada en el sistema.
+- Windows 10 u 11, o Mac.
+- **TradingView Desktop** con la cuenta de Tradovate conectada.
+- **Node.js 18 o superior.** En Windows, `node.exe` dentro de `node-win\`. En Mac, el Node portable `node/bin/node`.
+
+### Acceso de Escritorio «AI Profit» (una vez)
+
+El icono se llama **AI Profit** y el dibujo vive en el repositorio: `assets/abrir-granja-icon.png` (también `assets/abrir-granja-icon.icns` y `assets/abrir-granja-icon.ico`).
+
+- **Mac:** doble clic en `instalar-ai-profit.command`. Crea `AI Profit` en el Escritorio.
+- **Windows:** doble clic en `instalar-ai-profit.bat`. Crea el acceso `AI Profit` en el Escritorio.
+
+Después, cada día, un doble clic en **AI Profit** abre TradingView con el puerto 9222, enciende el servidor si hace falta y abre la Granja en Chrome (`http://localhost:8787/Granja-de-Cuentas-v2.html`). No envía órdenes. Si mueves la carpeta, vuelve a ejecutar el instalador. Para cambiar el dibujo, sustituye el PNG y ejecuta el instalador otra vez. Más detalle en [`AI-PROFIT-ACCESO.md`](AI-PROFIT-ACCESO.md).
 
 ### Arranque diario
 
-1. Cierra TradingView por completo.
-2. Doble clic en `abrir-tradingview.bat` (abre TradingView con el puerto de depuración 9222). Solo funciona la versión abierta así.
-3. Doble clic en `iniciar-tradinglink.bat`. Se abre la granja en `http://localhost:8787`.
-4. Comprueba `http://localhost:8787/api/colchon/conexion`: `tradingview` y `tradovate` deben salir conectados y `broker` verdadero.
+Doble clic en **AI Profit** en el Escritorio.
 
-> El servidor **no arranca solo** al reiniciar la PC. Hay que lanzarlo a mano.
+Sin ese acceso, en Windows: `abrir-tradingview.bat` y luego `iniciar-tradinglink.bat`. En Mac: `Abrir Granja.command`.
+
+Comprueba `http://localhost:8787/api/colchon/conexion`: `tradingview` y `tradovate` deben salir conectados y `broker` verdadero.
+
+> El servidor **no arranca solo** al reiniciar la PC. Hay que lanzarlo con **AI Profit**.
 
 ### Actualizar (Caroline y agentes)
 

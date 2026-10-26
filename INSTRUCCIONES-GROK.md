@@ -39,10 +39,10 @@ Doble clic en `actualizar.bat`.
 ## Paso 5: reiniciar el servidor (solo sin operaciones)
 1. Confirma sin posición y sin órdenes.
 2. Cierra la ventana de `tradinglink.mjs`.
-3. Abre `iniciar-tradinglink.bat` (o el acceso directo "Prop Farm").
+3. Abre el acceso **AI Profit** del Escritorio (o `Abrir Granja.bat` / `iniciar-tradinglink.bat`). Si todavía no existe el icono, una vez: `instalar-ai-profit.bat` en Windows o `instalar-ai-profit.command` en Mac.
 
 ## Paso 6: TradingView
-Solo funciona la versión abierta con `abrir-tradingview.bat` (puerto 9222). Si la granja dice "no conectado a TradingView/Tradovate", cierra TradingView y ábrelo con ese archivo.
+Solo funciona la versión abierta con el puerto 9222. El acceso **AI Profit** (o `Abrir Granja.bat` / `abrir-tradingview.bat`) lo abre así. Si la granja dice "no conectado a TradingView/Tradovate", ciérralo y ábrelo con ese acceso.
 
 ## Paso 7: verificación
 - `http://localhost:8787/api/colchon/conexion` debe mostrar `tradingview` y `tradovate` conectados y `broker` verdadero.
@@ -60,6 +60,6 @@ Cada vez que Bänéd avise que hay una versión nueva: repite los pasos 2, 3 y 5
 
 ## Si algo falla
 - "repository not found": falta aceptar la invitación o iniciar sesión con `karocerquera`.
-- La granja no abre: el servidor está apagado; usa `iniciar-tradinglink.bat`.
-- No se conecta a TradingView: reábrelo con `abrir-tradingview.bat`.
+- La granja no abre: el servidor está apagado; usa el acceso **AI Profit** o `iniciar-tradinglink.bat`.
+- No se conecta a TradingView: ábrelo con el acceso **AI Profit** o con `abrir-tradingview.bat`.
 - Cualquier otra cosa: no improvises; copia el error exacto y avísale a Caroline y a Bänéd.

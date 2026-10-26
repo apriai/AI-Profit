@@ -21,7 +21,9 @@ Carpeta: `C:\Users\<usuario>\OneDrive\Escritorio\TradingLink` en HERO.
 | `Granja-de-Cuentas-v2.html` | La página «granja». Lleva un único bloque `<script>/* Prueba colch…` con la UI del colchón (la fuente está en `colchon-src\colchon-ui.html`). El pill del agente (`#botToggle`) abre/cierra siempre el panel `#prCard` (fase «choose»); clic en el agente = solo selector de color. Ya no existen el botón «Prueba» (`#prBtn`) ni el panel antiguo «TradingLink Simulation» (`#tlPanel`). |
 | `colchon-src\` | Fuentes de la UI y pruebas (`test-mock.mjs`). Su `colchon.mjs` es viejo: el bueno es el de la raíz. |
 | `node-win\node.exe` | Node portable v22. No hay Node instalado en el sistema. |
-| `abrir-tradingview.bat` | Abre TradingView Desktop (Store) con `--remote-debugging-port=9222`. |
+| `Abrir Granja.bat` / `Abrir Granja.command` | Un clic: TradingView en 9222, servidor y `Granja-de-Cuentas-v2.html`. No envía órdenes. |
+| `instalar-ai-profit.bat` / `.command` | Crea el acceso de Escritorio **AI Profit** con `assets/abrir-granja-icon.png`. |
+| `abrir-tradingview.bat` | Solo abre TradingView Desktop (Store) con `--remote-debugging-port=9222`. |
 | `iniciar-tradinglink.bat` | Arranca el servidor en una ventana visible y abre el navegador. |
 | `real-allowlist.json` | Lista de cuentas reales permitidas (sección 10). |
 | `colchon-fuente.json` | Fuente de P&L: `{"modo":"broker"}` (actual), `"mas-rapido"` o `"grafica"`. Se lee al iniciar cada trade, así que no hace falta reiniciar. |
@@ -30,7 +32,9 @@ Carpeta: `C:\Users\<usuario>\OneDrive\Escritorio\TradingLink` en HERO.
 | `colchon.log`, `colchon-eventos.jsonl`, `colchon-latencia.log`, `colchon-resumen.json`, `tradinglink.log`, `reportes\` | Logs, eventos e informes (sección 12). |
 
 ## 3. Arranque
-1. **TradingView con CDP.** Cerrar TradingView del todo (todos los procesos `TradingView`) y ejecutar `abrir-tradingview.bat`. Comprobar que 9222 escucha: `Get-NetTCPConnection -LocalPort 9222 -State Listen` o `http://127.0.0.1:9222/json/version`. Tarda unos 3 s. El panel de trading necesita unos 10 s más antes de que se puedan leer las cuentas.
+El arranque de un clic es el acceso **AI Profit** (`instalar-ai-profit.bat` en Windows, `instalar-ai-profit.command` en Mac). Hace los pasos 1 y 2 y abre `http://localhost:8787/Granja-de-Cuentas-v2.html`. No envía órdenes. Los pasos de abajo siguen siendo la forma manual.
+
+1. **TradingView con CDP.** Cerrar TradingView del todo (todos los procesos `TradingView`) y ejecutar `abrir-tradingview.bat` (o **AI Profit**). Comprobar que 9222 escucha: `Get-NetTCPConnection -LocalPort 9222 -State Listen` o `http://127.0.0.1:9222/json/version`. Tarda unos 3 s. El panel de trading necesita unos 10 s más antes de que se puedan leer las cuentas.
 2. **Servidor.** Lanzarlo oculto, como hacen los agentes: `cmd /c node-win\node.exe tradinglink.mjs >> tradinglink.log 2>&1` desde la carpeta (`Start-Process -WindowStyle Hidden`). Otra opción es `iniciar-tradinglink.bat`.
 3. **Comprobar.** `GET /api/colchon/status` debe dar `state` igual a `idle` y `GET /Granja-de-Cuentas-v2.html` debe dar 200.
 4. **Reinicio.** Matar los `node.exe` cuya línea de comandos contenga `tradinglink` y volver al paso 2. Antes, verificar el estado libre: `node-win\node.exe %TEMP%\busy.mjs` usa `readAccounts({all:false})` y devuelve `{busy, live, current}`. Solo se reinicia con `busy:false`.
@@ -129,7 +133,7 @@ Parámetros comunes: `SL_USD`, `TP_USD` (bracket en $), `STEPS` (escalones `{tri
 - El cierre de las 4:45 PM se aplica también a las cuentas reales.
 
 ## 11. Pitfalls conocidos
-- **TradingView abierto desde la barra de tareas o el menú Inicio arranca SIN 9222.** El motor y las lecturas fallan con `ECONNREFUSED 127.0.0.1:9222`. Solución: cerrar todos los procesos de TradingView y usar `abrir-tradingview.bat`.
+- **TradingView abierto desde la barra de tareas o el menú Inicio arranca SIN 9222.** El motor y las lecturas fallan con `ECONNREFUSED 127.0.0.1:9222`. Solución: cerrar todos los procesos de TradingView y usar el acceso **AI Profit** o `abrir-tradingview.bat`.
 - **El servidor no arranca solo después de reiniciar el PC.** Hay que lanzarlo a mano (sección 3).
 - **`DRY_RUN` solo afecta a `/order` y `/confirm`** (órdenes manuales). **No afecta al motor colchón:** el motor opera de verdad en la cuenta que pase el check.
 - Una orden a mercado puede llenarse unos ticks peor que la referencia. El 23-oct fueron 2 pts; por eso existe el ajuste al fill.

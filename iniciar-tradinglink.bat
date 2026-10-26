@@ -1,4 +1,5 @@
 @echo off
+rem Solo el servidor. Para un clic (TradingView + servidor + granja) usa Abrir Granja.bat o el acceso AI Profit.
 cd /d "%~dp0"
 if exist "%~dp0node-win\node.exe" set "PATH=%~dp0node-win;%PATH%"
 where node >nul 2>nul
@@ -7,6 +8,6 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-start "" http://localhost:8787
+start "" http://localhost:8787/Granja-de-Cuentas-v2.html
 node tradinglink.mjs
 pause
