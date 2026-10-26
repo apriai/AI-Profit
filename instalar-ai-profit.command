@@ -1,8 +1,11 @@
 #!/bin/zsh
-# Crea en el Escritorio el enlace "AI Profit.command" al lanzador de esta carpeta.
-# Le pone el icono assets/abrir-granja-icon.icns con NSWorkspace (JavaScript).
-# No crea una app y no pide Rosetta. No llama al intérprete del sistema.
-# No abre TradingView y no envía órdenes.
+# Crea en el Escritorio el applet "AI Profit.app".
+# osacompile deja un ejecutable universal (arm64 + x86_64). No es un script
+# de shell dentro del bundle, así que en Apple Silicon no pide Rosetta.
+# El applet solo abre "AI Profit.command" de esta carpeta (ahí está el arranque).
+# El dibujo es assets/abrir-granja-icon.icns (applet.icns y AppIcon.icns)
+# y NSWorkspace lo confirma con el PNG.
+# No abre herramientas de desarrollador. No abre TradingView ni envía órdenes.
 
 fail() {
   echo ""
@@ -26,39 +29,65 @@ fi
 
 LAUNCHER="$SCRIPT_DIR/AI Profit.command"
 [[ -f "$LAUNCHER" ]] || fail "falta AI Profit.command"
+[[ -f "$SCRIPT_DIR/assets/abrir-granja-icon.icns" ]] || fail "falta assets/abrir-granja-icon.icns"
+command -v osacompile >/dev/null 2>&1 || fail "no encuentro osacompile. Viene con macOS; no hace falta Xcode."
+command -v plutil >/dev/null 2>&1 || fail "no encuentro plutil."
+command -v osascript >/dev/null 2>&1 || fail "no encuentro osascript."
+
 chmod +x "$LAUNCHER" "$SCRIPT_DIR/instalar-ai-profit.command" "$SCRIPT_DIR/Abrir Granja.command" 2>/dev/null || true
 if command -v xattr >/dev/null 2>&1; then
   xattr -d com.apple.quarantine "$LAUNCHER" >/dev/null 2>&1 || true
   xattr -d com.apple.quarantine "$SCRIPT_DIR/instalar-ai-profit.command" >/dev/null 2>&1 || true
 fi
 
-ICON="$SCRIPT_DIR/assets/abrir-granja-icon.icns"
-if [[ ! -f "$ICON" && -f "$SCRIPT_DIR/assets/abrir-granja-icon.png" ]]; then
-  ICON="$SCRIPT_DIR/assets/abrir-granja-icon.png"
-fi
-
 DESKTOP=""
-if command -v osascript >/dev/null 2>&1; then
-  DESKTOP="$(osascript -e 'POSIX path of (path to desktop folder)' 2>/dev/null | tr -d '\r')"
-  DESKTOP="${DESKTOP%/}"
-fi
+DESKTOP="$(osascript -e 'POSIX path of (path to desktop folder)' 2>/dev/null | tr -d '\r')"
+DESKTOP="${DESKTOP%/}"
 if [[ -z "$DESKTOP" || ! -d "$DESKTOP" ]]; then
   DESKTOP="$HOME/Desktop"
 fi
 mkdir -p "$DESKTOP" || fail "no puedo usar el Escritorio ($DESKTOP)."
 
-# Una prueba anterior dejó una app que en Apple Silicon pide Rosetta. Se quita.
-if [[ -e "$DESKTOP/AI Profit.app" ]]; then
-  rm -rf "$DESKTOP/AI Profit.app"
-  echo "Quité AI Profit.app del Escritorio (en Apple Silicon pedía instalar Rosetta)."
+# El enlace o la copia .command del instalador anterior no muestra el dibujo.
+OLD_CMD="$DESKTOP/AI Profit.command"
+if [[ -L "$OLD_CMD" || -f "$OLD_CMD" ]]; then
+  rm -f "$OLD_CMD"
+  echo "Quité AI Profit.command del Escritorio (Finder lo dejaba con el icono genérico de terminal)."
 fi
 
-LINK="$DESKTOP/AI Profit.command"
-ln -sfn "$LAUNCHER" "$LINK" || fail "no pude crear el enlace en el Escritorio."
+APP="$DESKTOP/AI Profit.app"
+rm -rf "$APP"
+
+# AppleScript: quoted form of protege espacios. El texto va entre comillas de AppleScript.
+launcher_as="${LAUNCHER//\\/\\\\}"
+launcher_as="${launcher_as//\"/\\\"}"
+src="$(mktemp "${TMPDIR:-/tmp}/ai-profit-applet.XXXXXX")"
+cat >"$src" <<EOF
+-- Generado por instalar-ai-profit.command. No envía órdenes.
+on run
+  do shell script "open " & quoted form of "$launcher_as"
+end run
+EOF
+
+osacompile -o "$APP" "$src" || { rm -f "$src"; fail "osacompile no pudo crear AI Profit.app"; }
+rm -f "$src"
+
+[[ -d "$APP/Contents/Resources" ]] || fail "el applet no tiene Contents/Resources."
+[[ -f "$APP/Contents/MacOS/applet" ]] || fail "el applet no tiene el ejecutable universal Contents/MacOS/applet."
+
+cp "$SCRIPT_DIR/assets/abrir-granja-icon.icns" "$APP/Contents/Resources/applet.icns" || fail "no pude copiar applet.icns"
+cp "$SCRIPT_DIR/assets/abrir-granja-icon.icns" "$APP/Contents/Resources/AppIcon.icns" || fail "no pude copiar AppIcon.icns"
+
+plist="$APP/Contents/Info.plist"
+plutil -replace CFBundleName -string "AI Profit" "$plist" 2>/dev/null || plutil -insert CFBundleName -string "AI Profit" "$plist" || fail "no pude poner el nombre del applet"
+plutil -replace CFBundleDisplayName -string "AI Profit" "$plist" 2>/dev/null || plutil -insert CFBundleDisplayName -string "AI Profit" "$plist" || fail "no pude poner CFBundleDisplayName"
+plutil -replace CFBundleIconFile -string "applet" "$plist" 2>/dev/null || plutil -insert CFBundleIconFile -string "applet" "$plist" || true
+
 if command -v xattr >/dev/null 2>&1; then
-  xattr -d com.apple.quarantine "$LINK" >/dev/null 2>&1 || true
+  xattr -dr com.apple.quarantine "$APP" >/dev/null 2>&1 || true
 fi
 
+PNG="$SCRIPT_DIR/assets/abrir-granja-icon.png"
 set_icon() {
   local result
   result="$(osascript -l JavaScript - "$1" "$2" <<'JS'
@@ -75,22 +104,22 @@ JS
 }
 
 echo ""
-if [[ -f "$ICON" ]] && command -v osascript >/dev/null 2>&1; then
-  if set_icon "$ICON" "$LAUNCHER"; then
-    echo "Icono aplicado desde $ICON"
+if [[ -f "$PNG" ]]; then
+  if set_icon "$PNG" "$APP"; then
+    echo "Icono aplicado desde el PNG y desde assets/abrir-granja-icon.icns"
   else
-    echo "El enlace quedó creado, pero no pude aplicar el icono."
-    echo "Comprueba que existe assets/abrir-granja-icon.icns y vuelve a ejecutar este instalador."
+    echo "El applet quedó creado con el .icns, pero NSWorkspace no pudo confirmar el PNG."
   fi
 else
-  echo "No encontré assets/abrir-granja-icon.icns. El enlace quedó sin icono propio."
+  echo "Icono del applet: assets/abrir-granja-icon.icns (no está el PNG para NSWorkspace)."
 fi
 
+touch "$APP"
 echo ""
-echo "Listo. En el Escritorio quedó AI Profit.command"
-echo "Es un enlace a esta carpeta, no una app. No pide Rosetta."
+echo "Listo. En el Escritorio quedó AI Profit."
+echo "Es un applet de AppleScript (arm64 nativo). No pide Rosetta."
 echo "Un doble clic abre TradingView (puerto 9222), el servidor y la Granja en Chrome."
 echo "No envía órdenes."
 echo "Carpeta: $SCRIPT_DIR"
 echo "Si mueves la carpeta de TradingLink, vuelve a ejecutar este instalador."
-echo "Para cambiar el dibujo, sustituye assets/abrir-granja-icon.icns y ejecútalo otra vez."
+echo "Para cambiar el dibujo, sustituye assets/abrir-granja-icon.icns y el PNG, y ejecútalo otra vez."

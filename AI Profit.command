@@ -1,8 +1,8 @@
 #!/bin/zsh
 # Abre TradingView (puerto 9222) + el servidor TradingLink + la Granja en Chrome.
 # No envía órdenes y no hace clic dentro de TradingView.
-# No es una app: es un script de zsh, nativo en Apple Silicon, sin Rosetta.
-# La carpeta es la de este archivo (también si el Escritorio es un enlace).
+# Lanzador zsh. El icono del Escritorio es el applet "AI Profit.app"
+# (osacompile); ese applet abre este archivo. La carpeta es la de este archivo.
 # Si ahí no está el servidor, se prueba ~/Documents/Grok Bot/TradingLink.
 
 fail() {

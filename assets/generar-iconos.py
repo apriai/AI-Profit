@@ -8,7 +8,7 @@ Fuente, en este orden:
 
 Los instaladores del cliente no ejecutan este script (en Mac, python3
 puede ser el aviso de las Command Line Tools).
-  Mac:     instalar-ai-profit.command aplica assets/abrir-granja-icon.icns
+  Mac:     instalar-ai-profit.command copia el .icns al applet (no ejecuta este script)
   Windows: instalar-ai-profit.bat genera el .ico con System.Drawing si puede,
            y si no usa el .ico que ya está en el repositorio.
 

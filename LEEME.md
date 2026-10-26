@@ -11,15 +11,15 @@ Las ordenes estan en MODO SIMULACION (DRY_RUN = true): nunca se coloca una orden
 
 ## Uso
 1. Una sola vez: doble clic en `instalar-ai-profit.bat` (Mac: `instalar-ai-profit.command`).
-   En Windows crea el acceso **AI Profit**. En Mac crea **AI Profit.command**
-   (enlace zsh, sin app y sin Rosetta), con el icono `assets/abrir-granja-icon.icns`.
-2. Cada dia: doble clic en **AI Profit** (en Mac, `AI Profit.command`).
+   En Windows crea el acceso **AI Profit**. En Mac crea el applet **AI Profit**
+   (icono de `assets/abrir-granja-icon.icns`, sin Rosetta).
+2. Cada dia: doble clic en **AI Profit**.
    Abre TradingView con el puerto 9222, enciende el servidor y abre la Granja
    en http://localhost:8787/Granja-de-Cuentas-v2.html. No envia ordenes.
 3. En TradingView abre el panel de cuentas (Account Manager) y dejalo visible.
 
 Sin el acceso del Escritorio, en Windows: `abrir-tradingview.bat` y luego `iniciar-tradinglink.bat`.
-En Mac: `AI Profit.command`. Detalle en `AI-PROFIT-ACCESO.md`.
+En Mac, sin el applet: `AI Profit.command`. Detalle en `AI-PROFIT-ACCESO.md`.
 
 ## Estrategia (ordenes, en simulacion)
 - 1 trade por dia por cuenta, siempre bracket.

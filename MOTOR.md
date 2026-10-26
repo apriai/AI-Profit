@@ -23,7 +23,7 @@ Carpeta: `C:\Users\<usuario>\OneDrive\Escritorio\TradingLink` en HERO.
 | `node-win\node.exe` | Node portable v22. No hay Node instalado en el sistema. |
 | `AI Profit.command` | Mac (zsh, sin app ni Rosetta): TradingView en 9222, servidor y `Granja-de-Cuentas-v2.html`. No envía órdenes. |
 | `Abrir Granja.bat` | Windows: lo mismo, en un doble clic. |
-| `instalar-ai-profit.command` | Mac: enlace de Escritorio `AI Profit.command` con `assets/abrir-granja-icon.icns`. |
+| `instalar-ai-profit.command` | Mac: applet de Escritorio **AI Profit** (`osacompile`, icono `.icns`, sin Rosetta). Abre `AI Profit.command`. |
 | `instalar-ai-profit.bat` | Windows: acceso de Escritorio **AI Profit** con el `.ico`. |
 | `abrir-tradingview.bat` | Solo abre TradingView Desktop (Store) con `--remote-debugging-port=9222`. |
 | `iniciar-tradinglink.bat` | Arranca el servidor en una ventana visible y abre el navegador. |
@@ -34,7 +34,7 @@ Carpeta: `C:\Users\<usuario>\OneDrive\Escritorio\TradingLink` en HERO.
 | `colchon.log`, `colchon-eventos.jsonl`, `colchon-latencia.log`, `colchon-resumen.json`, `tradinglink.log`, `reportes\` | Logs, eventos e informes (sección 12). |
 
 ## 3. Arranque
-El arranque de un clic es el acceso **AI Profit**. En Windows lo crea `instalar-ai-profit.bat`. En Mac, `instalar-ai-profit.command` deja en el Escritorio `AI Profit.command` (enlace zsh; no es una app y no pide Rosetta). Abre `http://localhost:8787/Granja-de-Cuentas-v2.html`. No envía órdenes. Los pasos de abajo siguen siendo la forma manual.
+El arranque de un clic es el acceso **AI Profit**. En Windows lo crea `instalar-ai-profit.bat`. En Mac, `instalar-ai-profit.command` deja en el Escritorio el applet **AI Profit** (binario universal de `osacompile`, no un script de shell, sin Rosetta) y abre `http://localhost:8787/Granja-de-Cuentas-v2.html`. No envía órdenes. Los pasos de abajo siguen siendo la forma manual.
 
 1. **TradingView con CDP.** Cerrar TradingView del todo (todos los procesos `TradingView`) y ejecutar `abrir-tradingview.bat` (o **AI Profit**). Comprobar que 9222 escucha: `Get-NetTCPConnection -LocalPort 9222 -State Listen` o `http://127.0.0.1:9222/json/version`. Tarda unos 3 s. El panel de trading necesita unos 10 s más antes de que se puedan leer las cuentas.
 2. **Servidor.** Lanzarlo oculto, como hacen los agentes: `cmd /c node-win\node.exe tradinglink.mjs >> tradinglink.log 2>&1` desde la carpeta (`Start-Process -WindowStyle Hidden`). Otra opción es `iniciar-tradinglink.bat`.
