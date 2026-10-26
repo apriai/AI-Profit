@@ -197,10 +197,22 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
     async stop() { return last.pos ? last.pos.stop : null; },
     async lastPrice() { try { const r = await evaluate(js.lastPrice); return r && typeof r.price === 'number' ? r.price : null; } catch { return null; } },
     async openBracket({ side, symbol, qty, slPts, tpPts }) {
-      const lp = await evaluate(js.lastPrice); if (lp.error) return 'error: ' + lp.error;
+      let lp = await evaluate(js.lastPrice); if (lp.error) return 'error: ' + lp.error;
       const cs = String(lp.symbol).replace(/^.*:/, ''), chartRoot = /^MNQ/.test(cs) ? 'MNQ' : /^NQ/.test(cs) ? 'NQ' : cs;
       if (chartRoot !== symbol) return `error: el chart está en ${lp.symbol}; pon ${symbol}1! en el chart`;
-      const ts = await evaluate(js.tradeSymbol(lp.symbol, lp.front)); if (!ts || ts.error) return 'error: ' + ((ts && ts.error) || 'sin símbolo del bróker');
+      // Tradovate exige contrato fechado; si el chart aún no trae front_contract, reintentar unos segundos
+      if (!lp.front && /\d!$/.test(String(lp.symbol || ''))) {
+        for (let i = 0; i < 8 && !lp.front; i++) {
+          await new Promise(z => setTimeout(z, 250));
+          const again = await evaluate(js.lastPrice);
+          if (again && !again.error) lp = again;
+        }
+      }
+      const ts = await evaluate(js.tradeSymbol(lp.symbol, lp.front));
+      if (!ts || ts.error) {
+        if (!lp.front && /\d!$/.test(String(lp.symbol || ''))) return 'error: Tradovate no acepta el continuo ' + lp.symbol + ' y aún no tengo el contrato fechado (front_contract). Espera 1–2 s con ' + symbol + '1! en el chart e inténtalo de nuevo.';
+        return 'error: ' + ((ts && ts.error) || 'sin símbolo del bróker');
+      }
       const s = side === 'long' ? 1 : -1, px = lp.price;
       const o = { symbol: ts.symbol, side: s, type: 2, qty, stopLoss: roundTick(px - s * slPts), takeProfit: roundTick(px + s * tpPts) };
       const r = await evaluate(js.place(o)); if (r.error) return 'error: ' + r.error;
@@ -343,7 +355,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
           setSrc('broker-lectura', pos.brokerPl, now); if (pos.chart && pos.chart.pnl != null) { S.chartPx = pos.chart.price; setSrc('grafica', pnlAt(pos.chart.price) ?? pos.chart.pnl, now); }
           if (now - lastLect >= 1000) { lastLect = now; ev('lectura', { brokerPl: pos.brokerPl ?? null, chartPl: pos.chart ? pos.chart.pnl : null, stop: sl, stopId: pos.stopId ?? null }); }
           const allowK = FZ.modo === 'grafica' ? ['grafica', 'bidask'] : FZ.modo === 'broker' ? ['broker-evento', 'broker-lectura'] : ['broker-evento', 'broker-lectura', 'grafica', 'bidask'];
-          const trig = (c.steps[st.step ?? 0] || c.steps[c.steps.length - 1] || { triggerUsd: 100 }).triggerUsd, lim = 20 * Math.max(Math.abs(trig), 1), okK = [];
+          const trig = (c.steps[st.step ?? 0] || c.steps[c.steps.length - 1] || { triggerUsd: 100 }).triggerUsd, lim = 20 * Math.max(Math.abs(trig), Math.abs((c.P && c.P.SL_USD) || 0), Math.abs((c.P && c.P.TP_USD) || 0), 1), okK = [];
           for (const k of allowK) { const x = SRC[k]; if (!x || x.v == null || now - x.readAt > FZ.frescoMs) continue; if (!isFinite(x.v) || Math.abs(x.v) > lim) { if (!x.badLogged || x.badLogged !== x.v) { x.badLogged = x.v; ev('anomalia', { kind: 'pnl_imposible', fuente: k, valor: x.v, limiteUSD: lim }); } continue; } okK.push(k); }
           okK.sort((a, b) => (SRC[b].v - SRC[a].v) || (SRC[b].changedAt - SRC[a].changedAt));
           const nl = okK[0] || null; if (nl !== lead) { ev('fuente_lider', { de: lead, a: nl, v: nl ? SRC[nl].v : null }); lead = nl; } if (nl) leadN[nl] = (leadN[nl] || 0) + 1;
@@ -478,7 +490,7 @@ if (process.argv.includes('--selftest')) {
 // ---- Lectura de saldos de TODAS las cuentas por la API interna (sin clics). La usa tradinglink.mjs para la granja.
 // all=false: solo la cuenta activa (sin cambiar nada). all=true: recorre las cuentas con setCurrentAccount y vuelve a la original,
 // solo si no hay posiciones/órdenes abiertas en la cuenta activa.
-export const js_readAccounts = all => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t);if(!ab||!ab.accountsMetainfo)return {error:'no-api'};
+export const js_readAccounts = (all, only = null) => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t);if(!ab||!ab.accountsMetainfo)return {error:'no-api'};
   var sl=function(ms){return new Promise(function(z){setTimeout(z,ms)})},orig=String(tvWv(ab.currentAccount())),l=await ab.accountsMetainfo(),out=[],busy=false,aborted=false;
   // TradingView en primer plano (visible y con foco) = el usuario lo está usando: no se cambia de cuenta
   var fg=function(){try{return document.visibilityState==='visible'&&document.hasFocus()}catch(e){return true}},visible=fg(),vis0=document.visibilityState;
@@ -486,7 +498,7 @@ export const js_readAccounts = all => `(async function(){${PAGE}var t=tvTrading(
   var read=function(a){var m={};try{(ab.accountManagerInfo().summary||[]).forEach(function(s){m[String(s.text).toLowerCase()]=s.wValue?tvWv(s.wValue):null})}catch(e){}
     var n=document.querySelector('[class*=accountName]');return {accountId:String(a.id),name:a.name,type:a.type,balance:m['account balance'],equity:m['equity'],profit:m['profit']!=null?m['profit']:m['unrealized pnl'],shownName:n?n.innerText.trim():null}};
   var cur=l.find(function(a){return String(a.id)===orig});if(cur)out.push(read(cur));
-  if(${all ? 'true' : 'false'}&&!busy&&!visible){for(const a of l){if(String(a.id)===orig)continue;if(fg()){aborted=true;break}ab.setCurrentAccount(String(a.id));var T=performance.now(),ok=false;
+  if(${all ? 'true' : 'false'}&&!busy&&!visible){for(const a of l){if(String(a.id)===orig)continue;if(${only ? 'true' : 'false'}&&!new RegExp(${JSON.stringify(only || '')}).test(a.name))continue;if(fg()){aborted=true;break}ab.setCurrentAccount(String(a.id));var T=performance.now(),ok=false;
       while(performance.now()-T<6000){if(fg()){aborted=true;break}var n=document.querySelector('[class*=accountName]');if(String(tvWv(ab.currentAccount()))===String(a.id)&&n&&n.innerText.trim()===a.name){ok=true;break}await sl(100)}
       if(aborted)break;if(!ok)continue;for(var w=0;w<20&&!fg();w++)await sl(100);var r=read(a);if(r.shownName===a.name&&String(tvWv(ab.currentAccount()))===String(a.id))out.push(r)}
     if(String(tvWv(ab.currentAccount()))!==orig){ab.setCurrentAccount(orig);var T2=performance.now();while(performance.now()-T2<6000&&String(tvWv(ab.currentAccount()))!==orig)await sl(100);await sl(1000)}}
@@ -495,10 +507,10 @@ export const js_readAccounts = all => `(async function(){${PAGE}var t=tvTrading(
 // - con una prueba activa (o arrancando) solo se lee la cuenta activa, sin cambiar nada;
 // - una prueba que arranca espera a que termine una lectura completa en curso antes de tocar la cuenta.
 export const acctGuard = { testActive: false, fullRead: null };
-export async function readAccounts({ all = false, evaluate = null } = {}) {
+export async function readAccounts({ all = false, only = null, evaluate = null } = {}) {
   if (all && acctGuard.testActive) all = false;
   let c = null; const ev = evaluate || (c = await cdpEvaluator()).evaluate;
-  const run = (async () => { try { return await ev(js_readAccounts(all)); } finally { try { c && c.close(); } catch {} } })();
+  const run = (async () => { try { return await ev(js_readAccounts(all, only)); } finally { try { c && c.close(); } catch {} } })();
   if (all) { acctGuard.fullRead = run.catch(() => {}); run.finally(() => { acctGuard.fullRead = null; }).catch(() => {}); }
   const r = await run; if (all) r.full = true; return r;
 }
