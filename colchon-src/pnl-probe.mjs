@@ -1,0 +1,1 @@
+import fs from 'node:fs'; import { cdpEvaluator } from 'file:///C:/Users/USUARIO/OneDrive/Escritorio/TradingLink/colchon.mjs'; const c = await cdpEvaluator(); const r = await c.evaluate(fs.readFileSync('C:/Users/USUARIO/OneDrive/Escritorio/TradingLink/colchon-src/pnl-probe.js','utf8')); console.log(JSON.stringify(r)); c.close();

@@ -1,0 +1,34 @@
+# Seguridad: nada personal ni pesado. Un "git add -A" futuro queda seguro.
+# Datos personales / saldos / cuentas
+accounts.json
+sod.json
+logros.json
+metas.json
+real-allowlist.json
+colchon-*.json
+colchon-*.json*
+colchon-*.jsonl
+colchon-resumen.json
+colchon-fuente.json
+colchon-eventos.jsonl
+pausa-lectura.flag
+historial/
+reportes/
+backups/
+# Registros
+*.log
+# Herramientas portatiles (cada PC tiene las suyas)
+node-win/
+git-portable/
+# Paquetes
+*.zip
+# Secretos
+.env
+.env.*
+*.pem
+*.key
+# Solo para Baned (usa rutas de HERO)
+subir-a-github.bat
+# Basura del sistema
+Thumbs.db
+desktop.ini

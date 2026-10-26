@@ -1,0 +1,182 @@
+// Prueba en el box: página falsa de TradingView (API interna simulada) + controlador real.
+import { readAccounts, createColchon, apiDriver } from 'file:///C:/Users/USUARIO/OneDrive/Escritorio/TradingLink/colchon.mjs';
+import { STRATEGIES } from 'file:///C:/Users/USUARIO/OneDrive/Escritorio/TradingLink/strategies.mjs'; import { lockUsdFor, triggerUsdFor, breakEvenFor } from 'file:///C:/Users/USUARIO/OneDrive/Escritorio/TradingLink/colchon.mjs';
+// Las pruebas 1-20 se escribieron con los parámetros anteriores de «Día mínimo + colchón» ($150 netos, disparo +$10, 20 MNQ por defecto):
+// se fijan aquí para conservar esa cobertura del motor; los valores actuales se comprueban al final (21).
+const DMC = STRATEGIES['dia-minimo-colchon'].params, DMC_NEW = { ...DMC };
+Object.assign(DMC, { NET_USD: 150, TRIGGER_EXTRA_USD: 10 }); delete DMC.DEFAULT_QTY;
+export function fakePage({ acct = 'Paper Trading', broker = 'Paper', symbol = 'CME_MINI:NQ1!', accounts = null, accType = 'demo', reject = null } = {}) {
+  const hist = [];
+  let px = 20000, nid = 1; const orders = [], positions = [];
+  const accs = accounts || [{ id: '1', name: acct, type: accType, title: broker + ' Trading' }]; let cur = accs.find(a => a.name === acct)?.id || accs[0].id;
+  const ab = { _brokerMetainfo: { id: broker, title: broker + ' Trading' },
+    accountManagerInfo: () => ({ summary: [{ text: 'Account Balance', wValue: { value: () => (accs.find(a => a.id === cur).bal ?? 100000) } }, { text: 'Equity', wValue: { value: () => (accs.find(a => a.id === cur).bal ?? 100000) } }, { text: 'Profit', wValue: { value: () => 0 } }] }),
+    currentAccount: () => cur, async accountsMetainfo() { return accs.map(a => ({ ...a })); }, setCurrentAccount(id) { setTimeout(() => { cur = id; }, 30); },
+    async positions() { positions.forEach(p => { p.lastPrice = px; p.pl = (px - p.avgPrice) * p.side * (/MNQ/.test(p.symbol) ? 2 : 20) * p.qty; });
+      for (const p of [...positions]) { const so = orders.find(o => o.type === 3), tp = orders.find(o => o.type === 1); if ((so && (p.side === 1 ? px <= so.stopPrice : px >= so.stopPrice)) || (tp && (p.side === 1 ? px >= tp.limitPrice : px <= tp.limitPrice))) { positions.splice(positions.indexOf(p), 1); orders.length = 0; } } return positions.map(p => ({ ...p, stopLoss: (orders.find(o => o.type === 3) || {}).stopPrice, takeProfit: (orders.find(o => o.type === 1) || {}).limitPrice })); },
+    async editPositionBrackets(id, b) { if (globalThis.__lag) { setTimeout(() => this.editPositionBrackets.call(this, id, b), globalThis.__lag); globalThis.__lag = 0; return true; } const p = positions.find(q => q.id === id); if (!p) return false; const so = orders.find(o => o.type === 3); if (b.stopLoss != null && ((p.side === 1 && b.stopLoss >= px) || (p.side === -1 && b.stopLoss <= px))) return false; if (so) so.stopPrice = b.stopLoss; const ti = orders.findIndex(o => o.type === 1); if (b.takeProfit == null && ti >= 0) orders.splice(ti, 1); else if (ti >= 0) orders[ti].limitPrice = b.takeProfit; },
+    async ordersHistory() { return hist; },
+    async placeOrder(o) { if (reject) { hist.push({ id: 'R' + nid++, symbol: o.symbol, type: 2, side: o.side, qty: o.qty, status: 5, message: { text: reject } }); return {}; } const p = { id: 'P' + nid++, symbol: o.symbol, side: o.side, qty: o.qty, avgPrice: px, lastPrice: px }; positions.push(p);
+      orders.push({ id: 'S' + nid++, parentId: p.id, parentType: 2, symbol: o.symbol, side: -o.side, type: 3, status: 6, qty: o.qty, stopPrice: o.stopLoss }, { id: 'T' + nid++, parentId: p.id, parentType: 2, symbol: o.symbol, side: -o.side, type: 1, status: 6, qty: o.qty, limitPrice: o.takeProfit }); return {}; },
+    async modifyOrder(o) { if (o.parentId != null) { globalThis.__modFail = (globalThis.__modFail || 0) + 1; return false; } const x = orders.find(q => q.id === o.id); if ((o.side === -1 && o.stopPrice >= px) || (o.side === 1 && o.stopPrice <= px)) return false; Object.assign(x, o); return true; },
+    async orderById(id) { return orders.find(q => q.id === id) || null; },
+    async closePosition(id) { positions.splice(positions.findIndex(p => p.id === id), 1); orders.length = 0; return true; } };
+  const win = { TradingView: { bottomWidgetBar: { _widgetControllers: new Map([['paper_trading', { _trading: { activeBroker: () => ab, _ordersService: { activeOrders: () => orders.filter(o => o.status === 6) } } }]]) } },
+    TradingViewApi: { _activeChartWidgetWV: { value: () => ({ _chartWidget: { model: () => ({ mainSeries: () => ({ symbol: () => symbol, bars: () => ({ last: () => ({ value: [0, 0, 0, 0, px] }) }) }) }) } }) } } };
+  let fgv = false; const doc = { get visibilityState() { return fgv ? 'visible' : 'hidden'; }, hasFocus: () => fgv, querySelector: s => /accountName/.test(s) ? { innerText: accs.find(a => a.id === cur).name } : null };
+  win.performance = globalThis.performance; const evaluate = async expr => new Function('window', 'document', 'performance', 'return (' + expr + ')')(win, doc, performance);
+  return { evaluate, setPx: v => { px = v; }, orders, positions, cur: () => cur, setCur: id => { cur = id; }, setFg: v => { fgv = v; } };
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+// El motor confirma 'flat' con 3 lecturas vacías y ≥1 s (guarda anti-lecturas-vacías de Tradovate): esperar a que termine el bucle.
+const done = async (k, ms = 5000) => { for (const t0 = Date.now(); k.status().state === 'running' && Date.now() - t0 < ms;) await sleep(50); };
+const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process.exitCode = 1; };
+// 1) Paper: abre, sube a +$170, mueve SL a entrada+3.75, cierra
+{ const pg = fakePage(); const k = createColchon(apiDriver(pg.evaluate), { pollMs: 50, logFile: 'C:/Users/USUARIO/AppData/Local/Temp/colchon-test.log', ignoreClock: true });
+  const r = await k.start({ side: 'long', symbol: 'NQ', qty: 2 }); ok(r.ok && k.status().mode === 'paper', 'paper: inicia y abre bracket');
+  ok(pg.orders[0].stopPrice === 19985 && pg.orders[1].limitPrice === 20040, `bracket SL 19985 / TP 20040 (${pg.orders[0].stopPrice}/${pg.orders[1].limitPrice})`);
+  pg.setPx(20004.25); await sleep(200); ok(!k.status().locked, 'a +$170 (2 NQ) no mueve'); 
+  pg.setPx(20004.5); await sleep(300); ok(k.status().locked && pg.orders[0].stopPrice === 20004.25, `a +$180 SL -> 20004.25 (${pg.orders[0].stopPrice})`);
+  pg.setPx(20010); await sleep(200); ok(pg.orders[0].stopPrice === 20004.25, 'no vuelve a mover (una vez)');
+  await k.stop({ flatten: true }); ok(pg.positions.length === 0 && k.status().state === 'stopped', 'stop + flatten');
+  console.log(k.status().log.join('\n')); }
+// 2) Short con MNQ
+{ const pg = fakePage({ symbol: 'CME_MINI:MNQ1!' }); const k = createColchon(apiDriver(pg.evaluate), { pollMs: 50, logFile: 'C:/Users/USUARIO/AppData/Local/Temp/colchon-test.log', ignoreClock: true });
+  await k.start({ side: 'short', symbol: 'MNQ', qty: 20 }); ok(pg.orders[0].stopPrice === 20015 && pg.positions[0].qty === 20, 'short 20 MNQ SL 20015');
+  pg.setPx(19994.75); await sleep(300); ok(pg.orders[0].stopPrice === 19995.5, `short 20 MNQ (disparo $190): SL -> 19995.5 (${pg.orders[0].stopPrice})`); await k.stop({ flatten: true }); }
+// 3) Lucid bloqueada
+for (const a of ['LFE00000000000000', 'LFF00000000000000']) { const pg = fakePage({ acct: a, broker: 'Tradovate' }); const k = createColchon(apiDriver(pg.evaluate), { pollMs: 50, ignoreClock: true, logFile: 'C:/Users/USUARIO/AppData/Local/Temp/colchon-test.log' });
+  const r = await k.start({ side: 'long', symbol: 'NQ', qty: 2 }); ok(!r.ok && r.blocked && pg.positions.length === 0, `bloqueada ${a}, 0 órdenes`); }
+// 4) Chart en otro símbolo -> no abre
+{ const pg = fakePage({ symbol: 'CME_MINI:ES1!' }); const k = createColchon(apiDriver(pg.evaluate), { pollMs: 50, ignoreClock: true, logFile: 'C:/Users/USUARIO/AppData/Local/Temp/colchon-test.log' });
+  const r = await k.start({ side: 'long', symbol: 'NQ', qty: 2 }); ok(!r.ok && pg.positions.length === 0, 'chart ES: no abre (' + r.err + ')'); }
+
+// 5) TP alcanzado -> resumen
+{ const pg = fakePage(); const k = createColchon(apiDriver(pg.evaluate), { pollMs: 50, logFile: 'C:/Users/USUARIO/AppData/Local/Temp/colchon-test.log', ignoreClock: true });
+  await k.start({ side: 'long', symbol: 'NQ', qty: 2 }); pg.setPx(20005); await sleep(200); pg.setPx(20041); await done(k);
+  const sm = k.summary(); ok(sm && sm.motivo === 'Take profit' && sm.pnlFinalUSD === 1600 && sm.latencia && sm.latencia.metodo === 'api' && sm.latencia.modificarMs != null && sm.latencia.confirmarMs != null, 'TP -> resumen con latencia ' + JSON.stringify(sm && sm.latencia)); }
+// 6) API falla -> fallback UI, latencias separadas
+{ const pg = fakePage(); const ev = async e => { if ((e.includes('20004.25') && e.includes('editPositionBrackets'))) { await sleep(5); throw new Error('api caída'); } return pg.evaluate(e); };
+  const ui = { async modifyStop(price) { await sleep(30); pg.orders.forEach(o => { if (o.type === 3) o.stopPrice = price; }); return 'ok'; } };
+  const k = createColchon(apiDriver(ev, ui), { pollMs: 50, logFile: 'C:/Users/USUARIO/AppData/Local/Temp/colchon-test.log', ignoreClock: true });
+  await k.start({ side: 'long', symbol: 'NQ', qty: 2 }); pg.setPx(20009); for (let i = 0; i < 50 && !k.status().latency; i++) await sleep(100); const l = k.status().latency; // API→relectura 0.8 s→UI
+  ok(l && l.metodo === 'ui' && l.apiIntentoMs != null && l.uiMs >= 25 && l.apiError, 'fallback UI: ' + JSON.stringify(l)); await k.stop({ flatten: true }); }
+// 7) cantidad configurable
+{ const pg = fakePage({ symbol: 'CME_MINI:MNQ1!' }); const k = createColchon(apiDriver(pg.evaluate), { pollMs: 50, logFile: 'C:/Users/USUARIO/AppData/Local/Temp/colchon-test.log', ignoreClock: true });
+  for (const [s, q] of [['MNQ', 21], ['NQ', 3], ['MNQ', 0], ['MNQ', 2.5]]) { const r = await k.start({ side: 'long', symbol: s, qty: q }); ok(!r.ok && pg.orders.length === 0, `rechaza ${q} ${s}: ${r.err}`); }
+  const r = await k.start({ side: 'long', symbol: 'MNQ' }); await sleep(150); const o = pg.orders, sl = o.find(x => x.type === 3), tp = o.find(x => x.type === 1);
+  ok(r.ok && k.status().qty === 20 && sl.stopPrice === 19985 && tp.limitPrice === 20040, `por defecto 20 MNQ: SL ${sl && sl.stopPrice} TP ${tp && tp.limitPrice}`);
+  pg.setPx(20004.5); await sleep(200); ok(sl.stopPrice === 19985, 'a +$180 (20 MNQ) no mueve'); pg.setPx(20004.75); await sleep(300);
+  ok(pg.orders.find(x => x.type === 3).stopPrice === 20004.5, `a +$190 SL -> 20004.5 (+$180) (${pg.orders.find(x => x.type === 3).stopPrice})`); await k.stop({ flatten: true }); }
+
+// 8) Paper real: modifyOrder sobre hijo de bracket falla -> usa editPositionBrackets y conserva el TP
+{ const pg = fakePage(); globalThis.__modFail = 0; const k = createColchon(apiDriver(pg.evaluate), { pollMs: 50, logFile: 'C:/Users/USUARIO/AppData/Local/Temp/colchon-test.log', ignoreClock: true });
+  await k.start({ side: 'long', symbol: 'NQ', qty: 2 }); pg.setPx(20009); await sleep(300); const l = k.status().latency, tp = pg.orders.find(o => o.type === 1);
+  ok(pg.orders.find(o => o.type === 3).stopPrice === 20004.25 && l.via === 'editPositionBrackets' && tp && tp.limitPrice === 20040 && globalThis.__modFail === 0, `editPositionBrackets: SL 20004.25, TP conservado ${tp && tp.limitPrice}, modifyOrder fallidos ${globalThis.__modFail}`); await k.stop({ flatten: true }); }
+
+// 9) editPositionBrackets devuelve true pero TradingView tarda: sondeo; si tarda >1.5 s no llama modifyOrder; salida por stop del colchón -> resumen correcto
+{ const pg = fakePage(); globalThis.__modFail = 0; globalThis.__lag = 400; const k = createColchon(apiDriver(pg.evaluate), { pollMs: 50, logFile: 'C:/Users/USUARIO/AppData/Local/Temp/colchon-test.log', ignoreClock: true });
+  await k.start({ side: 'long', symbol: 'NQ', qty: 2 }); pg.setPx(20009); await sleep(900); const l = k.status().latency;
+  ok(l && l.via === 'editPositionBrackets' && l.confirmarMs >= 350 && k.status().locked && globalThis.__modFail === 0, `lag 400 ms: confirmar ${l && l.confirmarMs} ms, modifyOrder ${globalThis.__modFail}`); await k.stop({ flatten: true }); }
+{ const pg = fakePage(); globalThis.__modFail = 0; globalThis.__lag = 2500; const k = createColchon(apiDriver(pg.evaluate), { pollMs: 50, logFile: 'C:/Users/USUARIO/AppData/Local/Temp/colchon-test.log', ignoreClock: true });
+  await k.start({ side: 'long', symbol: 'NQ', qty: 2 }); pg.setPx(20009); await sleep(3200); pg.setPx(20003); await done(k); const sm = k.summary();
+  ok(globalThis.__modFail === 0 && sm && sm.motivo === 'Stop loss' && sm.colchonMovido === true && sm.slColchon === 20004.25 && sm.pnlFinalUSD === 170 && sm.colchonUSD === 170, `lag 2.5 s: sin modifyOrder (${globalThis.__modFail}), resumen ${sm && sm.motivo} ${sm && sm.pnlFinalUSD} colchón ${sm && sm.colchonMovido}`); }
+// 10) duración
+{ const pg = fakePage(); const k = createColchon(apiDriver(pg.evaluate), { pollMs: 50, logFile: 'C:/Users/USUARIO/AppData/Local/Temp/colchon-test.log', ignoreClock: true });
+  await k.start({ side: 'long', symbol: 'NQ', qty: 2 }); await sleep(300); pg.setPx(20009); await sleep(300); pg.setPx(20041); await done(k); const sm = k.summary();
+  ok(sm && sm.duracionSeg >= 0.5 && sm.duracionSeg < 2.6 && sm.colchonTrasSeg >= 0.2 && sm.colchonTrasSeg < sm.duracionSeg && /ET$/.test(sm.abiertaET), `duración ${sm && sm.duracionSeg} s, colchón a los ${sm && sm.colchonTrasSeg} s, ${sm && sm.abiertaET} → ${sm && sm.cerradaET}`); }
+
+// 11) cuentas: lista, cambio verificado, bloqueo de Lucid/real
+{ const A = [{ id: '10', name: 'paper trading', type: 'demo', title: 'Paper Trading' }, { id: '11', name: 'PRUEBA', type: 'demo', title: 'Paper Trading' }, { id: '12', name: 'LFE0000000000', type: 'demo', title: 'Paper Trading' }, { id: '13', name: 'Real', type: 'live', title: 'Paper Trading' }];
+  const pg = fakePage({ acct: 'paper trading', accounts: A }); const k = createColchon(apiDriver(pg.evaluate), { pollMs: 50, logFile: 'C:/Users/USUARIO/AppData/Local/Temp/colchon-test.log', ignoreClock: true, realAllowFile: 'C:/Users/USUARIO/AppData/Local/Temp/no-existe-allowlist.json' }); // sin allowlist real: solo paper
+  const l = await k.accounts(); ok(l.ok && l.accounts.length === 4 && l.accounts.find(a => a.id === '10').current && l.accounts.filter(a => a.allowed).map(a => a.id).join() === '10,11', 'lista cuentas: permitidas ' + l.accounts.filter(a => a.allowed).map(a => a.name).join(','));
+  for (const id of ['12', '13', '99']) { const r = await k.start({ side: 'long', symbol: 'NQ', qty: 1, accountId: id }); ok(!r.ok && pg.orders.length === 0 && pg.cur() === '10', `cuenta ${id} rechazada sin cambiar ni operar: ${r.err}`); }
+  const r = await k.start({ side: 'long', symbol: 'NQ', qty: 1, accountId: '11' }); await sleep(150);
+  ok(r.ok && pg.cur() === '11' && k.status().account.name === 'PRUEBA' && pg.orders.length === 2, 'cambia a PRUEBA (verificada) y luego abre'); await k.stop({ flatten: true }); }
+
+// 12) orden rechazada (sin margen) tras cambiar de cuenta -> error claro, sin vigilar nada
+{ const A = [{ id: '10', name: 'paper trading', type: 'demo', title: 'Paper Trading' }, { id: '11', name: 'lore', type: 'demo', title: 'Paper Trading' }];
+  const pg = fakePage({ acct: 'paper trading', accounts: A, reject: 'Not enough funds to complete the order.' }); const k = createColchon(apiDriver(pg.evaluate), { pollMs: 50, logFile: 'C:/Users/USUARIO/AppData/Local/Temp/colchon-test.log', ignoreClock: true });
+  const t0 = Date.now(); const r = await k.start({ side: 'short', symbol: 'NQ', qty: 1, accountId: '11' });
+  ok(!r.ok && /RECHAZADA/.test(r.err) && /Not enough funds/.test(r.err) && pg.cur() === '11' && k.status().state === 'error' && k.summary().motivo === 'Error', 'rechazo detectado: ' + r.err + ` (${Date.now() - t0} ms)`); }
+// 13) la cuenta cambia en mitad de la prueba -> deja de vigilar sin cerrar nada
+{ const A = [{ id: '10', name: 'paper trading', type: 'demo', title: 'Paper Trading' }, { id: '11', name: 'lore', type: 'demo', title: 'Paper Trading' }];
+  const pg = fakePage({ acct: 'paper trading', accounts: A }); const k = createColchon(apiDriver(pg.evaluate), { pollMs: 50, logFile: 'C:/Users/USUARIO/AppData/Local/Temp/colchon-test.log', ignoreClock: true });
+  const r = await k.start({ side: 'long', symbol: 'NQ', qty: 1, accountId: '10' }); await sleep(150); pg.setCur('11'); await sleep(800);
+  ok(r.ok && k.status().state === 'error' && /cambió/.test(k.status().error) && pg.positions.length === 1, 'cambio de cuenta a mitad: ' + k.status().state + ' pos=' + pg.positions.length + ' ' + k.status().error); }
+
+// 14) saldos de todas las cuentas por API (sin clics), vuelve a la cuenta original; no recorre si hay posición
+{ const A = [{ id: 'D1', name: 'LFE00000000000000', type: 'demo', title: 'Tradovate', bal: 24376 }, { id: 'D2', name: 'LFE00000000000000', type: 'demo', title: 'Tradovate', bal: 24577.5 }];
+  const pg = fakePage({ acct: 'LFE00000000000000', accounts: A });
+  const r1 = await readAccounts({ all: false, evaluate: pg.evaluate }); ok(r1.accounts.length === 1 && r1.accounts[0].balance === 24376, 'solo la activa: ' + JSON.stringify(r1.accounts.map(a => a.balance)));
+  const r2 = await readAccounts({ all: true, evaluate: pg.evaluate }); const b = Object.fromEntries(r2.accounts.map(a => [a.name, a.balance]));
+  ok(b.LFE00000000000000 === 24577.5 && b.LFE00000000000000 === 24376 && pg.cur() === 'D1', `todas: 0013=${b.LFE00000000000000} (−$${25000 - b.LFE00000000000000}), vuelve a ${pg.cur()}`);
+  pg.positions.push({ id: 'P', symbol: 'CME_MINI:MNQ1!', side: 1, qty: 1, avgPrice: 20000 }); const r3 = await readAccounts({ all: true, evaluate: pg.evaluate });
+  ok(r3.busy && r3.accounts.length === 1 && pg.cur() === 'D1', 'con posición abierta no cambia de cuenta'); }
+// 15) estrategias: registro, por defecto, id desconocido rechazado, nombre en estado/resumen
+{ const pg = fakePage(); const k = createColchon(apiDriver(pg.evaluate), { pollMs: 50, logFile: 'C:/Users/USUARIO/AppData/Local/Temp/colchon-test.log', ignoreClock: true });
+  const l = k.strategies(); ok(l.default === 'dia-minimo-colchon' && l.strategies.length === 4 && l.strategies[3].id === 'prueba-be' && l.strategies[2].id === 'evaluacion-simple' && l.strategies[0].name === 'Día mínimo + colchón' && l.strategies[1].id === 'evaluacion', 'registro: ' + l.strategies.map(x => x.name).join());
+  const bad = await k.start({ side: 'long', symbol: 'NQ', qty: 2, strategyId: 'xyz' }); ok(!bad.ok && /desconocida/.test(bad.err) && pg.orders.length === 0, 'id desconocido rechazado: ' + bad.err);
+  const r = await k.start({ side: 'long', symbol: 'NQ', qty: 2 }); await sleep(150); pg.setPx(20004.5); await sleep(300); pg.setPx(20041); await done(k); const sm = k.summary();
+  ok(r.ok && k.status().strategy.id === 'dia-minimo-colchon' && sm.estrategia === 'Día mínimo + colchón' && sm.colchonUSD === 170 && sm.disparoUSD === 180 && sm.pnlFinalUSD === 1600 && /\[Día mínimo \+ colchón\]/.test(k.status().log.join('\n')), 'estrategia por defecto en estado, log y resumen'); }
+// 16) Evaluación: escalones en orden, solo hacia arriba, una vez cada uno
+{ const pg = fakePage(); const k = createColchon(apiDriver(pg.evaluate), { pollMs: 50, logFile: 'C:/Users/USUARIO/AppData/Local/Temp/colchon-test.log', ignoreClock: true });
+  const r = await k.start({ side: 'long', symbol: 'NQ', qty: 2, strategyId: 'evaluacion' }); await sleep(150);
+  const so = () => pg.orders.find(o => o.type === 3).stopPrice, tp = pg.orders.find(o => o.type === 1).limitPrice;
+  ok(r.ok && so() === 19984.25 && tp === 20015.75, `bracket evaluación 2 NQ: SL ${so()} TP ${tp}`);
+  pg.setPx(20003.5); await sleep(200); ok(so() === 19984.25, 'a +$140 no mueve');
+  pg.setPx(20003.75); await sleep(250); ok(so() === 20002.5 && k.status().step === 1, `paso 1 (+$150): SL ${so()}`);
+  pg.setPx(20003); await sleep(200); ok(so() === 20002.5 && k.status().step === 1, 'retrocede: no baja ni repite');
+  pg.setPx(20006.25); await sleep(250); ok(so() === 20005 && k.status().step === 2, `paso 2 (+$250): SL ${so()}`);
+  pg.setPx(20008.75); await sleep(250); ok(so() === 20007.5 && k.status().step === 3, `paso 3 (+$350): SL ${so()}`);
+  pg.setPx(20012); await sleep(200); ok(so() === 20007.5 && k.status().pasos.length === 3, 'no hay más pasos'); 
+  pg.setPx(20007); await done(k); const sm = k.summary();
+  ok(sm && sm.estrategia === 'Trailing stop loss - Evaluación' && sm.pasos.map(p => p.paso).join() === '1,2,3' && sm.pasos.every(p => p.enSeg != null) && sm.motivo === 'Stop loss' && sm.pnlFinalUSD === 300, `resumen: pasos ${sm && sm.pasos.map(p => p.paso + '@' + p.enSeg + 's').join(' ')} · ${sm && sm.motivo} ${sm && sm.pnlFinalUSD}`); }
+// 17) salto de varios disparos de golpe -> escalón más alto válido
+{ const pg = fakePage(); const k = createColchon(apiDriver(pg.evaluate), { pollMs: 50, logFile: 'C:/Users/USUARIO/AppData/Local/Temp/colchon-test.log', ignoreClock: true });
+  await k.start({ side: 'short', symbol: 'NQ', qty: 2, strategyId: 'evaluacion' }); await sleep(150);
+  pg.setPx(19991); await sleep(300); const s1 = pg.orders.find(o => o.type === 3).stopPrice;
+  ok(s1 === 19992.5 && k.status().step === 3 && k.status().pasos.length === 1 && k.status().pasos[0].paso === 3 && k.status().pasos[0].saltados === 2, `short +$360 de golpe: directo al paso 3, saltando 2 (SL ${s1})`);
+  pg.setPx(19985); await sleep(300); ok(pg.orders.find(o => o.type === 3).stopPrice === 19992.5 && k.status().pasos.length === 1, 'después no mueve más'); await k.stop({ flatten: true }); }
+{ const pg = fakePage(); const k = createColchon(apiDriver(pg.evaluate), { pollMs: 50, logFile: 'C:/Users/USUARIO/AppData/Local/Temp/colchon-test.log', ignoreClock: true });
+  await k.start({ side: 'long', symbol: 'NQ', qty: 2, strategyId: 'evaluacion' }); await sleep(150); pg.setPx(20010); await sleep(300);
+  ok(pg.orders.find(o => o.type === 3).stopPrice === 20007.5 && k.status().pasos.length === 1 && k.status().pasos[0].paso === 3 && k.status().step === 3, 'long +$400 de golpe: directo al paso 3'); await k.stop({ flatten: true }); }
+// 18) carrera real (10:22 AM): la lectura de todas las cuentas de la granja está en curso cuando arranca la prueba
+{ const A = [{ id: '10', name: 'PRUEBA', type: 'demo', title: 'Paper Trading' }, { id: '11', name: 'Financistad', type: 'demo', title: 'Paper Trading' }, { id: '12', name: 'lore', type: 'demo', title: 'Paper Trading' }];
+  const pg = fakePage({ acct: 'PRUEBA', accounts: A }); const k = createColchon(apiDriver(pg.evaluate), { pollMs: 50, logFile: 'C:/Users/USUARIO/AppData/Local/Temp/colchon-test.log', ignoreClock: true });
+  const rd = readAccounts({ all: true, evaluate: pg.evaluate }); await sleep(100);   // la granja empieza a recorrer cuentas
+  const r = await k.start({ side: 'long', symbol: 'NQ', qty: 2, accountId: '10' }); await rd;
+  const rd2 = await readAccounts({ all: true, evaluate: pg.evaluate });             // otra lectura completa durante la prueba: no debe cambiar de cuenta
+  await sleep(200); pg.setPx(20004.5); await sleep(400);
+  ok(r.ok && !rd2.full && pg.cur() === '10' && k.status().state === 'running' && !k.status().error && pg.orders.find(o => o.type === 3).stopPrice === 20004.25,
+    `prueba espera a la lectura, la granja no cambia de cuenta durante la prueba, SL movido (${k.status().error || 'sin error'})`); await k.stop({ flatten: true }); }
+// 19) estrategia sin escalones (Evaluación simple): nunca mueve el SL, termina en TP
+{ const pg = fakePage(); const k = createColchon(apiDriver(pg.evaluate), { pollMs: 50, logFile: 'C:/Users/USUARIO/AppData/Local/Temp/colchon-test.log', ignoreClock: true });
+  const r = await k.start({ side: 'long', symbol: 'NQ', qty: 2, strategyId: 'evaluacion-simple' }); const sl0 = pg.orders.find(o => o.type === 3).stopPrice;
+  ok(r.ok && k.status().steps.length === 0, 'cero escalones: arranca sin escalones');
+  for (const px of [20004, 20008, 20012]) { pg.setPx(px); await sleep(200); }
+  const slNow = pg.orders.find(o => o.type === 3).stopPrice; pg.setPx(20016); await done(k); const sm = k.summary();
+  ok(slNow === sl0 && !k.status().error && sm && sm.estrategia === 'Evaluación' && sm.pasosTotal === 0 && sm.pasos.length === 0 && sm.colchonUSD == null && !sm.colchonMovido && /take profit|^tp$/i.test(sm.motivo),
+    `cero escalones: SL fijo (${sl0}→${slNow}), TP, resumen sin pasos (${sm && sm.motivo})`); }
+// 20) lectura de todas las cuentas solo con TradingView en segundo plano
+{ const A = [{ id: '10', name: 'PRUEBA', type: 'demo', title: 'Paper Trading' }, { id: '11', name: 'Financistad', type: 'demo', title: 'Paper Trading' }, { id: '12', name: 'lore', type: 'demo', title: 'Paper Trading' }];
+  const pg = fakePage({ acct: 'PRUEBA', accounts: A }); pg.setFg(true);
+  const r1 = await readAccounts({ all: true, evaluate: pg.evaluate });
+  ok(r1.visible && r1.accounts.length === 1 && pg.cur() === '10', `TV en primer plano: no cambia de cuenta, solo lee la activa (${r1.accounts.length})`);
+  pg.setFg(false); const r2 = await readAccounts({ all: true, evaluate: pg.evaluate });
+  ok(!r2.visible && r2.accounts.length === 3 && pg.cur() === '10', `TV minimizado: lee las 3 cuentas y vuelve a la original (${r2.accounts.length}, ${pg.cur()})`);
+  const p3 = readAccounts({ all: true, evaluate: pg.evaluate }); await sleep(300); pg.setFg(true); const r3 = await p3;
+  ok(r3.aborted && pg.cur() === '10' && r3.final === '10', `TV pasa a primer plano a mitad: corta y vuelve a la original (${r3.accounts.length} leídas)`); }
+// 21) parámetros actuales: $100 netos, disparo = colchón + $15 (a tick), 10 MNQ por defecto, probabilidad necesaria
+{ for (const k of Object.keys(DMC)) delete DMC[k]; Object.assign(DMC, DMC_NEW);
+  const got = [['MNQ', 10], ['MNQ', 20], ['NQ', 2]].map(([y, q]) => `${lockUsdFor(y, q, DMC)}/${triggerUsdFor(y, q, DMC)}`).join(' ');
+  ok(got === '115/130 130/150 120/140', `Día mínimo: colchón/disparo 10 MNQ, 20 MNQ, 2 NQ = ${got}`);
+  const be = [breakEvenFor('MNQ', 10, DMC).pct, breakEvenFor('MNQ', 10, STRATEGIES['evaluacion'].params).pct, breakEvenFor('MNQ', 10, STRATEGIES['evaluacion-simple'].params).pct].join(' ');
+  ok(be === '85.7 86.3 50', `probabilidad necesaria: Día mínimo / Trailing / Evaluación = ${be}`);
+  const pg = fakePage({ symbol: 'CME_MINI:MNQ1!' }); const k = createColchon(apiDriver(pg.evaluate), { pollMs: 50, logFile: 'C:/Users/USUARIO/AppData/Local/Temp/colchon-test.log', ignoreClock: true });
+  const r = await k.start({ side: 'long', symbol: 'MNQ' }); await sleep(150); const sl0 = pg.orders.find(o => o.type === 3).stopPrice, e = k.status().entry;
+  ok(r.ok && k.status().qty === 10, `cantidad por defecto de Día mínimo: ${k.status().qty} MNQ`);
+  pg.setPx(e + 6.25); await sleep(300); const nm = pg.orders.find(o => o.type === 3).stopPrice;   // +$125 < $130: no mueve
+  pg.setPx(e + 6.5); await sleep(400); const mv = pg.orders.find(o => o.type === 3).stopPrice;    // +$130: protege +$115 (5.75 pts)
+  await k.stop({ flatten: true }); await done(k); const sm = k.summary();
+  ok(nm === sl0 && mv === e + 5.75 && sm && sm.probabilidadNecesaria && sm.probabilidadNecesaria.pct === 85.7, `10 MNQ: a +$125 no mueve, a +$130 SL ${mv} (entrada+5.75), resumen ${sm && JSON.stringify(sm.probabilidadNecesaria)}`); }
