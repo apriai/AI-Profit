@@ -8,3 +8,6 @@ Empieza aquí.
 4. Si mueves esta carpeta, vuelve a ejecutar el instalador.
 
 El resto son carpetas del programa. No hace falta abrirlas para usarlo.
+
+## Notas
+- 26 oct 2026: la mascota y el agente ya no se atraviesan al caminar. Si se acercan, la mascota se aparta (o se detiene un momento) y el que queda más cerca de la cámara se dibuja delante. Sin física pesada.
