@@ -1,6 +1,6 @@
 # AGENTS.md: reglas para cualquier agente (Grok) que trabaje en este repositorio
 
-Repositorio privado de Prop Farm / TradingLink (motor y página, sin datos personales). Los pasos para actualizar están en `INSTRUCCIONES-GROK.md`.
+Repositorio privado de Prop Farm / TradingLink (motor y página, sin datos personales). El texto largo está en `docs/AGENTS.md`. Los pasos para actualizar están en `docs/INSTRUCCIONES-GROK.md`.
 
 ## Reglas que no se rompen
 1. Nunca abras, modifiques, canceles ni cierres órdenes reales por tu cuenta. Solo Caroline lo hace desde la granja.
@@ -12,8 +12,4 @@ Repositorio privado de Prop Farm / TradingLink (motor y página, sin datos perso
 7. No hagas clics dentro de TradingView.
 8. No inventes números ni resultados. Si algo no se puede verificar, dilo.
 
-## Cambios importantes (26 oct 2026)
-- **Historial del Negocio:** ahora se guarda también en `negocio.json`, junto al servidor (lo escribe `negocio.mjs`, que `tradinglink.mjs` importa: no lo borres). Hace una copia diaria en `backups-negocio/` (las últimas 30). Es personal: **nunca lo subas a GitHub** (está en `.gitignore`). Actualizar o reemplazar archivos nunca debe borrar `negocio.json` ni `backups-negocio/`.
-- **Cuentas viejas:** al arrancar, el servidor ya no resucita las cuentas de evaluación antiguas guardadas en `sod.json`. Cuando TradingView ya no lista una cuenta (no fondeada), se marca con `gone` en `sod.json` y no se siembra más; si vuelve a aparecer, se quita la marca. Las cuentas fondeadas (LFF) **nunca** se marcan `gone`, a propósito, para que la lógica de cuenta quemada siga funcionando.
-- **Error de la página:** se corrigió un fallo (`glow` indefinido) que rompía la página con los árboles de flores de voxels.
-- **Actualizar:** `actualizar.ps1` solo copia archivos que están en el repositorio y no debe tocar `negocio.json`, `sod.json`, `accounts.json`, `metas.json` ni `logros.json`.
+El servidor está en `motor/`. Los datos personales van a `datos/` (o se quedan en la raíz si ya estaban ahí). No los subas.

@@ -2,7 +2,7 @@
 # Crea en el Escritorio el applet "AI Profit.app".
 # osacompile deja un ejecutable universal (arm64 + x86_64). No es un script
 # de shell dentro del bundle, así que en Apple Silicon no pide Rosetta.
-# El applet solo abre "AI Profit.command" de esta carpeta (ahí está el arranque).
+# El applet solo abre "acceso/AI Profit.command" (ahí está el arranque).
 # El dibujo es assets/abrir-granja-icon.icns (applet.icns y AppIcon.icns)
 # y NSWorkspace lo confirma con el PNG.
 # No abre herramientas de desarrollador. No abre TradingView ni envía órdenes.
@@ -18,23 +18,23 @@ fail() {
 }
 
 SCRIPT_DIR="${0:A:h}"
-if [[ ! -f "$SCRIPT_DIR/tradinglink.mjs" ]]; then
+if [[ ! -f "$SCRIPT_DIR/motor/tradinglink.mjs" ]]; then
   FALLBACK="$HOME/Documents/Grok Bot/TradingLink"
-  if [[ -f "$FALLBACK/tradinglink.mjs" && -f "$FALLBACK/instalar-ai-profit.command" ]]; then
+  if [[ -f "$FALLBACK/motor/tradinglink.mjs" && -f "$FALLBACK/instalar-ai-profit.command" ]]; then
     SCRIPT_DIR="$FALLBACK"
   else
-    fail "no encuentro tradinglink.mjs junto a este instalador ($SCRIPT_DIR)."
+    fail "no encuentro motor/tradinglink.mjs junto a este instalador ($SCRIPT_DIR)."
   fi
 fi
 
-LAUNCHER="$SCRIPT_DIR/AI Profit.command"
-[[ -f "$LAUNCHER" ]] || fail "falta AI Profit.command"
+LAUNCHER="$SCRIPT_DIR/acceso/AI Profit.command"
+[[ -f "$LAUNCHER" ]] || fail "falta acceso/AI Profit.command"
 [[ -f "$SCRIPT_DIR/assets/abrir-granja-icon.icns" ]] || fail "falta assets/abrir-granja-icon.icns"
 command -v osacompile >/dev/null 2>&1 || fail "no encuentro osacompile. Viene con macOS; no hace falta Xcode."
 command -v plutil >/dev/null 2>&1 || fail "no encuentro plutil."
 command -v osascript >/dev/null 2>&1 || fail "no encuentro osascript."
 
-chmod +x "$LAUNCHER" "$SCRIPT_DIR/instalar-ai-profit.command" "$SCRIPT_DIR/Abrir Granja.command" 2>/dev/null || true
+chmod +x "$LAUNCHER" "$SCRIPT_DIR/instalar-ai-profit.command" "$SCRIPT_DIR/acceso/Abrir Granja.command" 2>/dev/null || true
 if command -v xattr >/dev/null 2>&1; then
   xattr -d com.apple.quarantine "$LAUNCHER" >/dev/null 2>&1 || true
   xattr -d com.apple.quarantine "$SCRIPT_DIR/instalar-ai-profit.command" >/dev/null 2>&1 || true

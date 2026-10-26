@@ -2,15 +2,15 @@
 # Solo actualiza archivos que estan en el repositorio. NO borra nada. NO usa reset --hard.
 # Antes de reemplazar, respalda en backups\pre-actualizar-<fecha-hora>.
 $ErrorActionPreference = 'Continue'
-$dir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$dir = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location -LiteralPath $dir
 $repo = 'https://github.com/apriai/AI-Profit.git'
 $gitExe = Join-Path $dir 'git-portable\cmd\git.exe'
 
 Write-Host '=== Actualizar Prop Farm desde GitHub ===' -ForegroundColor Cyan
 Write-Host "Carpeta: $dir"
-if (-not (Test-Path -LiteralPath (Join-Path $dir 'tradinglink.mjs'))) {
-  Write-Host 'AVISO: aqui no veo tradinglink.mjs. Pon actualizar.bat en tu carpeta TradingLink. Sigo de todos modos (es la primera instalacion?).' -ForegroundColor Yellow
+if (-not (Test-Path -LiteralPath (Join-Path $dir 'motor\tradinglink.mjs'))) {
+  Write-Host 'AVISO: aqui no veo motor\tradinglink.mjs. Ejecuta acceso\actualizar.bat desde la carpeta TradingLink. Sigo de todos modos (es la primera instalacion?).' -ForegroundColor Yellow
 }
 
 # 1) Git portatil (solo dentro de esta carpeta)

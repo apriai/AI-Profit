@@ -3,12 +3,12 @@
 # No abre TradingView y no envia ordenes.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$bat = Join-Path $root 'Abrir Granja.bat'
-if (-not (Test-Path -LiteralPath (Join-Path $root 'tradinglink.mjs'))) {
-  throw "No encuentro tradinglink.mjs en $root"
+$bat = Join-Path $root 'acceso\Abrir Granja.bat'
+if (-not (Test-Path -LiteralPath (Join-Path $root 'motor\tradinglink.mjs'))) {
+  throw "No encuentro motor\tradinglink.mjs en $root"
 }
 if (-not (Test-Path -LiteralPath $bat)) {
-  throw "Falta Abrir Granja.bat en $root"
+  throw "Falta acceso\Abrir Granja.bat en $root"
 }
 
 function Convert-PngToIco([string]$PngPath, [string]$IcoPath) {
@@ -86,7 +86,7 @@ $png = $null
 foreach ($candidate in @(
   (Join-Path $root 'assets\abrir-granja-icon.png'),
   (Join-Path $root 'assets\ai-profit-icon.png'),
-  (Join-Path $root 'propfarm-logo.png')
+  (Join-Path $root 'assets\propfarm-logo.png')
 )) {
   if (Test-Path -LiteralPath $candidate) { $png = $candidate; break }
 }

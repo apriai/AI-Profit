@@ -1,7 +1,10 @@
 # Seguridad: nada personal ni pesado. Un "git add -A" futuro queda seguro.
-# Datos personales / saldos / cuentas
+# Datos personales / saldos / cuentas.
+# Los nombres no van anclados a la raiz: cubren la raiz (instalaciones viejas) y datos/.
+# datos/LEEME.md si se versiona; no ignores toda la carpeta datos/.
 accounts.json
 sod.json
+days.json
 logros.json
 metas.json
 real-allowlist.json

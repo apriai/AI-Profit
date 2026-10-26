@@ -15,18 +15,19 @@ Carpeta: `C:\Users\<usuario>\OneDrive\Escritorio\TradingLink` en HERO.
 
 | Archivo | Para qué sirve |
 |---|---|
-| `tradinglink.mjs` | Servidor HTTP en 127.0.0.1:8787. Sirve la granja, la API, la lectura de cuentas en segundo plano y las órdenes manuales (`/order`, `/confirm`). |
-| `colchon.mjs` | El motor: driver CDP (`apiDriver` + scripts `js.*` inyectados en TradingView), el controlador `createColchon`, `readAccounts` y `buildReport`. |
-| `strategies.mjs` | El registro de estrategias. |
-| `Granja-de-Cuentas-v2.html` | La página «granja». Lleva un único bloque `<script>/* Prueba colch…` con la UI del colchón (la fuente está en `colchon-src\colchon-ui.html`). El pill del agente (`#botToggle`) abre/cierra siempre el panel `#prCard` (fase «choose»); clic en el agente = solo selector de color. Ya no existen el botón «Prueba» (`#prBtn`) ni el panel antiguo «TradingLink Simulation» (`#tlPanel`). |
-| `colchon-src\` | Fuentes de la UI y pruebas (`test-mock.mjs`). Su `colchon.mjs` es viejo: el bueno es el de la raíz. |
-| `node-win\node.exe` | Node portable v22. No hay Node instalado en el sistema. |
-| `AI Profit.command` | Mac (zsh, sin app ni Rosetta): TradingView en 9222, servidor y `Granja-de-Cuentas-v2.html`. No envía órdenes. |
-| `Abrir Granja.bat` | Windows: lo mismo, en un doble clic. |
-| `instalar-ai-profit.command` | Mac: applet de Escritorio **AI Profit** (`osacompile`, icono `.icns`, sin Rosetta). Abre `AI Profit.command`. |
-| `instalar-ai-profit.bat` | Windows: acceso de Escritorio **AI Profit** con el `.ico`. |
-| `abrir-tradingview.bat` | Solo abre TradingView Desktop (Store) con `--remote-debugging-port=9222`. |
-| `iniciar-tradinglink.bat` | Arranca el servidor en una ventana visible y abre el navegador. |
+| `motor\tradinglink.mjs` | Servidor HTTP en 127.0.0.1:8787. Sirve la granja, la API, la lectura de cuentas en segundo plano y las órdenes manuales (`/order`, `/confirm`). |
+| `motor\colchon.mjs` | El motor: driver CDP (`apiDriver` + scripts `js.*` inyectados en TradingView), el controlador `createColchon`, `readAccounts` y `buildReport`. |
+| `motor\strategies.mjs` | El registro de estrategias. |
+| `motor\rutas.mjs` | Carpeta de datos: `datos\` si es una instalación nueva; la raíz si ahí ya hay `accounts.json`, `sod.json`, `negocio.json` u otro marcador. TradingView sigue en `tradingview-mcp\` de la raíz. |
+| `motor\Granja-de-Cuentas-v2.html` | La página «granja». Lleva un único bloque `<script>/* Prueba colch…` con la UI del colchón (la fuente está en `motor\colchon-src\colchon-ui.html`). El pill del agente (`#botToggle`) abre/cierra siempre el panel `#prCard` (fase «choose»); clic en el agente = solo selector de color. Ya no existen el botón «Prueba» (`#prBtn`) ni el panel antiguo «TradingLink Simulation» (`#tlPanel`). |
+| `motor\colchon-src\` | Fuentes viejas de la UI y pruebas (`test-mock.mjs`). Su `colchon.mjs` es viejo: el bueno es `motor\colchon.mjs`. |
+| `node-win\node.exe` | Node portable v22, en la raíz. No hay Node instalado en el sistema. En Mac: `node\bin\node`. |
+| `acceso\AI Profit.command` | Mac (zsh): TradingView en 9222, servidor y la Granja. No envía órdenes. El Escritorio no usa este archivo como icono. |
+| `acceso\Abrir Granja.bat` | Windows: lo mismo, en un doble clic. |
+| `instalar-ai-profit.command` | Mac, en la raíz: applet de Escritorio **AI Profit** (`osacompile`, icono `.icns`, sin Rosetta). Abre `acceso\AI Profit.command`. |
+| `instalar-ai-profit.bat` | Windows, en la raíz: acceso de Escritorio **AI Profit** con el `.ico`. |
+| `acceso\abrir-tradingview.bat` | Solo abre TradingView Desktop (Store) con `--remote-debugging-port=9222`. |
+| `acceso\iniciar-tradinglink.bat` | Arranca `motor\tradinglink.mjs` en una ventana visible y abre el navegador. |
 | `real-allowlist.json` | Lista de cuentas reales permitidas (sección 10). |
 | `colchon-fuente.json` | Fuente de P&L: `{"modo":"broker"}` (actual), `"mas-rapido"` o `"grafica"`. Se lee al iniciar cada trade, así que no hace falta reiniciar. |
 | `accounts.json`, `sod.json` | Estado de las cuentas y saldo de inicio del día (los genera el servidor). |
@@ -37,7 +38,7 @@ Carpeta: `C:\Users\<usuario>\OneDrive\Escritorio\TradingLink` en HERO.
 El arranque de un clic es el acceso **AI Profit**. En Windows lo crea `instalar-ai-profit.bat`. En Mac, `instalar-ai-profit.command` deja en el Escritorio el applet **AI Profit** (binario universal de `osacompile`, no un script de shell, sin Rosetta) y abre `http://localhost:8787/Granja-de-Cuentas-v2.html`. No envía órdenes. Los pasos de abajo siguen siendo la forma manual.
 
 1. **TradingView con CDP.** Cerrar TradingView del todo (todos los procesos `TradingView`) y ejecutar `abrir-tradingview.bat` (o **AI Profit**). Comprobar que 9222 escucha: `Get-NetTCPConnection -LocalPort 9222 -State Listen` o `http://127.0.0.1:9222/json/version`. Tarda unos 3 s. El panel de trading necesita unos 10 s más antes de que se puedan leer las cuentas.
-2. **Servidor.** Lanzarlo oculto, como hacen los agentes: `cmd /c node-win\node.exe tradinglink.mjs >> tradinglink.log 2>&1` desde la carpeta (`Start-Process -WindowStyle Hidden`). Otra opción es `iniciar-tradinglink.bat`.
+2. **Servidor.** Desde la raíz de TradingLink: `cmd /c node-win\node.exe motor\tradinglink.mjs >> tradinglink.log 2>&1` (`Start-Process -WindowStyle Hidden`). En una instalación nueva el registro del lanzador de Mac va a `datos\tradinglink.log`. Otra opción es `acceso\iniciar-tradinglink.bat`.
 3. **Comprobar.** `GET /api/colchon/status` debe dar `state` igual a `idle` y `GET /Granja-de-Cuentas-v2.html` debe dar 200.
 4. **Reinicio.** Matar los `node.exe` cuya línea de comandos contenga `tradinglink` y volver al paso 2. Antes, verificar el estado libre: `node-win\node.exe %TEMP%\busy.mjs` usa `readAccounts({all:false})` y devuelve `{busy, live, current}`. Solo se reinicia con `busy:false`.
 
@@ -200,7 +201,7 @@ Parámetros comunes: `SL_USD`, `TP_USD` (bracket en $), `STEPS` (escalones `{tri
 ## 18. Prop Farm: P&L de la barra superior conectado al bróker, logo y nombre (2026-10-23)
 - Causa del $0: la barra sumaba solo las cuentas "vivas" del estado local de la granja. LFE…014 (balance 23,992 < piso 24,000 de la granja) se considera quemada y queda fuera, así que "P&L" y "hoy" daban $0 y "0 cuentas".
 - Ahora un script (al final de la página) lee cada 30 s `/api/colchon/trades` y `/accounts.json` y guarda `window.__tlPnl` {neto = `daily[hoy]` (cambio real de balance con comisiones), bruto = total del historial, cuentas = nº de cuentas vivas}. `zu()` (HUD) usa esos valores si existen: "P&L −$332.50 hoy neto · bruto −$368.00". Sin datos, vuelve al cálculo local.
-- Nombre "Prop Farm" (título, pestaña, cabecera). Logo: imagen del usuario recortada (fondo transparente) embebida como data URI en la cabecera y como favicon; copia en `propfarm-logo.png`.
+- Nombre "Prop Farm" (título, pestaña, cabecera). Logo: imagen del usuario recortada (fondo transparente) embebida como data URI en la cabecera y como favicon; copia en `assets/propfarm-logo.png` (la página la pide como `/propfarm-logo.png`).
 - Contador de cuentas: el 📦 se reemplazó por una flor pixel-art (SVG 24 px, pétalos rosa #ff5ea8, centro amarillo, tallo verde, tierra marrón) al estilo de las plantas de la isla.
 
 ### 18.1 Un solo P&L (23-oct 5:48 PM ET)

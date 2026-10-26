@@ -4,9 +4,10 @@ import http from 'node:http'; import fs from 'node:fs'; import path from 'node:p
 import * as orders from './orders.mjs';
 import { negocio } from './negocio.mjs';
 import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, etDay, cdpEvaluator, PAGE } from './colchon.mjs';
-import { execFile } from 'node:child_process'; import { fileURLToPath } from 'node:url';
-const DIR = path.dirname(fileURLToPath(import.meta.url));
-const TV = path.join(DIR, 'tradingview-mcp/src/cli/index.js');
+import { execFile } from 'node:child_process';
+import { dataDir, ROOT, HTML, TV_CLI } from './rutas.mjs';
+const DIR = dataDir();
+const TV = TV_CLI;
 const PORT = 8787, EVERY_MS = 5 * 60 * 1000;
 const tv = (...a) => new Promise(r => execFile(process.execPath, [TV, ...a], (e, o) => { try { r(JSON.parse(o)); } catch { r({ success: false }); } }));
 const ev = async js => (await tv('ui', 'eval', js)).result;
@@ -182,7 +183,11 @@ http.createServer((q, r) => {
     else if (q.url==='/cancel') out={ok: orders.cancel(j.id)};
     else out={ok:false,err:['ruta desconocida']};
     console.log(new Date().toLocaleTimeString(), q.url, JSON.stringify(out)); r.writeHead(200,{'content-type':'application/json'}); r.end(JSON.stringify(out)); }); return; }
-  r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); fs.createReadStream(path.join(DIR, 'Granja-de-Cuentas-v2.html')).pipe(r);
+  if (q.method === 'GET' && (q.url === '/propfarm-logo.png' || q.url.startsWith('/propfarm-logo.png?'))) {
+    const logo = path.join(ROOT, 'assets', 'propfarm-logo.png');
+    if (fs.existsSync(logo)) { r.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'no-store' }); return fs.createReadStream(logo).pipe(r); }
+  }
+  r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); fs.createReadStream(HTML).pipe(r);
 }).listen(PORT, '127.0.0.1', () => console.log(`Granja: http://localhost:${PORT}`));
 let lastFull = 0, lastFunded = 0, lastBusy = Date.now(); const FULL_MS = EVERY_MS, QUIET_MS = 5 * 60 * 1000;
 cycle(); setInterval(cycle, 30 * 1000);

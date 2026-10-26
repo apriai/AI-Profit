@@ -16,17 +16,17 @@ Repositorio privado: https://github.com/apriai/AI-Profit (rama `main`).
 
 ## Paso 0: requisitos
 - Caroline aceptó la invitación como colaboradora de `apriai/AI-Profit` (le llega por correo o aparece en https://github.com/notifications). Sin eso el paso 3 falla con "repository not found".
-- Su carpeta de TradingLink es donde está `colchon.mjs`. Anota la ruta.
+- Su carpeta de TradingLink es la que tiene `LEEME.md` en la raíz. El motor está en `motor/` (`motor/colchon.mjs`). Anota la ruta.
 
 ## Paso 1: conseguir `actualizar.bat`
-Descarga `actualizar.bat` y `actualizar.ps1` desde el repositorio y ponlos en la carpeta de TradingLink, junto a `colchon.mjs`.
+En la carpeta del repositorio ya está `acceso/actualizar.bat` (y `acceso/actualizar.ps1`). Doble clic ahí. No hace falta copiarlos junto a `colchon.mjs`: el script sube a la raíz y deja `git-portable` y los respaldos en esa raíz.
 
 ## Paso 2: antes de actualizar
 - Verifica que `http://localhost:8787/api/colchon/conexion` responda y que no haya posición ni órdenes abiertas. Si hay una operación en curso, espera.
 - Haz una copia manual de la carpeta de TradingLink (sin `node-win` ni `git-portable`) en `backups\manual-<fecha>`.
 
 ## Paso 3: actualizar
-Doble clic en `actualizar.bat`.
+Doble clic en `acceso\actualizar.bat`.
 - La primera vez descarga Git portátil dentro de la carpeta (`git-portable`), sin instalar nada en el sistema.
 - Se abre una ventana del navegador para iniciar sesión en GitHub con la cuenta `karocerquera`. Es un paso que solo Caroline puede hacer.
 - El script guarda una copia de los archivos que va a reemplazar en `backups\pre-actualizar-<fecha>` y los reemplaza desde `origin/main`. No borra nada y no toca `accounts.json`, `sod.json`, `logros.json`, `metas.json`, `real-allowlist.json`, `historial\` ni sus registros.
@@ -34,7 +34,7 @@ Doble clic en `actualizar.bat`.
 ## Paso 4: dejar su configuración correcta
 - `colchon-fuente.json` debe contener `{"modo":"broker"}` para leer el P&L real de Tradovate. Si no existe o dice otra cosa, créalo o corrígelo (con respaldo).
 - Si falta `real-allowlist.json`, pídele a Caroline cuáles cuentas reales autoriza. No lo llenes tú.
-- `strategies.mjs` debe tener `DEFAULT_QTY` MNQ en 5 en las estrategias `dia-minimo-colchon` y `prueba-be` (el valor por defecto actual).
+- `motor/strategies.mjs` debe tener `DEFAULT_QTY` MNQ en 5 en las estrategias `dia-minimo-colchon` y `prueba-be` (el valor por defecto actual).
 
 ## Paso 5: reiniciar el servidor (solo sin operaciones)
 1. Confirma sin posición y sin órdenes.
@@ -53,7 +53,7 @@ Solo funciona la versión abierta con el puerto 9222. El acceso **AI Profit** (o
 Cada vez que Bänéd avise que hay una versión nueva: repite los pasos 2, 3 y 5. Si hay cambios que tú quieras proponer, hazlos en la rama `caroline` y abre un pull request.
 
 ## Cambios importantes (26 oct 2026)
-- **Historial del Negocio:** ahora se guarda también en `negocio.json`, junto al servidor (lo escribe `negocio.mjs`, que `tradinglink.mjs` importa: no lo borres). Hace una copia diaria en `backups-negocio/` (las últimas 30). Es personal: **nunca lo subas a GitHub** (está en `.gitignore`). Actualizar o reemplazar archivos nunca debe borrar `negocio.json` ni `backups-negocio/`.
+- **Historial del Negocio:** ahora se guarda también en `negocio.json` (lo escribe `motor/negocio.mjs`, que `motor/tradinglink.mjs` importa: no lo borres). En una carpeta nueva queda en `datos/`. Si ya estaba en la raíz, se queda ahí. Hace una copia diaria en `backups-negocio/` (las últimas 30). Es personal: **nunca lo subas a GitHub** (está en `.gitignore`). Actualizar o reemplazar archivos nunca debe borrar `negocio.json` ni `backups-negocio/`.
 - **Cuentas viejas:** al arrancar, el servidor ya no resucita las cuentas de evaluación antiguas guardadas en `sod.json`. Cuando TradingView ya no lista una cuenta (no fondeada), se marca con `gone` en `sod.json` y no se siembra más; si vuelve a aparecer, se quita la marca. Las cuentas fondeadas (LFF) **nunca** se marcan `gone`, a propósito, para que la lógica de cuenta quemada siga funcionando.
 - **Error de la página:** se corrigió un fallo (`glow` indefinido) que rompía la página con los árboles de flores de voxels.
 - **Actualizar:** `actualizar.ps1` solo copia archivos que están en el repositorio y no debe tocar `negocio.json`, `sod.json`, `accounts.json`, `metas.json` ni `logros.json`.

@@ -12,7 +12,7 @@
 
 # Prop Farm · AI-Profit (TradingLink)
 
-**Hecho por Ai Profit Camp.**
+**Hecho por Ai Profit Camp.** Si solo vas a usarlo, abre [`LEEME.md`](LEEME.md): una vez el instalador, y después el acceso **AI Profit** del Escritorio.
 
 **Prop Farm** es una aplicación web local que gestiona una *granja* de cuentas de evaluación de firmas de fondeo (Lucid, Tradovate) y trae un **motor de ejecución** que habla con TradingView Desktop y con Tradovate para abrir, ajustar y vigilar órdenes de **MNQ / NQ**.
 
@@ -48,7 +48,7 @@ Todo corre en tu propia PC (Windows, o Mac en el caso de Caroline). La página s
 | **Slider de contratos 1 a 20** | Por defecto 5. Del verde al rojo según el tamaño, y el fondo de la página se tiñe de rojo al subir el riesgo. |
 | **Historial** | Trades del día con hora ET, dirección, contratos, resultado y cuenta enmascarada (4 primeros y 3 últimos caracteres). |
 | **Luces de conexión** | Servidor, TradingView (CDP 9222) y Tradovate, siempre visibles en la barra superior. |
-| **Actualización segura** | `actualizar.bat` descarga Git portátil, respalda lo que va a reemplazar y nunca toca tus archivos personales. |
+| **Actualización segura** | `acceso/actualizar.bat` descarga Git portátil, respalda lo que va a reemplazar y nunca toca tus archivos personales. |
 
 <p align="center">
   <img src="assets/granja-isla.png" alt="La isla de la granja con el Jardín de logros" width="80%">
@@ -111,7 +111,7 @@ El motor usa la **misma conexión que ya tiene tu TradingView Desktop**: no guar
 
 ## Estrategias
 
-Se definen en [`strategies.mjs`](strategies.mjs). Añadir una nueva es crear una entrada más en `STRATEGIES`; la página la lista sola.
+Se definen en [`motor/strategies.mjs`](motor/strategies.mjs). Añadir una nueva es crear una entrada más en `STRATEGIES`; la página la lista sola.
 
 | Id | Nombre | Qué hace |
 |---|---|---|
@@ -128,33 +128,20 @@ Tope de tamaño: 20 MNQ o 2 NQ.
 
 ```text
 AI-Profit/
-├── Granja-de-Cuentas-v2.html   La página (granja, slider, historial)
-├── tradinglink.mjs             Servidor local en 127.0.0.1:8787 y API
-├── colchon.mjs                 Motor de ejecución (CDP, stop, P&L)
-├── orders.mjs                  Órdenes manuales con confirmación
-├── strategies.mjs              Registro de estrategias
-├── negocio.mjs                 Copia del historial del Negocio (negocio.json)
-├── probe.mjs · busy.mjs        Herramientas de lectura (¿está libre la cuenta?)
-├── AI Profit.command           Mac: zsh, TradingView 9222 + servidor + Granja
-├── Abrir Granja.command        Mac: abre "AI Profit.command" (nombre anterior)
-├── Abrir Granja.bat            Windows: lo mismo, en un doble clic
+├── LEEME.md                    Empieza aquí (instalador, luego el Escritorio)
+├── README.md                   Esta página
 ├── instalar-ai-profit.command  Mac: applet de Escritorio AI Profit (icono, sin Rosetta)
 ├── instalar-ai-profit.bat/.ps1 Windows: crea el acceso de Escritorio AI Profit
-├── abrir-tradingview.bat       Solo TradingView Desktop con el puerto 9222
-├── iniciar-tradinglink.bat     Solo el servidor y la granja
-├── AI-PROFIT-ACCESO.md         Cómo instalar el icono del Escritorio
-├── actualizar.bat / .ps1       Actualización segura desde este repositorio
-├── colchon-src/                Fuentes de la UI del motor y pruebas simuladas
+├── acceso/                     Lanzadores (Mac .command, Windows .bat, actualizar)
+├── motor/                      Servidor, página, estrategias y motor
+├── docs/                       Guías (acceso, actualizar, motor, agentes)
+├── datos/                      Datos locales de cada PC (no se suben)
+├── assets/                     Icono de Karo y las imágenes
 ├── tradingview-mcp/            Herramientas de apoyo para TradingView
-├── docs/                       Documentación adicional
-├── MOTOR.md                    Guía técnica completa del motor
-├── LEEME.md · LEEME-ACTUALIZAR.md
-├── AGENTS.md                   Reglas para cualquier agente
-├── INSTRUCCIONES-GROK.md       Pasos para el agente de Caroline
-└── assets/                     Imágenes de este README
+└── node/                       Node portable de Mac (node/bin/node); en Windows, node-win/
 ```
 
-Los archivos personales de cada PC (`accounts.json`, `sod.json`, `negocio.json`, `logros.json`, `metas.json`, `real-allowlist.json`, `historial/`, `backups-negocio/`, `reportes/`, `backups/`, `colchon-*.json*`, `*.log`) están en `.gitignore` y **nunca** se suben.
+Los archivos personales de cada PC (`accounts.json`, `sod.json`, `days.json`, `negocio.json`, `logros.json`, `metas.json`, `real-allowlist.json`, `historial/`, `backups-negocio/`, `reportes/`, `backups/`, `colchon-*.json*`, `*.log`) están en `.gitignore` y **nunca** se suben. En una carpeta nueva quedan dentro de `datos/`. Si ya estaban en la raíz, el servidor los sigue usando ahí.
 
 ---
 
@@ -170,16 +157,16 @@ Los archivos personales de cada PC (`accounts.json`, `sod.json`, `negocio.json`,
 
 El icono se llama **AI Profit** y el dibujo vive en el repositorio: `assets/abrir-granja-icon.png` (también `assets/abrir-granja-icon.icns` y `assets/abrir-granja-icon.ico`).
 
-- **Mac:** doble clic en `instalar-ai-profit.command`. Crea en el Escritorio **AI Profit**, un applet de AppleScript con el dibujo de `assets/abrir-granja-icon.icns`. El ejecutable es el binario universal de `osacompile`, no un script de shell, y no pide Rosetta. Ese applet abre `AI Profit.command`.
-- **Windows:** doble clic en `instalar-ai-profit.bat`. Crea el acceso `AI Profit` en el Escritorio.
+- **Mac:** doble clic en `instalar-ai-profit.command`. Crea en el Escritorio **AI Profit**, un applet de AppleScript con el dibujo de `assets/abrir-granja-icon.icns`. El ejecutable es el binario universal de `osacompile`, no un script de shell, y no pide Rosetta. Ese applet abre `acceso/AI Profit.command`.
+- **Windows:** doble clic en `instalar-ai-profit.bat`. Crea el acceso `AI Profit` en el Escritorio. El acceso ejecuta `acceso/Abrir Granja.bat`.
 
-Después, cada día, un doble clic en **AI Profit** abre TradingView con el puerto 9222, enciende el servidor si hace falta y abre la Granja en Chrome (`http://localhost:8787/Granja-de-Cuentas-v2.html`). No envía órdenes. Si mueves la carpeta, vuelve a ejecutar el instalador. Para cambiar el dibujo, sustituye el PNG y ejecuta el instalador otra vez. Más detalle en [`AI-PROFIT-ACCESO.md`](AI-PROFIT-ACCESO.md).
+Después, cada día, un doble clic en **AI Profit** abre TradingView con el puerto 9222, enciende el servidor si hace falta y abre la Granja en Chrome (`http://localhost:8787/Granja-de-Cuentas-v2.html`). No envía órdenes. Si mueves la carpeta, vuelve a ejecutar el instalador. Para cambiar el dibujo, sustituye el PNG y ejecuta el instalador otra vez. Más detalle en [`docs/AI-PROFIT-ACCESO.md`](docs/AI-PROFIT-ACCESO.md).
 
 ### Arranque diario
 
 Doble clic en **AI Profit** en el Escritorio.
 
-Sin ese acceso, en Windows: `abrir-tradingview.bat` y luego `iniciar-tradinglink.bat`. En Mac: `AI Profit.command` (el del Escritorio es el applet **AI Profit**).
+Sin ese acceso, en Windows: `acceso/abrir-tradingview.bat` y luego `acceso/iniciar-tradinglink.bat`. En Mac: `acceso/AI Profit.command` (el del Escritorio es el applet **AI Profit**).
 
 Comprueba `http://localhost:8787/api/colchon/conexion`: `tradingview` y `tradovate` deben salir conectados y `broker` verdadero.
 
@@ -187,13 +174,13 @@ Comprueba `http://localhost:8787/api/colchon/conexion`: `tradingview` y `tradova
 
 ### Actualizar (Caroline y agentes)
 
-1. Acepta la invitación como colaboradora de `apriai/AI-Profit` y descarga `actualizar.bat` y `actualizar.ps1` en tu carpeta de TradingLink, junto a `colchon.mjs`.
+1. Acepta la invitación como colaboradora de `apriai/AI-Profit`. La carpeta es la que tiene `LEEME.md`.
 2. Antes de actualizar, confirma que **no hay operación abierta ni órdenes pendientes**.
-3. Doble clic en `actualizar.bat`. La primera vez descarga Git portátil dentro de la carpeta y abre el navegador para que inicies sesión en GitHub.
+3. Doble clic en `acceso/actualizar.bat`. La primera vez descarga Git portátil dentro de la carpeta y abre el navegador para que inicies sesión en GitHub.
 4. El programa guarda una copia de lo que va a cambiar en `backups\pre-actualizar-<fecha-hora>` y reemplaza **solo el código**. No toca cuentas, saldos, historial, logros ni metas.
 5. Reinicia el servidor **solo estando plana y sin órdenes**.
 
-Para un agente, los pasos completos y las comprobaciones están en [`INSTRUCCIONES-GROK.md`](INSTRUCCIONES-GROK.md). Más detalle en [`LEEME-ACTUALIZAR.md`](LEEME-ACTUALIZAR.md).
+Para un agente, los pasos completos y las comprobaciones están en [`docs/INSTRUCCIONES-GROK.md`](docs/INSTRUCCIONES-GROK.md). Más detalle en [`docs/LEEME-ACTUALIZAR.md`](docs/LEEME-ACTUALIZAR.md).
 
 ### Publicar cambios (solo Bänéd)
 
@@ -226,7 +213,7 @@ Reglas completas en [`AGENTS.md`](AGENTS.md).
 | Lectura del P&L directamente de Tradovate (modo `broker`) | **Verificado** en esa misma prueba real. |
 | Stop modificado con `modifyOrder` | **Verificado** (en la prueba real el stop se movió y Tradovate lo confirmó; en una prueba anterior se comprobó además que el id de la orden no cambia). |
 | Movimiento a *break even* en modo `broker` | **Sin probar** en un trade real. Se vio funcionar una vez en una prueba anterior de 2 MNQ con la fuente «más rápido» (según `MOTOR.md`), pero no en modo `broker`. |
-| Slider 1 a 20, tinte rojo, valor por defecto 5 | Implementado y revisado en capturas; el valor por defecto 5 en `strategies.mjs` entra en vigor al reiniciar el servidor. |
+| Slider 1 a 20, tinte rojo, valor por defecto 5 | Implementado y revisado en capturas; el valor por defecto 5 en `motor/strategies.mjs` entra en vigor al reiniciar el servidor. |
 
 **Hoja de ruta**
 

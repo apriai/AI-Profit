@@ -2,11 +2,12 @@
 rem AI Profit: TradingView (puerto 9222) + servidor TradingLink + la Granja.
 rem No envia ordenes. El icono del Escritorio lo crea instalar-ai-profit.bat.
 setlocal EnableExtensions
-cd /d "%~dp0"
+set "ROOT=%~dp0.."
+cd /d "%ROOT%"
 title AI Profit
 
-if not exist "%~dp0tradinglink.mjs" (
-  echo No encuentro tradinglink.mjs en esta carpeta.
+if not exist "%ROOT%\motor\tradinglink.mjs" (
+  echo No encuentro motor\tradinglink.mjs. Este acceso tiene que estar en la carpeta acceso.
   pause
   exit /b 1
 )
@@ -44,9 +45,9 @@ call :listening_http 8787
 if not errorlevel 1 goto browser
 
 set "NODE="
-if exist "%~dp0node-win\node.exe" set "NODE=%~dp0node-win\node.exe"
-if not defined NODE if exist "%~dp0node\node.exe" set "NODE=%~dp0node\node.exe"
-if not defined NODE if exist "%~dp0node\bin\node.exe" set "NODE=%~dp0node\bin\node.exe"
+if exist "%ROOT%\node-win\node.exe" set "NODE=%ROOT%\node-win\node.exe"
+if not defined NODE if exist "%ROOT%\node\node.exe" set "NODE=%ROOT%\node\node.exe"
+if not defined NODE if exist "%ROOT%\node\bin\node.exe" set "NODE=%ROOT%\node\bin\node.exe"
 if not defined NODE (
   for /f "delims=" %%N in ('where node 2^>nul') do (
     if not defined NODE set "NODE=%%N"
@@ -54,13 +55,13 @@ if not defined NODE (
 )
 if not defined NODE (
   echo Falta Node.js para Windows v18+.
-  echo Copia node.exe en la carpeta node-win\ o instalalo desde https://nodejs.org
+  echo Copia node.exe en la carpeta node-win\ (en la raiz de TradingLink) o instalalo desde https://nodejs.org
   pause
   exit /b 1
 )
 
 echo Encendiendo TradingLink...
-start "TradingLink" /MIN "%NODE%" "%~dp0tradinglink.mjs"
+start "TradingLink" /MIN "%NODE%" "%ROOT%\motor\tradinglink.mjs"
 set "TRIES=0"
 :wait_srv
 call :listening_http 8787
