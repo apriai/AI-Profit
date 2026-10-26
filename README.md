@@ -133,6 +133,7 @@ AI-Profit/
 ├── colchon.mjs                 Motor de ejecución (CDP, stop, P&L)
 ├── orders.mjs                  Órdenes manuales con confirmación
 ├── strategies.mjs              Registro de estrategias
+├── negocio.mjs                 Copia del historial del Negocio (negocio.json)
 ├── probe.mjs · busy.mjs        Herramientas de lectura (¿está libre la cuenta?)
 ├── abrir-tradingview.bat       Abre TradingView Desktop con el puerto 9222
 ├── iniciar-tradinglink.bat     Arranca el servidor y abre la granja
@@ -147,7 +148,7 @@ AI-Profit/
 └── assets/                     Imágenes de este README
 ```
 
-Los archivos personales de cada PC (`accounts.json`, `sod.json`, `logros.json`, `metas.json`, `real-allowlist.json`, `historial/`, `reportes/`, `backups/`, `colchon-*.json*`, `*.log`) están en `.gitignore` y **nunca** se suben.
+Los archivos personales de cada PC (`accounts.json`, `sod.json`, `negocio.json`, `logros.json`, `metas.json`, `real-allowlist.json`, `historial/`, `backups-negocio/`, `reportes/`, `backups/`, `colchon-*.json*`, `*.log`) están en `.gitignore` y **nunca** se suben.
 
 ---
 

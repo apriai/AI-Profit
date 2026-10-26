@@ -2,6 +2,7 @@
 // Regla: cuentas LFE = evaluación, LFF = fondeada.
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
 import * as orders from './orders.mjs';
+import { negocio } from './negocio.mjs';
 import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, etDay, cdpEvaluator, PAGE } from './colchon.mjs';
 import { execFile } from 'node:child_process'; import { fileURLToPath } from 'node:url';
 const DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -17,7 +18,7 @@ let state = { updated: null, accounts: {}, error: null, daily: {} };
 const SOD_FILE = path.join(DIR, 'sod.json');
 let sod = { accounts: {}, daily: {} }; try { sod = { accounts: {}, daily: {}, ...JSON.parse(fs.readFileSync(SOD_FILE, 'utf8')) }; } catch {}
 // Semilla: al reiniciar, las cuentas no activas no se releen (p.ej. con pausa-lectura.flag); se publica su ÚLTIMO saldo real conocido (sod.lastBal) marcado stale para que la granja pueda marcar quemada una fondeada.
-for (const [id, s] of Object.entries(sod.accounts || {})) if (/^LF[EF]/.test(id) && s && s.lastBal != null) state.accounts[id] = { id, type: typeOf(id), balance: s.lastBal, equity: s.lastBal, profit: null, readAt: s.readAt || null, startOfDay: s.bal, dayPnl: Math.round((s.lastBal - s.bal) * 100) / 100, totalPnl: Math.round((s.lastBal - 25000) * 100) / 100, tradingDay: s.day, stale: true };
+for (const [id, s] of Object.entries(sod.accounts || {})) if (/^LF[EF]/.test(id) && s && s.lastBal != null && !s.gone) state.accounts[id] = { id, type: typeOf(id), balance: s.lastBal, equity: s.lastBal, profit: null, readAt: s.readAt || null, startOfDay: s.bal, dayPnl: Math.round((s.lastBal - s.bal) * 100) / 100, totalPnl: Math.round((s.lastBal - 25000) * 100) / 100, tradingDay: s.day, stale: true };
 function tradingDay() { const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false }).formatToParts(new Date()).map(x => [x.type, x.value])); const d = new Date(Date.UTC(+p.year, +p.month - 1, +p.day)); if ((+p.hour % 24) >= 18) d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); }
 
 const readCurrent = () => ev(`(()=>{const n=document.querySelector('[class*=accountName]');const f=[...document.querySelectorAll('[class*=accountSummaryField]')].map(e=>e.innerText.split('\\n'));const p=(document.querySelector('[class*=accountManager]')||{}).innerText||'';return JSON.stringify({id:n&&n.innerText.trim(),f,busy:/Positions\\s*\\(?[1-9]|Orders\\s*\\(?[1-9]/.test(p)})})()`).then(s => JSON.parse(s || '{}'));
@@ -81,7 +82,7 @@ async function cycle() {
     for (const a of r.accounts) if (/^LF[EF]/.test(a.name) && a.balance != null)
       save({ id: a.name, f: [['Account Balance', String(a.balance)], ['Equity', String(a.equity ?? a.balance)], ['Profit', String(a.profit ?? 0)]] });
     // la granja refleja SOLO las cuentas que TradingView tiene ahora (accountsMetainfo); se borran las que ya no existen
-    if (Array.isArray(r.live) && r.live.length) { state.live = r.live.map(a => a.name); for (const k of Object.keys(state.accounts)) if (!state.live.includes(k)) { console.log('cuenta ya no está en TradingView, se quita:', k); delete state.accounts[k]; } rellenar(state.live); }
+    if (Array.isArray(r.live) && r.live.length) { state.live = r.live.map(a => a.name); for (const k of Object.keys(state.accounts)) if (!state.live.includes(k)) { console.log('cuenta ya no está en TradingView, se quita:', k); delete state.accounts[k]; if (!/^LFF/.test(k) && sod.accounts[k] && !sod.accounts[k].gone) { sod.accounts[k].gone = new Date().toISOString(); try { fs.writeFileSync(SOD_FILE, JSON.stringify(sod, null, 2)); } catch {} } } for (const id of state.live) if (sod.accounts[id] && sod.accounts[id].gone) delete sod.accounts[id].gone; rellenar(state.live); }
     state.updated = new Date().toISOString(); state.error = null;
   } catch (e) { state.error = String(e.message || e); }
   fs.writeFileSync(path.join(DIR, 'accounts.json'), JSON.stringify(state, null, 2));
@@ -147,7 +148,9 @@ async function conexion() { if (conn.v && Date.now() - conn.at < 10000) return c
   if (cdp && st.state !== 'running') { try { const c = await Promise.race([colchon.check(), sleep(4000).then(() => null)]); if (c && c.account) { broker = c.account.broker || c.account.brokerId || null; tdv = /tradovate/i.test(`${broker} ${c.account.brokerId || ''}`) && !!c.account.name; real = !!c.real; cuenta = maskId(c.account.name); } } catch {} }
   if (!cdp) tdv = false; if (st.state === 'running' && st.mode === 'real') real = true;
   conn = { at: Date.now(), v: { servidor: true, tradingview: cdp, tradovate: tdv, broker, real, cuenta, lecturaOk: !state.error, actualizado: state.updated } }; return conn.v; }
+const negocioH = negocio({ dir: DIR, port: PORT, day: () => etDay() }); // /api/negocio: copia del historial del Negocio (negocio.json)
 http.createServer((q, r) => {
+  if (negocioH(q, r)) return;
   if (/^\/(logros|metas)\.json/.test(q.url)) { let t='{}'; try { t = fs.readFileSync(path.join(DIR, q.url.startsWith('/logros') ? 'logros.json' : 'metas.json'), 'utf8'); } catch {} r.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); return r.end(t); }
   if (q.url.startsWith('/accounts.json')) { r.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); return r.end(JSON.stringify(state)); }
   if (q.url.startsWith('/api/colchon/')) { let b=''; q.on('data',c=>b+=c); q.on('end', async()=>{ let j={}; try{j=JSON.parse(b||'{}')}catch{} let out;

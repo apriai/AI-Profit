@@ -9,6 +9,17 @@
 #fatal h2{font-size:19px;margin:0 0 6px}#fatal p{font-size:13.5px;opacity:.85;margin:0 0 10px;line-height:1.45}
 #fatal pre{white-space:pre-wrap;word-break:break-word;font-size:12px;background:rgba(0,0,0,.35);padding:10px 12px;border-radius:10px;max-height:40vh;overflow:auto;margin:0 0 12px}
 #fatal button{font:inherit;font-weight:600;color:#fff;cursor:pointer;padding:8px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.14);margin-right:8px}.label{min-width:0!important;padding:3px 10px 4px!important;font-size:11px!important;border-radius:999px!important;background:rgba(20,8,40,.32)!important;backdrop-filter:blur(4px);box-shadow:none!important;border:1px solid rgba(255,255,255,.14)!important}.lbl-head{font-size:10px!important;opacity:.8;gap:3px!important}.lbl-main{font-size:12px!important;margin-top:0!important}.lbl-main .of,.ej,.lbl-sub{display:none!important}.bar{height:3px!important;margin-top:3px!important;min-width:64px}.badge{font-size:10px!important;padding:2px 6px!important}.simbtn{font-size:10px!important;padding:2px 8px!important;margin-top:2px}#blobColorBtn{display:none!important}#blobColors{transform:translate(-50%,-8px) scale(.96)}</style>
+<script>/* Negocio: copia del historial en el servidor (negocio.json). Si el navegador esta vacio lo restaura; si no, lo guarda (max 1 vez cada 10 s). */
+(function(){var API='/api/negocio',RX=/^(tl_|granja\.)/,last=null,timer=0;
+function ln(v){try{var a=JSON.parse(v);return Array.isArray(a)?a.length:0}catch(e){return 0}}
+function snap(){var d={};try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(RX.test(k))d[k]=localStorage.getItem(k)}}catch(e){}return d}
+try{if(ln(localStorage.getItem('tl_ledger_v1'))===0){var x=new XMLHttpRequest();x.open('GET',API,false);x.send();
+if(x.status===200){var j=JSON.parse(x.responseText),d=j&&j.data;if(d&&ln(d.tl_ledger_v1)>0){for(var k in d)if(RX.test(k)&&typeof d[k]==='string')localStorage.setItem(k,d[k]);console.log('Negocio restaurado desde negocio.json')}}}}catch(e){}
+function push(){timer=0;var d=snap();if(ln(d.tl_ledger_v1)===0)return;var s=JSON.stringify(d);if(s===last)return;
+fetch(API,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({version:1,data:d}),keepalive:true}).then(function(r){return r.json()}).then(function(o){if(o&&o.ok)last=s}).catch(function(){})}
+function sched(){if(!timer)timer=setTimeout(push,10000)}
+try{var P=Storage.prototype,si=P.setItem,ri=P.removeItem;P.setItem=function(k){var r=si.apply(this,arguments);if(this===window.localStorage&&RX.test(k))sched();return r};P.removeItem=function(k){var r=ri.apply(this,arguments);if(this===window.localStorage&&RX.test(k))sched();return r}}catch(e){}
+setTimeout(push,5000);setInterval(push,60000);addEventListener('pagehide',function(){if(timer){clearTimeout(timer);push()}});})();</script>
 <script>
 // Pantalla de error amigable: si algo falla, se muestra el mensaje en vez de una pagina en blanco.
 (function(){
@@ -5157,7 +5168,7 @@ function build(){const gx=window.__gx;if(!gx||!gx.wt||!gx.Xt)return;const es=ent
 function scr(gx,obj,dy){const v=obj.getWorldPosition(new gx.P);v.y+=dy;v.project(gx.Lt);return v.z<1&&Math.abs(v.x)<1.1&&Math.abs(v.y)<1.1?{x:(v.x+1)/2*innerWidth,y:(1-v.y)/2*innerHeight}:null}
 function loop(t){requestAnimationFrame(loop);const gx=window.__gx;if(!gx||!gx.Lt)return;const s=t/1000;
  sparks.forEach(p=>{const u=p.userData;p.position.set(Math.cos(u.a+s*u.v)*u.r,u.y+Math.sin(s*1.3+u.a)*.25,Math.sin(u.a+s*u.v)*u.r);p.scale.setScalar(.7+.5*Math.sin(s*3+u.a))});
- items.forEach(e=>{e.obj.userData.glow.material.opacity=.09+.05*Math.sin(s*1.5);const p=scr(gx,e.obj,4.2);if(p){e.tag.style.display="";e.tag.style.left=p.x+"px";e.tag.style.top=p.y+70+"px"}else e.tag.style.display="none"});
+ items.forEach(e=>{const gl=e.obj.userData.glow;if(gl)gl.material.opacity=.09+.05*Math.sin(s*1.5);const p=scr(gx,e.obj,4.2);if(p){e.tag.style.display="";e.tag.style.left=p.x+"px";e.tag.style.top=p.y+70+"px"}else e.tag.style.display="none"});
  if(sign&&items.length){const c=items[0].obj;const p=scr(gx,c,5.3);if(p){sign.style.display="";sign.style.left=p.x+"px";sign.style.top=p.y+"px"}else sign.style.display="none"}
  const seen=new Set();(gx.At||[]).forEach(n=>{if(n.removed||!n.a||n.a.memorial||!n.d||n.d.kind==="wither"||!n.g.visible)return;seen.add(n);let b=bars.get(n);if(!b){b=document.createElement("div");b.className="pfMeta";b.innerHTML='<div class="t"><i></i></div><span></span>';document.body.appendChild(b);bars.set(n,b)}
   const pr=prog(n.a);b.firstChild.firstChild.style.width=Math.round(pr.p*100)+"%";b.lastChild.textContent=Math.round(pr.p*100)+"%";b.title=pr.lbl;

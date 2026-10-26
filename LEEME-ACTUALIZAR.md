@@ -16,7 +16,7 @@ Sirve para traer la última versión del código desde el repositorio privado `h
 3. `git fetch` de `origin/main`.
 4. **Respalda** cada archivo que va a ser reemplazado en `backups\pre-actualizar-<fecha-hora>\` (mantiene las mismas subcarpetas).
 5. Actualiza **solo los archivos que están en el repositorio** (`git checkout origin/main -- .`). **No usa `git reset --hard`** y no borra nada.
-6. Tus archivos personales (`accounts.json`, `sod.json`, `logros.json`, `metas.json`, `real-allowlist.json`, `historial\`, `reportes\`, `backups\`, `colchon-*.json*`, logs, `node-win\`) no están en el repositorio y quedan intactos.
+6. Tus archivos personales (`accounts.json`, `sod.json`, `negocio.json`, `backups-negocio\`, `logros.json`, `metas.json`, `real-allowlist.json`, `historial\`, `reportes\`, `backups\`, `colchon-*.json*`, logs, `node-win\`) no están en el repositorio y quedan intactos.
 
 ## Después de actualizar
 **Reinicia el servidor solo cuando estés plana y sin órdenes** (sin posición abierta ni órdenes de trabajo; ningún trade en curso). El código nuevo no se usa hasta reiniciar. Hasta entonces el servidor sigue con la versión anterior.
