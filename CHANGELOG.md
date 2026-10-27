@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.3.1] - 2026-10-26
+### Arreglado
+- **Arreglo: el respaldo del Negocio (`negocio.json`) no se creaba con historiales grandes (>64 KB).** La página enviaba el respaldo con `keepalive:true`, y los navegadores rechazan en silencio cuerpos de más de 64 KiB con esa opción, así que con un historial grande (por ejemplo, un jardín de varios MB) el archivo nunca se creaba. Ahora `keepalive` solo se usa cuando el envío es pequeño (`motor/Granja-de-Cuentas-v2.html`).
+- El servidor acepta hasta **25 MB** por envío a `/api/negocio` (antes 5 MB), porque el jardín crece (`motor/negocio.mjs`).
+- El servidor envía `Cache-Control: no-store` en la página HTML, para que el navegador no se quede con una copia vieja sin el script de guardado (`motor/tradinglink.mjs`).
+
 ## [0.3.0] - 2026-10-26
 Reorganización de carpetas y acceso de escritorio para Mac y Windows (PR #5 y #6 de Caroline, integrados y revisados por Bänéd).
 

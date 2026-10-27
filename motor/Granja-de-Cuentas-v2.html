@@ -16,7 +16,7 @@ function snap(){var d={};try{for(var i=0;i<localStorage.length;i++){var k=localS
 try{if(ln(localStorage.getItem('tl_ledger_v1'))===0){var x=new XMLHttpRequest();x.open('GET',API,false);x.send();
 if(x.status===200){var j=JSON.parse(x.responseText),d=j&&j.data;if(d&&ln(d.tl_ledger_v1)>0){for(var k in d)if(RX.test(k)&&typeof d[k]==='string')localStorage.setItem(k,d[k]);console.log('Negocio restaurado desde negocio.json')}}}}catch(e){}
 function push(){timer=0;var d=snap();if(ln(d.tl_ledger_v1)===0)return;var s=JSON.stringify(d);if(s===last)return;
-fetch(API,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({version:1,data:d}),keepalive:true}).then(function(r){return r.json()}).then(function(o){if(o&&o.ok)last=s}).catch(function(){})}
+fetch(API,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({version:1,data:d}),keepalive:(s.length<60000)}).then(function(r){return r.json()}).then(function(o){if(o&&o.ok)last=s}).catch(function(){})}
 function sched(){if(!timer)timer=setTimeout(push,10000)}
 try{var P=Storage.prototype,si=P.setItem,ri=P.removeItem;P.setItem=function(k){var r=si.apply(this,arguments);if(this===window.localStorage&&RX.test(k))sched();return r};P.removeItem=function(k){var r=ri.apply(this,arguments);if(this===window.localStorage&&RX.test(k))sched();return r}}catch(e){}
 setTimeout(push,5000);setInterval(push,60000);addEventListener('pagehide',function(){if(timer){clearTimeout(timer);push()}});})();</script>
@@ -5325,7 +5325,7 @@ function hook(){const G=window.__granja&&window.__granja.pet;if(!G||!G.renderer|
  if(cfg.kind!=="perro"||cfg.body!==A.perro.b||cfg.accent!==A.perro.a){try{applyPet(G,cfg)}catch(err){console.warn("mascota",err)}}
  (function lab(){const p=window.__pet.screen();if(p&&cfg.name){tag.textContent=cfg.name;tag.style.left=p.x+"px";tag.style.top=(p.y-8)+"px";tag.style.display="block"}else tag.style.display="none";requestAnimationFrame(lab)})()}
 setTimeout(hook,600);})();</script>
-<div id="tl-version" style="position:fixed;right:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.3.0</div>
+<div id="tl-version" style="position:fixed;right:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.3.1</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/VERSION",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
 </body>
 </html>

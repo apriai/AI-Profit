@@ -1,7 +1,7 @@
 // Negocio: copia persistente (en esta carpeta) del historial que la pagina guarda en el navegador (localStorage).
 // Rutas: GET /api/negocio -> negocio.json (o {}); POST|PUT /api/negocio -> guarda. Solo localhost. Nunca se sube a GitHub.
 import fs from 'node:fs'; import path from 'node:path';
-const MAX = 5 * 1024 * 1024, KEEP = 30, KEYRX = /^(tl_|granja\.)/;
+const MAX = 25 * 1024 * 1024, KEEP = 30, KEYRX = /^(tl_|granja\.)/;
 const count = v => { try { const a = JSON.parse(v); return Array.isArray(a) ? a.length : 0; } catch { return 0; } };
 export function negocio({ dir, port, day }) {
   const FILE = path.join(dir, 'negocio.json'), BK = path.join(dir, 'backups-negocio');
@@ -37,7 +37,7 @@ export function negocio({ dir, port, day }) {
     if (q.method !== 'POST' && q.method !== 'PUT') { send(r, 405, { ok: false, err: 'metodo no permitido' }); return true; }
     const ch = []; let n = 0, big = false;
     q.on('data', c => { n += c.length; if (n > MAX) big = true; else ch.push(c); });
-    q.on('end', () => { if (big) return send(r, 413, { ok: false, err: 'muy grande (max 5 MB)' });
+    q.on('end', () => { if (big) return send(r, 413, { ok: false, err: 'muy grande (max 25 MB)' });
       let j; try { j = JSON.parse(Buffer.concat(ch).toString('utf8')); } catch { return send(r, 400, { ok: false, err: 'JSON invalido' }); }
       let res; try { res = guardar(j); } catch (e) { res = [500, { ok: false, err: String(e.message || e) }]; } send(r, res[0], res[1]); });
     return true;

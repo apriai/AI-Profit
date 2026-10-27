@@ -187,7 +187,7 @@ http.createServer((q, r) => {
     const logo = path.join(ROOT, 'assets', 'propfarm-logo.png');
     if (fs.existsSync(logo)) { r.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'no-store' }); return fs.createReadStream(logo).pipe(r); }
   }
-  r.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); fs.createReadStream(HTML).pipe(r);
+  r.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' }); fs.createReadStream(HTML).pipe(r);
 }).listen(PORT, '127.0.0.1', () => console.log(`Granja: http://localhost:${PORT}`));
 let lastFull = 0, lastFunded = 0, lastBusy = Date.now(); const FULL_MS = EVERY_MS, QUIET_MS = 5 * 60 * 1000;
 cycle(); setInterval(cycle, 30 * 1000);
