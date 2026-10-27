@@ -10,6 +10,17 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.4.0] - 2026-10-26
+Stop en break even con 3 ticks de ganancia, panel de operación nuevo a la izquierda y un vigía visual para comprobar el stop en TradingView.
+
+### Agregado
+- **`motor/vigia-visual.mjs` (vigía visual, solo lectura).** Después de mover el stop en una operación real (`real`), durante unos 5 s anota el precio de la orden en TradingView, si la página está visible y con foco, y toma 4 capturas JPEG en `colchon-visual/`. Registra el evento `visual_stop` en `colchon-eventos.jsonl` y solo guarda las últimas 40 carpetas. Se lanza sin esperar (fire-and-forget) y un error aquí nunca afecta a la operación. `colchon-visual/` está en `.gitignore`.
+- **Panel de operación nuevo** (`motor/Granja-de-Cuentas-v2.html`): ahora está a la **izquierda**. Muestra el P&L bruto grande, una barra con SL a la izquierda y TP a la derecha, una marca de entrada y una bolita de precio que se mueve en proporción (limitada a los bordes), y una etiqueta verde «Stop en break even (+3 ticks)» cuando el stop ya se movió. Sin etiquetas encimadas y sin rojo alarmante. Solo un P&L (el bruto).
+
+### Cambiado
+- **Estrategia `prueba-be`** (`motor/strategies.mjs`, `motor/colchon.mjs`): el escalón ahora usa `lockTicks: 3`. Al llegar a +$15 el stop sube a **entrada + 3 ticks** (0.75 pts: +$1.50 con 1 MNQ, +$15 con 1 NQ) en vez de quedar exactamente en la entrada. Así se cubre al menos la comisión y TradingView ya no esconde la línea del stop pegada a la entrada. `stepsFor` acepta `lockTicks` y el disparo nunca queda a menos de 1 tick de ese stop. Las demás estrategias no cambian.
+- **Barra de la página:** se corrigió el cálculo de la barra de SL/TP del panel, que antes tomaba los puntos del TP como si fueran un precio.
+
 ## [0.3.1] - 2026-10-26
 ### Arreglado
 - **Arreglo: el respaldo del Negocio (`negocio.json`) no se creaba con historiales grandes (>64 KB).** La página enviaba el respaldo con `keepalive:true`, y los navegadores rechazan en silencio cuerpos de más de 64 KiB con esa opción, así que con un historial grande (por ejemplo, un jardín de varios MB) el archivo nunca se creaba. Ahora `keepalive` solo se usa cuando el envío es pequeño (`motor/Granja-de-Cuentas-v2.html`).

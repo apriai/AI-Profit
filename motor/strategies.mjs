@@ -22,9 +22,9 @@ export const STRATEGIES = {
   },
   'prueba-be': {
     id: 'prueba-be', name: 'Prueba BE',
-    short: "Operación: SL −$630 / TP +$630\n+$15 → protege $0 (entrada)",
-    description: "Operación: entra a mercado con SL −$630 y TP +$630. AI: +$15 → el stop sube a la entrada (sin pérdida). Se mueve una sola vez.",
-    params: { SL_USD: 630, TP_USD: 630, STEPS: [{ trigger: 15, lock: 0 }], PROB: 'tp', DEFAULT_QTY: { MNQ: 5, NQ: 1 } },
+    short: "Operación: SL −$630 / TP +$630\n+$15 → stop a entrada +3 ticks (cubre la comisión)",
+    description: "Operación: entra a mercado con SL −$630 y TP +$630. AI: +$15 → el stop sube a la entrada +3 ticks de ganancia (0.75 pts), para cubrir al menos la comisión. Se mueve una sola vez.",
+    params: { SL_USD: 630, TP_USD: 630, STEPS: [{ trigger: 15, lockTicks: 3 }], PROB: 'tp', DEFAULT_QTY: { MNQ: 5, NQ: 1 } },
   },
 };
 export const DEFAULT_STRATEGY = 'evaluacion-simple';
