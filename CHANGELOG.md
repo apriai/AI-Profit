@@ -10,6 +10,25 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.4.0] - 2026-10-26
+Stop en break even con 3 ticks de ganancia, panel de operación nuevo a la izquierda y todos los paneles de detalle abiertos a la izquierda.
+
+### Agregado
+- **Panel de detalle de un trade** (`motor/Granja-de-Cuentas-v2.html`): al tocar un trade en «Historial de trades» se abre un panel con el mismo estilo del panel en vivo: P&L bruto grande, dirección, tamaño y símbolo, estrategia, cuenta enmascarada, motivo del cierre en español sencillo, entrada → salida, duración, horas en ET, barra pequeña, etiqueta de break even, pasos y ajuste de fill. Incluye secciones plegadas «Detalles técnicos» y «Ver informe completo», y un botón «← Volver». Se lee bien a ~560 px y en pantalla ancha.
+- **Ruta nueva de solo lectura `GET /api/colchon/detalle?at=<hora>`** (`motor/tradinglink.mjs`): junta, desde `colchon-eventos.jsonl`, el cierre del trade, los movimientos del stop, los disparos y la comparación broker/gráfico de esa operación. No escribe nada, no toca órdenes y enmascara la cuenta (4 primeros + 3 últimos).
+- **Mascota en la barra del panel en vivo:** reemplaza la bolita de precio por una mascota (bolita verde lima brillante con dos ojos negros verticales) que se mueve y se inclina hacia donde va el precio, con los ojos mirando ahí, un pequeño rebote al ganar y una respiración suave en reposo. Al perder se preocupa: el color cambia de forma continua de verde lima a naranja y a rojo en proporción al avance hacia el SL, con ojos más grandes que miran de lado, cejas, sudor y un temblor que se acelera cerca del SL. Todo es CSS liviano; con «reducir movimiento» (`prefers-reduced-motion`) se quitan las animaciones pero se mantiene el cambio de color. No se agregan bordes ni íconos rojos.
+- **Sección «Logs» plegable en el panel en vivo:** las líneas de método y latencia, la línea «fuente» y las líneas de registro con hora quedan dentro de un solo botón «Logs», cerrado por defecto y que se abre hacia abajo. Se recuerda abierto o cerrado durante la sesión y no se reinicia con cada refresco.
+- **Panel de operación nuevo** (`motor/Granja-de-Cuentas-v2.html`): ahora está a la **izquierda**. Muestra el P&L bruto grande, una barra con SL a la izquierda y TP a la derecha, una marca de entrada y una bolita de precio que se mueve en proporción (limitada a los bordes), y una etiqueta verde «Stop en break even (+3 ticks)» cuando el stop ya se movió. Sin etiquetas encimadas y sin rojo alarmante. Solo un P&L (el bruto).
+
+### Cambiado
+- **Todos los paneles de detalle se abren a la izquierda.** Los de una burbuja sin fondear, una flor y una cuenta fondeada (el panel `#panel`) aparecían a la derecha; ahora se abren a la izquierda y, si el panel en vivo está abierto, justo a su derecha para no taparse. El panel «Negocio» (resumen, abierto desde el botón de abajo a la derecha) no cambió.
+- **«Estado» → «Status»** en la barra superior de la granja.
+- **Etiqueta de break even del panel en vivo:** ahora dice solo «Stop en break even (+3 ticks)»; la nota sobre cómo TradingView muestra la línea pasó a un texto emergente (tooltip).
+- **Botón «Detener y cerrar posición»:** ahora es rojo (con estado al pasar el mouse, al presionar y al enfocar), del mismo tamaño. Es el único elemento rojo del panel.
+- **Barra del panel en vivo:** más espacio vertical para que la mascota no choque con las etiquetas de SL, TP y entrada.
+- **Estrategia `prueba-be`** (`motor/strategies.mjs`, `motor/colchon.mjs`): el escalón ahora usa `lockTicks: 3`. Al llegar a +$15 el stop sube a **entrada + 3 ticks** (0.75 pts: +$1.50 con 1 MNQ, +$15 con 1 NQ) en vez de quedar exactamente en la entrada. Así se cubre al menos la comisión y TradingView ya no esconde la línea del stop pegada a la entrada. `stepsFor` acepta `lockTicks` y el disparo nunca queda a menos de 1 tick de ese stop. Las demás estrategias no cambian.
+- **Barra de la página:** se corrigió el cálculo de la barra de SL/TP del panel, que antes tomaba los puntos del TP como si fueran un precio.
+
 ## [0.3.1] - 2026-10-26
 ### Arreglado
 - **Arreglo: el respaldo del Negocio (`negocio.json`) no se creaba con historiales grandes (>64 KB).** La página enviaba el respaldo con `keepalive:true`, y los navegadores rechazan en silencio cuerpos de más de 64 KiB con esa opción, así que con un historial grande (por ejemplo, un jardín de varios MB) el archivo nunca se creaba. Ahora `keepalive` solo se usa cuando el envío es pequeño (`motor/Granja-de-Cuentas-v2.html`).

@@ -28,7 +28,8 @@ export function breakEvenFor(symbol, qty, P = getStrategy().params) {
 }
 export function stepsFor(symbol, qty, P = getStrategy().params) {
   const t = tickUsdFor(symbol, qty), ppt = PT_USD[symbol] * qty;
-  if (Array.isArray(P.STEPS)) return P.STEPS.map((x, i) => { const lockUsd = Math.round(Math.ceil(x.lock / t - 1e-9) * t * 100) / 100; return { n: i + 1, triggerUsd: x.trigger, lockUsd, lockPts: Math.round(lockUsd / ppt / TICK) * TICK }; });
+  // escalón con `lockTicks`: el stop va a entrada + N ticks de ganancia (USD = N ticks × tamaño); el disparo nunca queda a menos de 1 tick de ese stop
+  if (Array.isArray(P.STEPS)) return P.STEPS.map((x, i) => { const tk = x.lockTicks != null, lockUsd = tk ? Math.round(x.lockTicks * t * 100) / 100 : Math.round(Math.ceil(x.lock / t - 1e-9) * t * 100) / 100, triggerUsd = tk ? Math.max(x.trigger, Math.round((lockUsd + t) * 100) / 100) : x.trigger; return { n: i + 1, triggerUsd, lockUsd, lockPts: Math.round(lockUsd / ppt / TICK) * TICK }; });
   return [{ n: 1, triggerUsd: triggerUsdFor(symbol, qty, P), lockUsd: lockUsdFor(symbol, qty, P), lockPts: lockPtsFor(symbol, qty, P) }];
 }
 export const roundTick = p => Math.round(p / TICK) * TICK;

@@ -93,6 +93,25 @@ async function cycle() {
 
 // ---- Solo lectura para la granja: historial de trades, informes y luces de conexión ----
 const maskId = t => String(t ?? '').replace(/\b(LF[EF]\d)\d{3,}(\d{3})\b/g, '$1…$2');
+// Detalle de UN trade para la granja (SOLO LECTURA): junta, desde colchon-eventos.jsonl, el cierre (fin_trade), los movimientos del stop y la comparacion broker/chart de esa operacion.
+// Puntos maximos del trade (SOLO LECTURA): peor y mejor P&L visto en las lecturas 1/s de colchon-eventos.jsonl, convertido a puntos.
+function maxPuntos(W, t1, tam) { const m = /(\d+)\s*(MNQ|NQ)/i.exec(String(tam || '')); if (!m) return null; const pv = (/^MNQ$/i.test(m[2]) ? 2 : 20) * +m[1]; const v = W.filter(x => x.type === 'lectura' && Date.parse(x.at) <= t1 + 1e3).map(x => x.brokerPl ?? x.chartPl).filter(x => typeof x === 'number' && isFinite(x)); if (!v.length) return null; const q = u => Math.round(u / pv / .25) * .25; return { neg: q(Math.min(0, ...v)), pos: q(Math.max(0, ...v)), n: v.length, fuente: 'lecturas del broker (1/s)' }; }
+function detalleTrade(at) {
+  const T = Date.parse(at); if (!isFinite(T)) return { ok: false, err: 'Falta la hora del trade' };
+  let L = []; try { L = fs.readFileSync(path.join(DIR, 'colchon-eventos.jsonl'), 'utf8').split('\n').filter(Boolean).map(x => { try { return JSON.parse(x); } catch { return null; } }).filter(x => x && x.at); } catch {}
+  const ms = x => Date.parse(x), cierre = f => ms(f.cerradaEn || f.fin || f.at);
+  let f = null, best = 120e3; for (const x of L) { if (x.type !== 'fin_trade') continue; const d = Math.abs(cierre(x) - T); if (d < best) { best = d; f = x; } }
+  if (!f) return { ok: false, err: 'No hay registro detallado de este trade (por ejemplo, un trade manual).' };
+  const t0 = ms(f.abiertaEn) || (cierre(f) - (f.duracionSeg || 0) * 1e3), t1 = cierre(f), W = L.filter(x => ms(x.at) >= t0 - 5e3 && ms(x.at) <= t1 + 20e3);
+  const intento = m => ((m.intentos || []).find(i => i.ok) || (m.intentos || [])[0] || {});
+  const movs = W.filter(x => x.type === 'mover_stop' && ms(x.at) <= t1 + 1e3).map(m => ({ at: m.at, paso: m.paso, precio: m.precio, ok: !!m.ok, verificado: m.verificado ?? null, via: m.via || null, ms: intento(m).ms ?? null, enSeg: Math.round((ms(m.at) - t0) / 100) / 10 }));
+  const disparos = W.filter(x => x.type === 'disparo' && ms(x.at) <= t1).map(d => ({ at: d.at, paso: d.paso, pnl: d.pnl, disparoUSD: d.disparoUSD, precio: d.precio, slAntes: d.slAntes }));
+  const lec = W.filter(x => x.type === 'lectura' && x.brokerPl != null && x.chartPl != null && ms(x.at) <= t1), dif = lec.map(x => Math.abs(x.brokerPl - x.chartPl));
+  const aj = f.ajusteFill ? { ref: f.ajusteFill.ref, fill: f.ajusteFill.fill, slAntes: f.ajusteFill.slAntes, slNuevo: f.ajusteFill.slNuevo, tpAntes: f.ajusteFill.tpAntes, tpNuevo: f.ajusteFill.tpNuevo, seg: f.ajusteFill.seg ?? null, ok: f.ajusteFill.ok !== false, nada: !!f.ajusteFill.nada } : null;
+  const lt = f.latencia || {};
+  const fin = { direccion: f.direccion, tamano: f.tamano, motivo: f.motivo, estrategia: f.estrategia, estrategiaId: f.estrategiaId, modo: f.modo, cuenta: maskId(f.cuenta), abiertaEn: f.abiertaEn, cerradaEn: f.cerradaEn || f.fin, abiertaET: f.abiertaET, cerradaET: f.cerradaET, duracionSeg: f.duracionSeg ?? null, colchonTrasSeg: f.colchonTrasSeg ?? null, entrada: f.entrada ?? null, pnlFinalUSD: f.pnlFinalUSD ?? null, pnlFinalAprox: !!f.pnlFinalAprox, colchonMovido: !!f.colchonMovido, slColchon: f.slColchon ?? null, colchonUSD: f.colchonUSD ?? null, pasos: f.pasos || [], pasosTotal: f.pasosTotal ?? null, ajusteFill: aj, latencia: { metodo: lt.metodo || null, via: lt.via || null, modificarMs: lt.modificarMs ?? null, confirmarMs: lt.confirmarMs ?? null, totalMs: lt.totalDesdeLecturaMs ?? null }, fuenteLider: f.fuenteLider || null, fuenteModo: f.fuenteModo || null };
+  return { ok: true, fin, movs, disparos, puntos: maxPuntos(W, t1, f.tamano), lecturas: { n: lec.length, difMedia: dif.length ? Math.round(dif.reduce((a, b) => a + b, 0) / dif.length * 100) / 100 : null, difMax: dif.length ? Math.round(Math.max(...dif) * 100) / 100 : null } };
+}
 function tradesFarm(dia) { let L = []; try { L = fs.readFileSync(path.join(DIR, 'colchon-eventos.jsonl'), 'utf8').split('\n').filter(Boolean).map(x => { try { return JSON.parse(x); } catch { return null; } }).filter(x => x && x.at && etDay(Date.parse(x.at)) === dia); } catch {}
   const out = []; let movs = [];
   for (const x of L) { if (x.type === 'mover_stop' && x.ok) movs.push(x); if (x.type !== 'fin_trade') continue;
@@ -161,6 +180,7 @@ http.createServer((q, r) => {
       if (q.url.startsWith('/api/colchon/informe')) { const f = path.basename(new URL(q.url, 'http://x').searchParams.get('f') || ''); let md = 'No encontré ese informe.';
         if (/^[\w.-]+\.md$/.test(f)) try { md = maskId(fs.readFileSync(path.join(DIR, 'reportes', f), 'utf8')); } catch {}
         r.writeHead(200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-store' }); return r.end(md); }
+      if (q.url.startsWith('/api/colchon/detalle')) { const out2 = detalleTrade(new URL(q.url, 'http://x').searchParams.get('at') || ''); r.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); return r.end(JSON.stringify(out2)); }
       if (q.url.startsWith('/api/colchon/lectura')) { const f = path.join(DIR, 'pausa-lectura.flag');
         if (q.method === 'POST') { const p = j.pause ?? !fs.existsSync(f); if (p) fs.writeFileSync(f, 'pausa manual ' + new Date().toISOString()); else fs.rmSync(f, { force: true }); }
         out = { paused: fs.existsSync(f), ultimaLecturaCompleta: lastFull ? new Date(lastFull).toISOString() : null, ultimaActividad: new Date(lastBusy).toISOString(), esperaSeg: Math.max(0, Math.ceil((QUIET_MS - (Date.now() - lastBusy)) / 1000)) }; }
