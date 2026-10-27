@@ -4983,8 +4983,7 @@ function liveRun(s){const st=s.steps||[],k=s.step||0,nm=(s.strategy&&s.strategy.
  if(s.steps&&!st.length)tl+=`<div><small>Stop</small><b>fijo · sin movimientos</b></div>`;
  else{const nx=st[k];tl+=`<div><small>Paso ${k}/${st.length||1}</small><b class="${k?"ok":""}">${k?"Movido ✓":"Sin mover"}</b></div><div class=w><small>Siguiente</small><b>${nx?"+"+fm(nx.triggerUsd)+" → protege +"+fm(nx.lockUsd)+(nx.lockPts>0&&nx.lockPts<=1?" ("+lt(nx.lockPts)+" ticks)":nx.lockPts===0?" (entrada)":""):"— (último)"}</b></div>`}
  return `<div class=hd><div class=t><b>${nm}</b><span class="sd ${s.side==="long"?"l":"s"}">${s.side==="long"?"COMPRA":"VENTA"} ${s.qty} ${s.symbol}</span></div>${acct?`<div class=ac>${acct}</div>`:""}</div>
-${window.__tlViz?window.__tlViz(s):""}<div class=kv>${tl}</div>${s.fuenteLider?`<div class=src>fuente <b>${s.fuenteLider}</b> (${s.fuenteModo||""})</div>`:""}${s.alerta?`<div class=al>${s.alerta}</div>`:""}${latHTML(s.latency)}
-<div class=lg>${(s.log||[]).slice(-5).join("\n")}</div><button class=act data-stop>Detener y cerrar posición</button>`}
+${window.__tlViz?window.__tlViz(s):""}<div class=kv>${tl}</div>${s.alerta?`<div class=al>${s.alerta}</div>`:""}<button class=act data-stop>Detener y cerrar posición</button>${window.__tlLogs?window.__tlLogs((s.fuenteLider?`<div class=src>fuente <b>${s.fuenteLider}</b> (${s.fuenteModo||""})</div>`:"")+latHTML(s.latency)+`<div class=lg>${(s.log||[]).slice(-5).join("\n")}</div>`):latHTML(s.latency)}`}
 async function poll(){clearTimeout(pollT);if(!on)return;const s=await J("/api/colchon/status");
  if(s.state==="running"){live.style.display="block";live.innerHTML=liveRun(s);
   live.querySelector("[data-stop]").onclick=async()=>{if(!confirm(`¿Detener la prueba y cerrar la posición en ${s.mode==="real"?"la CUENTA REAL":"Paper"}?`))return;await J("/api/colchon/stop",{flatten:true});poll()};
@@ -5024,9 +5023,41 @@ window.__prueba=()=>({on,phase,chk,agent:agentXY()});})();</script><style>/* Mej
 .tlBig{font:800 34px/1.1 Inter,system-ui;text-align:center;margin:2px 0 4px;font-variant-numeric:tabular-nums}
 #prLive .rng{margin:10px 3px 4px}
 #prLive .rng .rl{display:flex;justify-content:space-between;gap:8px;font-size:10.5px;color:rgba(255,255,255,.5)}#prLive .rng .rl b{color:#fff;font-weight:600;margin-left:3px}
-#prLive .rng .trk{position:relative;height:10px;margin:9px 0 3px;border-radius:5px;background:linear-gradient(90deg,rgba(255,138,154,.45) 0,rgba(255,138,154,.12) var(--e),rgba(205,234,29,.12) var(--e),rgba(205,234,29,.45) 100%)}
+#prLive .rng .trk{position:relative;height:10px;margin:22px 0 15px;border-radius:5px;background:linear-gradient(90deg,rgba(255,138,154,.45) 0,rgba(255,138,154,.12) var(--e),rgba(205,234,29,.12) var(--e),rgba(205,234,29,.45) 100%)}
 #prLive .rng .en{position:absolute;top:-4px;width:2px;height:18px;margin-left:-1px;border-radius:1px;background:#ffd86b}
 #prLive .rng .px{position:absolute;top:-2px;width:14px;height:14px;margin-left:-7px;border-radius:50%;border:2px solid #fff;box-sizing:border-box;transition:left .5s ease,background .3s}
+/* Mascota del precio actual + Logs colapsable */
+#prLive .rng .tlMas{position:absolute;top:-10px;width:30px;height:30px;margin-left:-15px;z-index:3;display:block;transition:left .55s cubic-bezier(.3,.7,.3,1)}
+#prLive .rng .tlMas .ro,#prLive .rng .tlMas .sv{display:block;width:30px;height:30px}
+#prLive .rng .tlMas .ro{transform:rotate(var(--lean,0deg));transform-origin:50% 90%}
+#prLive .rng .tlMas svg{display:block;width:30px;height:30px;overflow:visible}
+#prLive .rng .tlMas .bz{transform-origin:50% 92%;animation:tlBreath 3s ease-in-out infinite;animation-delay:var(--bd,0s)}
+#prLive .rng .tlMas .s1{stop-color:hsl(var(--mh,68) 96% 70%)}#prLive .rng .tlMas .s2{stop-color:hsl(var(--mh,68) 88% 52%)}#prLive .rng .tlMas .s3{stop-color:hsl(var(--mh,68) 85% 38%)}
+#prLive .rng .tlMas .ey{transform:translate(var(--lx,0px),0);transition:transform .3s ease}
+#prLive .rng .tlMas .e{fill:#1b1a20;transform-box:fill-box;transform-origin:center;transform:scale(calc(1 + .5*var(--wo,0)),calc(1 + .22*var(--wo,0)))}
+#prLive .rng .tlMas.hp .ey{transform:translate(var(--lx,0px),-.7px)}
+#prLive .rng .tlMas .br{display:none;fill:none;stroke:#1b1a20;stroke-width:1.5;stroke-linecap:round;opacity:var(--bo,0)}
+#prLive .rng .tlMas .dpw{display:none;opacity:var(--so,0)}#prLive .rng .tlMas .dp{fill:#a8e0ff;stroke:rgba(255,255,255,.7);stroke-width:.5;animation:tlDrip 1.9s ease-in infinite;animation-delay:var(--bd,0s)}
+#prLive .rng .tlMas.wr .br,#prLive .rng .tlMas.wr .dpw{display:inline}
+#prLive .rng .tlMas.wr .sv{animation:tlShiv var(--sh,.5s) linear infinite;animation-delay:var(--bd,0s)}
+#prLive .rng .tlMas.mvr .ro{animation:tlRollR .7s ease-out both}
+#prLive .rng .tlMas.mvl .ro{animation:tlRollL .7s ease-out both}
+@keyframes tlBreath{0%,100%{transform:scale(1,1)}50%{transform:scale(1.035,.955)}}
+@keyframes tlShiv{0%,100%{transform:translate(0,0)}25%{transform:translate(-.7px,.2px)}50%{transform:translate(.6px,-.2px)}75%{transform:translate(-.5px,.2px)}}
+@keyframes tlDrip{0%{transform:translateY(0);opacity:0}15%{opacity:1}80%{opacity:.9}100%{transform:translateY(5px);opacity:0}}
+@keyframes tlRollR{0%{transform:rotate(0)}35%{transform:translateY(-3px) rotate(32deg) scale(1.06,.94)}100%{transform:rotate(var(--lean,9deg))}}
+@keyframes tlRollL{0%{transform:rotate(0)}35%{transform:translateY(-3px) rotate(-32deg) scale(1.06,.94)}100%{transform:rotate(var(--lean,-9deg))}}
+@media (prefers-reduced-motion:reduce){#prLive .rng .tlMas,#prLive .rng .tlMas *{animation:none!important;transition:none!important}#prLive .rng .tlMas .dp{opacity:1}}
+#prLive .tlLogB{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:8px;padding:6px;background:transparent;border:1px dashed rgba(255,255,255,.16);color:rgba(255,255,255,.6);border-radius:10px;font:600 11.5px Inter,system-ui;cursor:pointer}
+#prLive .tlLogB:hover{color:#fff;background:rgba(255,255,255,.05)}
+#prLive .tlLogs{margin-top:6px}#prLive .tlLogs[hidden]{display:none}#prLive .tlLogs .lat{margin-top:0}
+/* Detener y cerrar posición: único botón rojo del panel */
+#prLive .act[data-stop]{background:linear-gradient(180deg,#e5484d,#c92a30);color:#fff;border:1px solid rgba(255,255,255,.14);box-shadow:0 2px 10px rgba(201,42,48,.28);transition:background .15s,box-shadow .15s,transform .1s}
+#prLive .act[data-stop]:hover{background:linear-gradient(180deg,#f05a5f,#d8343a);box-shadow:0 3px 14px rgba(216,52,58,.42)}
+#prLive .act[data-stop]:active{transform:translateY(1px);background:#b8242a}
+#prLive .act[data-stop]:focus-visible{outline:2px solid rgba(255,255,255,.7);outline-offset:2px}
+#prLive .act[data-stop]:disabled{opacity:.55;cursor:default}
+
 #prLive .rng .lk{position:absolute;top:-10px;margin-left:-5px;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid #cdea1d}
 #prLive .rng .eb{position:relative;height:15px}#prLive .rng .eb span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap;font-size:10.5px;color:#ffd86b}
 #prLive .lockb{margin:8px 0 6px;padding:8px 10px;border-radius:10px;background:rgba(205,234,29,.12);border:1px solid rgba(205,234,29,.38);color:#e8ffb0;font-weight:700;font-size:12px}#prLive .lockb small{display:block;margin-top:3px;font-weight:500;font-size:10.5px;line-height:1.35;color:rgba(255,255,255,.62)}
@@ -5048,6 +5079,33 @@ window.__prueba=()=>({on,phase,chk,agent:agentXY()});})();</script><style>/* Mej
 #tradesView select{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:3px 6px}
 #tradesView pre{white-space:pre-wrap;font:11.5px/1.5 ui-monospace,Consolas,monospace;background:rgba(255,255,255,.04);padding:10px;border-radius:10px;color:rgba(255,255,255,.85)}
 #tradesView .back{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;border-radius:8px;padding:5px 10px;cursor:pointer;margin-bottom:8px}
+/* Detalle de trade (panel) */
+#tradesView.det{width:min(580px,calc(100vw - 44px))}
+#tradesView .dp .dph{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2px 0 6px}
+#tradesView .dp .dpn{font-size:36px;font-weight:800;line-height:1.05;letter-spacing:-.5px}
+#tradesView .dp .dpl{font-size:11.5px;color:rgba(255,255,255,.55);margin-top:4px}
+#tradesView .dp .dpc{display:inline-flex;gap:8px;align-items:center;padding:7px 12px;border-radius:999px;background:rgba(255,255,255,.07);font-weight:700;font-size:13px;white-space:nowrap}
+#tradesView .dp .dpg{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:12px 0 4px}
+#tradesView .dp .dpt{background:rgba(255,255,255,.05);border-radius:10px;padding:8px 10px;min-width:0}
+#tradesView .dp .dpk{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.5);margin-bottom:2px}
+#tradesView .dp .dpv{display:block;font-size:14px;font-weight:600;color:#fff;overflow-wrap:anywhere}
+#tradesView .dp .dpsec{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.5);margin:16px 0 7px}
+#tradesView .dp .dpbe{display:inline-flex;gap:6px;align-items:center;padding:6px 12px;border-radius:999px;background:rgba(205,234,29,.14);border:1px solid rgba(205,234,29,.5);color:#cdea1d;font-weight:700;font-size:12.5px}
+#tradesView .dp .dpbe.n{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.18);color:rgba(255,255,255,.75);font-weight:600}
+#tradesView .dp .dpsub{font-size:12px;color:rgba(255,255,255,.65);margin:6px 2px 0}
+#tradesView .dp .dpr{margin:10px 3px 2px}
+#tradesView .dp .dpr .dprl{display:flex;justify-content:space-between;gap:8px;font-size:10.5px;color:rgba(255,255,255,.5)}#tradesView .dp .dpr .dprl span{white-space:nowrap}#tradesView .dp .dpr .dprl i{font-style:normal;color:#fff;font-weight:600;margin-left:3px}
+#tradesView .dp .dpr .dptr{position:relative;height:10px;margin:12px 0 6px;border-radius:5px;background:linear-gradient(90deg,rgba(255,138,154,.45) 0,rgba(255,138,154,.12) var(--e),rgba(205,234,29,.12) var(--e),rgba(205,234,29,.45) 100%)}
+#tradesView .dp .dpr .dpen{position:absolute;top:-4px;width:2px;height:18px;margin-left:-1px;border-radius:1px;background:#ffd86b}
+#tradesView .dp .dpr .dpex{position:absolute;top:-2px;width:14px;height:14px;margin-left:-7px;border-radius:50%;border:2px solid #fff;box-sizing:border-box}
+#tradesView .dp .dpr .dplk{position:absolute;top:-10px;margin-left:-5px;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid #cdea1d}
+#tradesView .dp .dpr .dpgl{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11px;color:rgba(255,255,255,.65);margin-top:2px}
+#tradesView .dp .dpst{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;font-size:12px;align-items:baseline;background:rgba(255,255,255,.04);border-radius:10px;padding:9px 10px}
+#tradesView .dp .dpst .a{font-weight:700;color:#cdea1d;white-space:nowrap}#tradesView .dp .dpst .c{color:rgba(255,255,255,.55);white-space:nowrap;text-align:right}
+#tradesView .dp .dpd{margin-top:10px;background:rgba(255,255,255,.04);border-radius:10px;padding:0 12px}
+#tradesView .dp .dpd>summary{cursor:pointer;padding:10px 0;font-size:12px;color:rgba(255,255,255,.75)}
+#tradesView .dp .dpd .dpx{padding:0 0 10px;font-size:12px;line-height:1.55;color:rgba(255,255,255,.82)}#tradesView .dp .dpd .dpx p{margin:0 0 6px}
+#tradesView .dp .dpd pre{margin:0 0 12px;max-height:340px;overflow:auto}
 </style>
 <button id="tradesBtn" class="glass btn">📈 Historial de trades</button>
 <aside id="tradesView"></aside>
@@ -5056,19 +5114,28 @@ window.__prueba=()=>({on,phase,chk,agent:agentXY()});})();</script><style>/* Mej
 const $u=v=>v==null||isNaN(v)?"—":(v<0?"−$":"+$")+Math.abs(Math.round(v*100)/100).toLocaleString("es");
 const esc=t=>String(t??"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"})[c]);
 // 1) P&L grande + barra SL · entrada · TP · precio actual (se usa dentro del panel del agente)
+/* Mascota: marca el precio actual en la barra. Solo visual. */
+window.__tlMascota=function(x,fp,sp,px){const S=window.__tlMasS||(window.__tlMasS={x:null,dir:0}),prev=S.x,dx=prev==null?0:x-prev,mv=Math.abs(dx)>.25,f=fp<0&&sp>0?Math.min(1,-fp/sp):0;
+ if(prev==null)S.dir=fp>.5?1:fp<-.5?-1:0;else if(mv)S.dir=dx>0?1:-1;S.x=x;
+ const wr=f>.02,hue=(68-68*f).toFixed(1),sh=(.55-.43*f).toFixed(2),wo=Math.min(1,f*2).toFixed(2),bo=Math.min(1,f*3).toFixed(2),so=Math.min(1,f*2.5).toFixed(2),lx=((S.dir||(wr?-1:0))*2.4).toFixed(1),ph=((performance.now()/1000)%3).toFixed(2),start=mv&&prev!=null?prev:x;
+ Promise.resolve().then(()=>{const el=document.querySelector("#prLive .tlMas");if(el){void el.offsetWidth;el.style.left=x.toFixed(2)+"%"}});
+ return`<i class="tlMas${wr?" wr":fp>0?" hp":""}${mv?(dx>0?" mvr":" mvl"):""}" style="left:${start.toFixed(2)}%;--mh:${hue};--sh:${sh}s;--wo:${wo};--bo:${bo};--so:${so};--lx:${lx}px;--lean:${S.dir*9}deg;--bd:-${ph}s" title="Precio ${px}"><span class=ro><span class=sv><svg class=bz viewBox="0 0 40 40" aria-hidden="true"><defs><radialGradient id=tlMg cx=".36" cy=".3" r=".85"><stop offset="0" class=s1 /><stop offset=".55" class=s2 /><stop offset="1" class=s3 /></radialGradient></defs><ellipse cx="20" cy="37.5" rx="11" ry="2" fill="#000" opacity=".28" /><ellipse cx="20" cy="20" rx="17.5" ry="17" fill="url(#tlMg)" /><ellipse cx="12.5" cy="11" rx="5.6" ry="3.1" transform="rotate(-35 12.5 11)" fill="#fff" opacity=".55" /><circle cx="29.5" cy="9.5" r="1.3" fill="#fff" opacity=".6" /><g class=ey><rect class=e x="12.8" y="14.2" width="4.4" height="9" rx="2.2" /><rect class=e x="22.8" y="14.2" width="4.4" height="9" rx="2.2" /></g><g class=br><path d="M10.2 12.4 L16.6 9.4" /><path d="M29.8 12.4 L23.4 9.4" /></g><g class=dpw><path class=dp d="M33 12.5 q2.5 3.5 0 5.2 q-2.5 -1.7 0 -5.2z" /></g></svg></span></span></i>`};
+window.__tlLogs=function(inner){let o=0;try{o=sessionStorage.getItem("tl_logs_open")==="1"}catch(e){}return`<button class=tlLogB data-logs aria-expanded="${o?"true":"false"}">Logs <span>${o?"▴":"▾"}</span></button><div class=tlLogs${o?"":" hidden"}>${inner}</div>`};
+(function(){const L=document.getElementById("prLive");if(!L)return;const tg=e=>{const b=e.target.closest&&e.target.closest("[data-logs]");if(!b)return;const p=b.nextElementSibling,abrir=p.hidden;p.hidden=!abrir;try{sessionStorage.setItem("tl_logs_open",abrir?"1":"0")}catch(_){}b.setAttribute("aria-expanded",abrir?"true":"false");b.lastElementChild.textContent=abrir?"▴":"▾"};L.addEventListener("pointerdown",e=>{if(e.button===0)tg(e)});L.addEventListener("click",e=>{if(e.detail===0)tg(e)})})();
+
 window.__tlViz=function(s){if(!s)return"";const nf=(v,sg)=>(sg?(v<0?"−":"+"):"")+"$"+Math.abs(v).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}),p=s.pnl!=null?Number(s.pnl):(s.brokerPl!=null?Number(s.brokerPl):NaN),okp=isFinite(p);
  let h=`<div class=plw><small>P&amp;L bruto</small><div class="tlBig ${!okp?"":p>=0?"pos":"neg"}">${okp?nf(p,1):"—"}</div></div>`;
  const en=+s.entry,lg=s.side==="long",sp=+s.slPts,tpPr=+s.tpPrice,tpP=isFinite(+s.tpPts)&&+s.tpPts>0?+s.tpPts:(isFinite(tpPr)&&isFinite(en)?Math.abs(tpPr-en):NaN),px=+s.price,st=s.steps||[],k=s.step||0,fv=v=>lg?v-en:en-v;
  if([en,sp,tpP].every(isFinite)&&sp>0&&tpP>0){const tot=sp+tpP,X=f=>Math.max(0,Math.min(100,(f+sp)/tot*100)),ex=X(0),slI=lg?en-sp:en+sp,tpI=isFinite(tpPr)?tpPr:(lg?en+tpP:en-tpP),fp=isFinite(px)?fv(px):null,lk=(k>0||s.locked)&&isFinite(+s.sl)?fv(+s.sl):null,eL=Math.max(17,Math.min(83,ex));
-  h+=`<div class=rng title="SL a la izquierda, TP a la derecha. La bolita es el precio actual."><div class=rl><span>SL<b>${+slI.toFixed(2)}</b></span><span>TP<b>${tpI}</b></span></div><div class=trk style="--e:${ex.toFixed(2)}%"><i class=en style="left:${ex.toFixed(2)}%"></i>${lk!=null?`<i class=lk style="left:${X(lk).toFixed(2)}%" title="Stop actual ${s.sl}"></i>`:""}${fp!=null?`<i class=px style="left:${X(fp).toFixed(2)}%;background:${fp>=0?"#cdea1d":"#ff8a9a"}" title="Precio ${px}"></i>`:""}</div><div class=eb><span style="left:${eL.toFixed(2)}%">Entrada ${en}</span></div></div>`}
+  h+=`<div class=rng title="SL a la izquierda, TP a la derecha. La mascota es el precio actual."><div class=rl><span>SL<b>${+slI.toFixed(2)}</b></span><span>TP<b>${tpI}</b></span></div><div class=trk style="--e:${ex.toFixed(2)}%"><i class=en style="left:${ex.toFixed(2)}%"></i>${lk!=null?`<i class=lk style="left:${X(lk).toFixed(2)}%" title="Stop actual ${s.sl}"></i>`:""}${fp!=null?window.__tlMascota(X(fp),fp,sp,px):""}</div><div class=eb><span style="left:${eL.toFixed(2)}%">Entrada ${en}</span></div></div>`}
  const cur=k>0?st[k-1]:null,nx=st[k];
  if(cur||s.locked){const lp=cur?cur.lockPts:null,lu=cur?cur.lockUsd:null,tk=lp!=null?Math.round(lp/.25):null,be=lp!=null&&lp<=1;
-  h+=`<div class=lockb>✓ ${lp===0?"Stop en break even":be?"Stop en break even (+"+tk+" ticks)":lu!=null?"Stop protegido +"+nf(lu):"Stop movido"} · SL ${s.sl??"—"}${be?`<small>TradingView casi no lo muestra: el stop queda pegado a la entrada, pero la orden ya está movida.</small>`:""}</div>`}
+  h+=`<div class=lockb${be?' title="TradingView casi no lo muestra: el stop queda pegado a la entrada, pero la orden ya está movida."':""}>✓ ${lp===0?"Stop en break even":be?"Stop en break even (+"+tk+" ticks)":lu!=null?"Stop protegido +"+nf(lu):"Stop movido"} · SL ${s.sl??"—"}</div>`}
  else if(s.lockPending)h+=`<div class="lockb pend">Moviendo el stop…</div>`;
  if(nx&&okp){const tr=+nx.triggerUsd||0,pc=tr>0?Math.max(0,Math.min(100,p/tr*100)):0;h+=`<div class=prog><div class=bh><span>Hacia el paso ${nx.n}</span><b>${nf(Math.max(p,0))} / ${nf(tr)}</b></div><div class=bt><i style="width:${pc.toFixed(1)}%"></i></div></div>`}
  return h};
 // 2) + 3) Cuenta real (borde rojo) y luces de conexión
-const hud=document.getElementById("hud");const lz=document.createElement("span");lz.id="tlLuces";lz.innerHTML='<b class=tlEstT>Estado</b><span title="Servidor" data-tip="Servidor"><i data-k=servidor title="Servidor"></i></span><span title="TradingView" data-tip="TradingView"><i data-k=tradingview title="TradingView"></i></span><span title="Tradovate" data-tip="Tradovate"><i data-k=tradovate title="Tradovate"></i></span>';
+const hud=document.getElementById("hud");const lz=document.createElement("span");lz.id="tlLuces";lz.innerHTML='<b class=tlEstT>Status</b><span title="Servidor" data-tip="Servidor"><i data-k=servidor title="Servidor"></i></span><span title="TradingView" data-tip="TradingView"><i data-k=tradingview title="TradingView"></i></span><span title="Tradovate" data-tip="Tradovate"><i data-k=tradovate title="Tradovate"></i></span>';
 if(hud){const sp=document.createElement("span");sp.className="sep";hud.appendChild(sp);hud.appendChild(lz)}
 const luz=(k,ok,t)=>{const i=lz.querySelector(`[data-k=${k}]`);if(i){i.className=ok?"ok":"ko";const tip=({servidor:"Servidor",tradingview:"TradingView",tradovate:"Tradovate"})[k]||k;i.title=tip;i.parentNode.title=tip;i.parentNode.dataset.tip=tip}};
 async function conn(){let c=null;try{c=await (await fetch("/api/colchon/conexion",{cache:"no-store"})).json()}catch(e){}
@@ -5093,7 +5160,7 @@ window.__tlRealGate={ok:()=>!realNow||sessionStorage.getItem(RK)==="1",
  refresh:async()=>{try{await conn()}catch(e){}try{const c=await (await fetch("/api/colchon/check",{cache:"no-store"})).json();if(c&&c.real)realNow=true}catch(e){}return realNow}};
 // 4) Historial de trades
 const v=document.getElementById("tradesView");let dia=null;
-const mk=c=>{c=String(c??"");const m=c.match(/^([A-Za-z0-9]{4})[A-Za-z0-9…]*?([0-9A-Za-z]{3})$/);return c.length>8&&m?m[1]+"…"+m[2]:c};async function list(){let d;try{d=await (await fetch("/api/colchon/trades"+(dia?"?dia="+dia:""),{cache:"no-store"})).json()}catch(e){v.innerHTML='<button class=close>×</button><h2>📈 Historial de trades</h2><p>No pude leer los trades.</p>';v.querySelector(".close").onclick=()=>v.classList.remove("open");return}
+const mk=c=>{c=String(c??"");const m=c.match(/^([A-Za-z0-9]{4})[A-Za-z0-9…]*?([0-9A-Za-z]{3})$/);return c.length>8&&m?m[1]+"…"+m[2]:c};async function list(){v.classList.remove("det");let d;try{d=await (await fetch("/api/colchon/trades"+(dia?"?dia="+dia:""),{cache:"no-store"})).json()}catch(e){v.innerHTML='<button class=close>×</button><h2>📈 Historial de trades</h2><p>No pude leer los trades.</p>';v.querySelector(".close").onclick=()=>v.classList.remove("open");return}
  dia=d.dia;const dias=[...new Set([d.dia,...(d.dias||[])])];
  /* Una sola fila por trade: si hay un registro sin resultado (al abrir) y luego el cierre del mismo trade (misma cuenta/dirección/contratos, apertura ±5 min), se queda solo el cierre. */
  {const T=x=>+new Date(x),cl=(d.trades||[]).filter(t=>t.pnl!=null);d.trades=(d.trades||[]).filter(t=>{if(t.pnl!=null)return true;return !cl.some(c=>c.cuenta===t.cuenta&&c.direccion===t.direccion&&c.tamano===t.tamano&&Math.abs(T(c.abierta||c.at)-T(t.at))<=5*60e3&&T(c.at)>=T(t.at)-60e3)});d.n=d.trades.length;d.ganados=d.trades.filter(t=>(t.pnl||0)>0).length;
@@ -5104,9 +5171,56 @@ const mk=c=>{c=String(c??"");const m=c.match(/^([A-Za-z0-9]{4})[A-Za-z0-9…]*?(
  <div class="tr th"><span>Hora</span><span>Dirección</span><span>Contratos</span><span>Resultado</span><span>Cuenta</span></div>${rows||'<div style="opacity:.7;padding:10px 0">No hay trades este día.</div>'}<div style="font-size:11px;opacity:.55;margin-top:8px">Toca un trade para ver su informe.</div>`;
  v.querySelector(".close").onclick=()=>v.classList.remove("open");v.querySelector("select").onchange=e=>{dia=e.target.value;list()};
  v.querySelectorAll(".tr[data-i]").forEach(r=>r.onclick=()=>informe(d.trades[+r.dataset.i]))}
-async function informe(t){let md="Este trade no tiene informe en reportes.";if(t.informe)try{md=await (await fetch("/api/colchon/informe?f="+encodeURIComponent(t.informe),{cache:"no-store"})).text()}catch(e){}
- v.innerHTML=`<button class=close>×</button><button class=back>← Volver</button><h2>${esc(t.direccion)} ${esc(t.tamano)} · ${$u(t.pnl)}</h2><div style="font-size:12px;opacity:.7;margin-bottom:8px">${esc(t.estrategia||"")} · ${esc(mk(t.cuenta))} · ${esc(t.motivo||"")} · ${esc(t.informe||"sin informe")}${t.entrada!=null&&t.salida!=null?` · entrada ${t.entrada} → salida ${t.salida}`:""}${t.pnlGranja!=null?` · estimado granja ${$u(t.pnlGranja)}`:""}</div><pre>${esc(md)}</pre>`;
- v.querySelector(".close").onclick=()=>v.classList.remove("open");v.querySelector(".back").onclick=list}
+async function informe(t){const my=informe.n=(informe.n||0)+1;v.classList.add("det");
+ const H=x=>esc(String(x??"")),dr=t.direccion==="COMPRA"?1:-1,L=(x,o)=>(+x).toLocaleString("en-US",o),
+  N=x=>x==null||isNaN(x)?"—":L(x,{minimumFractionDigits:2,maximumFractionDigits:2}),
+  M=x=>x==null||isNaN(x)?"—":(x<0?"−$":"+$")+L(Math.abs(x),{minimumFractionDigits:2,maximumFractionDigits:2}),
+  A=x=>x==null||isNaN(x)?"—":"$"+L(Math.abs(x),{minimumFractionDigits:2,maximumFractionDigits:2}),
+  DU=s=>{s=Math.round(+s);if(!(s>=0))return"—";const h=Math.floor(s/3600),m=Math.floor(s%3600/60),r=s%60;return h?h+" h "+m+" min":m?m+" min "+r+" s":r+" s"},
+  TT=x=>x?new Date(x).toLocaleString("es",{timeZone:"America/New_York",day:"numeric",month:"short",hour:"numeric",minute:"2-digit",second:"2-digit"})+" ET":"—",
+  AC=c=>{c=String(c??"");const m=c.match(/^(.{4})[.…](.{3})$/);return m?m[1]+"…"+m[2]:mk(c)},
+  WHY={"Stop loss":"Salió por el stop","Take profit":"Llegó al objetivo (take profit)","Detenido manualmente":"Lo detuviste a mano","Posición cerrada":"Se cerró la posición","Cierre 4:45 PM ET":"Cierre automático de las 4:45 PM ET","Error":"Terminó por un error"};
+ const bindTop=()=>{v.querySelector(".close").onclick=()=>{v.classList.remove("open");v.classList.remove("det")};v.querySelector(".back").onclick=list};
+ const draw=D=>{const ok=!!(D&&D.ok),f=ok?D.fin:null,aj=f&&f.ajusteFill||null,movs=ok?(D.movs||[]).filter(x=>x.ok!==false):[],pasos=f&&f.pasos||[],lt=f&&f.latencia||{};
+  const en=t.entrada??(f&&f.entrada),sa=t.salida,op=t.abierta||(f&&f.abiertaEn),cl=t.at||(f&&f.cerradaEn),sg=op&&cl?(Date.parse(cl)-Date.parse(op))/1e3:(f&&f.duracionSeg);
+  const win=(t.pnl||0)>=0,col=win?"#cdea1d":"#ff8a9a",mot=t.motivo?(WHY[t.motivo]||t.motivo):(t.pnl==null?"En curso":"Trade cerrado");
+  const tile=(k,x)=>`<div class=dpt><span class=dpk>${k}</span><span class=dpv>${x}</span></div>`;
+  let h=`<button class=close>×</button><button class=back>← Volver</button><div class=dp>`;
+  h+=`<div class=dph><div><div class=dpn style="color:${col}">${t.pnl==null?"—":M(t.pnl)}</div><div class=dpl>${t.pnl==null?"En curso":win?"Ganancia":"Pérdida"}${t.neto===false?" · P&L bruto, sin comisiones":t.neto?" · neto de comisiones":""}${t.aprox&&t.pnl!=null?" · aproximado":""}</div></div><span class=dpc><span style="color:${t.direccion==="COMPRA"?"#cdea1d":"#ff8a9a"}">${H(t.direccion)}</span><span>${H(t.tamano)}</span></span></div>`;
+  h+=`<div class=dpg>${tile("Resultado",H(mot))}${tile("Entrada → salida",N(en)+" → "+N(sa))}${tile("Estrategia",H(t.estrategia||"Manual / fuera de la granja"))}${tile("Cuenta",H(AC(t.cuenta))||"—")}${tile("Duración",DU(sg))}${tile("Abrió",TT(op))}${tile("Cerró",TT(cl))}</div>`;
+  const sl=aj?(aj.slNuevo??aj.slAntes):null,tp=aj?(aj.tpNuevo??aj.tpAntes):null,last=movs.length?movs[movs.length-1].precio:null;
+  if(en!=null&&sl!=null&&tp!=null&&sl!==tp){const P=p=>Math.max(0,Math.min(100,(p-sl)/(tp-sl)*100)),pe=P(en).toFixed(2);
+   h+=`<div class=dpsec>Stop, entrada y objetivo</div><div class=dpr><div class=dprl><span>Stop inicial<i>${N(sl)}</i></span><span>Objetivo<i>${N(tp)}</i></span></div><div class=dptr style="--e:${pe}%"><span class=dpen style="left:${pe}%"></span>${last!=null?`<span class=dplk style="left:${P(last).toFixed(2)}%"></span>`:""}${sa!=null?`<span class=dpex style="left:${P(sa).toFixed(2)}%;background:${col}"></span>`:""}</div><div class=dpgl><span><span style="color:#ffd86b">▏</span> Entrada ${N(en)}</span>${last!=null?`<span><span style="color:#cdea1d">▼</span> Stop protegido ${N(last)}</span>`:""}${sa!=null?`<span><span style="color:${col}">●</span> Salió ${N(sa)}</span>`:""}</div></div>`}
+  h+=`<div class=dpsec>Stop</div>`;
+  const m0=movs[0];
+  if(m0&&en!=null){const gn=(m0.precio-en)*dr,tk=Math.round(gn/.25),be=gn<=.75+1e-9,p0=pasos.find(p=>p.paso===m0.paso)||pasos[0];
+   h+=`<span class=dpbe>✓ ${be?"Stop movido a break even"+(tk>0?` (+${tk} ticks)`:""):"Stop protegido "+(p0&&p0.protegeUSD!=null?"+"+A(p0.protegeUSD):"+"+tk+" ticks")}</span><div class=dpsub>A los ${DU(m0.enSeg)} de entrar${m0.ms!=null?` · el cambio tardó ${(m0.ms/1000).toFixed(1)} s`:""}</div>`}
+  else if(t.stopMovido)h+=`<span class=dpbe>✓ Stop movido por el agente</span>`;
+  else h+=`<span class="dpbe n">${!D?"Cargando el detalle…":ok?"El stop no se movió en este trade":"Sin datos del stop de este trade"}</span>`;
+  if(pasos.length||movs.length>1){const rows=pasos.length?pasos.map(p=>{const mv=movs.find(x=>x.paso===p.paso),lat=p.latenciaSeg??(mv&&mv.ms!=null?mv.ms/1e3:null);
+     return `<span class=a>Paso ${p.paso}</span><span>Al llegar a ${M(p.disparoUSD)}: ${p.protegeUSD>0?"el stop protege "+A(p.protegeUSD):"queda en break even"}${p.precio!=null?` (stop en ${N(p.precio)})`:""}${p.confirmado===false?" · sin confirmar":""}</span><span class=c>${p.enSeg!=null?DU(p.enSeg):""}${lat!=null?" · "+(+lat).toFixed(1)+" s":""}</span>`}).join(""):movs.map((m,i)=>`<span class=a>Paso ${m.paso||i+1}</span><span>Stop movido a ${N(m.precio)}</span><span class=c>${DU(m.enSeg)}${m.ms!=null?" · "+(m.ms/1e3).toFixed(1)+" s":""}</span>`).join("");
+   h+=`<div class=dpsec>Pasos del stop</div><div class=dpst>${rows}</div>${f&&f.pasosTotal?`<div class=dpsub>${pasos.length} de ${f.pasosTotal} pasos alcanzados</div>`:""}`}
+  if(aj){const d=aj.fill-aj.ref;
+   h+=`<div class=dpsec>Ajuste al entrar</div><div class=dpsub style="margin-top:0">${aj.nada||Math.abs(d)<1e-9?"Sin ajuste: el broker llenó en el precio de referencia ("+N(aj.ref)+").":`El precio de referencia era ${N(aj.ref)} y el broker llenó en ${N(aj.fill)} (${d>=0?"+":"−"}${N(Math.abs(d))} pts). Por eso el stop pasó de ${N(aj.slAntes)} a ${N(aj.slNuevo)} y el objetivo de ${N(aj.tpAntes)} a ${N(aj.tpNuevo)}${aj.seg!=null?` (en ${aj.seg} s)`:""}.`}${aj.ok===false?" No se pudo confirmar el ajuste.":""}</div>`}
+  /* Detalles técnicos (cerrado) */
+  let x="";
+  x+=`<p>${t.fuente==="broker"?"El P&L grande sale de las ejecuciones del broker"+(t.neto===false?" (bruto, sin comisiones)":"")+".":"El P&L es un estimado de la granja (sin ejecuciones del broker)."}</p>`;
+  if(t.pnlGranja!=null&&t.pnl!=null&&Math.abs(t.pnlGranja-t.pnl)>=.005)x+=`<p>La granja calculó ${M(t.pnlGranja)} con el precio del gráfico y el broker dice ${M(t.pnl)}: ${A(t.pnlGranja-t.pnl)} de diferencia, normalmente por el precio exacto en que se llenó la salida. Vale el del broker.</p>`;
+  else if(t.pnlGranja!=null)x+=`<p>La granja calculó lo mismo que el broker (${M(t.pnlGranja)}).</p>`;
+  if(D&&D.lecturas&&D.lecturas.n)x+=`<p>Durante el trade se compararon ${L(D.lecturas.n,{})} lecturas del broker y del gráfico: diferencia media ${A(D.lecturas.difMedia)}, máxima ${A(D.lecturas.difMax)}.</p>`;
+  if(f&&f.fuenteLider)x+=`<p>Fuente que mandó el P&L: ${H(f.fuenteLider==="broker-lectura"?"lectura del broker":f.fuenteLider)}.</p>`;
+  if(lt&&(lt.modificarMs!=null||lt.confirmarMs!=null))x+=`<p>Mover el stop: ${lt.modificarMs!=null?"se modificó en "+(lt.modificarMs/1e3).toFixed(1)+" s":""}${lt.confirmarMs!=null?" y se confirmó en "+(lt.confirmarMs/1e3).toFixed(1)+" s":""}${lt.via?" (vía "+H(lt.via)+")":""}.</p>`;
+  if(f&&f.modo)x+=`<p>Modo: ${f.modo==="real"?"real (el agente operó)":H(f.modo)}.</p>`;
+  if(D&&!ok)x+=`<p>${H(D.err||"No hay registro detallado de este trade.")}</p>`;else if(!D)x+=`<p>Cargando el detalle…</p>`;
+  h+=`<details class=dpd><summary>Detalles técnicos</summary><div class=dpx>${x}</div></details>`;
+  const vz=ok&&D.visual||[];
+  if(vz.length)h+=`<details class=dpd><summary>Verificación visual del stop</summary><div class=dpx>${vz.map(z=>z.error?`<p>Stop a ${N(z.precio)}: no se pudo revisar (${H(z.error)}).</p>`:`<p>Stop a ${N(z.precio)} · ${TT(z.at)}<br>Pestaña visible: ${z.visible?H(z.visible):"sin dato"}${z.foco!=null?" · con foco: "+(z.foco?"sí":"no"):""}<br>El texto del stop ${z.textoEnPanel?"apareció":"no apareció"} en el panel${z.panelMs!=null?" ("+(z.panelMs/1e3).toFixed(1)+" s)":""}${z.memoriaMs!=null?" · lectura en memoria a los "+(z.memoriaMs/1e3).toFixed(1)+" s":""}<br>Fotos guardadas: ${z.fotos||0}${z.carpeta?" · carpeta "+H(z.carpeta):""}</p>`).join("")}</div></details>`;
+  h+=`<details class=dpd id=dpInf><summary>Ver informe completo</summary><div class=dpx><pre>Cargando…</pre></div></details></div>`;
+  v.innerHTML=h;bindTop();
+  const di=v.querySelector("#dpInf");di.addEventListener("toggle",async()=>{if(!di.open||di.dataset.ok)return;di.dataset.ok=1;let md="Este trade no tiene informe en reportes.";if(t.informe)try{md=await (await fetch("/api/colchon/informe?f="+encodeURIComponent(t.informe),{cache:"no-store"})).text()}catch(e){md="No pude leer el informe."}di.querySelector("pre").textContent=md})};
+ draw(null);v.scrollTop=0;
+ let D=null;if(t.at)try{const r=await fetch("/api/colchon/detalle?at="+encodeURIComponent(t.at),{cache:"no-store"});D=r.ok?await r.json():{ok:false}}catch(e){D={ok:false,err:"No pude leer el detalle del trade."}}
+ if(informe.n===my&&D)draw(D)}
 document.getElementById("tradesBtn").onclick=()=>{if(v.classList.toggle("open"))list()};
 })();</script>
 
