@@ -58,6 +58,10 @@ Cada vez que Bänéd avise que hay una versión nueva: repite los pasos 2, 3 y 5
 - **Error de la página:** se corrigió un fallo (`glow` indefinido) que rompía la página con los árboles de flores de voxels.
 - **Actualizar:** `actualizar.ps1` solo copia archivos que están en el repositorio y no debe tocar `negocio.json`, `sod.json`, `accounts.json`, `metas.json` ni `logros.json`.
 
+## Versiones
+- Cada pull request debe **subir `VERSION`** (SemVer: arreglo `0.2.1`, función nueva `0.3.0`, estable para otras personas `1.0.0`) y **agregar una entrada arriba en `CHANGELOG.md`** (en español, con fecha).
+- La versión se ve, pequeña, en la esquina inferior derecha de la granja. Al subir `VERSION`, actualiza también el texto de respaldo `vX.Y.Z` del bloque `tl-version` al final de `Granja-de-Cuentas-v2.html`.
+
 ## Si algo falla
 - "repository not found": falta aceptar la invitación o iniciar sesión con `karocerquera`.
 - La granja no abre: el servidor está apagado; usa `iniciar-tradinglink.bat`.
