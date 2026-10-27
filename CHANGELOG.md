@@ -36,7 +36,7 @@ Stop en break even con 3 ticks de ganancia, panel de operación nuevo a la izqui
 - **Barra de la página:** se corrigió el cálculo de la barra de SL/TP del panel, que antes tomaba los puntos del TP como si fueran un precio.
 
 ### Eliminado
-- **El vigía visual** (verificación del stop mirando el gráfico, `motor/vigia-visual.mjs`): se quitó. La confirmación del stop sigue siendo la del broker.
+- **El vigía visual** (verificación del stop mirando el gráfico, `motor/vigia-visual.mjs`): se quitó.
 
 ### Notas
 - Los PR #6 y #7 se cerraron sin fusionar porque sus cambios quedaron superados por 0.3.0 y 0.4.0.
