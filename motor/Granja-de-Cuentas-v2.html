@@ -5089,7 +5089,7 @@ window.__prueba=()=>({on,phase,chk,agent:agentXY()});})();</script><style>/* Mej
 #tradesView .dp .dpl{font-size:11.5px;color:rgba(255,255,255,.55);margin-top:4px}
 #tradesView .dp .dpc{display:inline-flex;gap:8px;align-items:center;padding:7px 12px;border-radius:999px;background:rgba(255,255,255,.07);font-weight:700;font-size:13px;white-space:nowrap}
 #tradesView .dp .dpg{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:12px 0 4px}
-#tradesView .dp .dpt{background:rgba(255,255,255,.05);border-radius:10px;padding:8px 10px;min-width:0}
+#tradesView .dp .dpmx{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin:0 0 4px} #tradesView .dp .dpmx i{font-style:normal;font-weight:400;font-size:12px;color:rgba(255,255,255,.55)} #tradesView .dp .dpt{background:rgba(255,255,255,.05);border-radius:10px;padding:8px 10px;min-width:0}
 #tradesView .dp .dpk{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.5);margin-bottom:2px}
 #tradesView .dp .dpv{display:block;font-size:14px;font-weight:600;color:#fff;overflow-wrap:anywhere}
 #tradesView .dp .dpsec{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.5);margin:16px 0 7px}
@@ -5190,10 +5190,12 @@ async function informe(t){const my=informe.n=(informe.n||0)+1;v.classList.add("d
   const tile=(k,x)=>`<div class=dpt><span class=dpk>${k}</span><span class=dpv>${x}</span></div>`,pm=ok&&D.puntos&&typeof D.puntos.neg==="number"?D.puntos:null,PM=(g)=>pm?(g<0?(pm.neg<0?"−"+L(Math.abs(pm.neg),{maximumFractionDigits:2}):"0")+" pts":(pm.pos>0?"+"+L(pm.pos,{maximumFractionDigits:2}):"0")+" pts"):(D?"sin dato":"…");
   let h=`<button class=close>×</button><button class=back>← Volver</button><div class=dp>`;
   h+=`<div class=dph><div><div class=dpn style="color:${col}">${t.pnl==null?"—":M(t.pnl)}</div><div class=dpl>${t.pnl==null?"En curso":win?"Ganancia":"Pérdida"}${t.neto===false?" · P&L bruto, sin comisiones":t.neto?" · neto de comisiones":""}${t.aprox&&t.pnl!=null?" · aproximado":""}</div></div><span class=dpc><span style="color:${t.direccion==="COMPRA"?"#cdea1d":"#ff8a9a"}">${H(t.direccion)}</span><span>${H(t.tamano)}</span></span></div>`;
-  h+=`<div class=dpg>${tile("Resultado",H(mot))}${tile("Entrada → salida",N(en)+" → "+N(sa))}${tile("Máx. en contra",PM(-1))}${tile("Máx. a favor",PM(1))}${tile("Estrategia",H(t.estrategia||"Manual / fuera de la granja"))}${tile("Cuenta",H(AC(t.cuenta))||"—")}${tile("Duración",DU(sg))}${tile("Abrió",TT(op))}${tile("Cerró",TT(cl))}</div>`;
+  h+=`<div class=dpg>${tile("Resultado",H(mot))}${tile("Entrada → salida",N(en)+" → "+N(sa))}${tile("Estrategia",H(t.estrategia||"Manual / fuera de la granja"))}${tile("Cuenta",H(AC(t.cuenta))||"—")}${tile("Duración",DU(sg))}${tile("Abrió",TT(op))}${tile("Cerró",TT(cl))}</div>`;
   const sl=aj?(aj.slNuevo??aj.slAntes):null,tp=aj?(aj.tpNuevo??aj.tpAntes):null,last=movs.length?movs[movs.length-1].precio:null;
   if(en!=null&&sl!=null&&tp!=null&&sl!==tp){const P=p=>Math.max(0,Math.min(100,(p-sl)/(tp-sl)*100)),pe=P(en).toFixed(2);
    h+=`<div class=dpsec>Stop, entrada y objetivo</div><div class=dpr><div class=dprl><span>Stop inicial<i>${N(sl)}</i></span><span>Objetivo<i>${N(tp)}</i></span></div><div class=dptr style="--e:${pe}%"><span class=dpen style="left:${pe}%" title="Entrada ${N(en)}"></span>${last!=null?`<span class=dplk style="left:${P(last).toFixed(2)}%"></span>`:""}${sa!=null?`<span class=dpex style="left:${P(sa).toFixed(2)}%;background:${col}"></span>`:""}</div><div class=dpgl>${last!=null?`<span><span style="color:#cdea1d">▼</span> Protegido ${N(last)}</span>`:""}${sa!=null?`<span><span style="color:${col}">●</span> Salió ${N(sa)}</span>`:""}</div></div>`}
+  const dS=sl!=null&&en!=null?Math.abs(en-sl):null,dT=tp!=null&&en!=null?Math.abs(tp-en):null,PT=x=>L(x,{maximumFractionDigits:2});
+  h+=`<div class=dpsec>Puntos máximos del trade</div><div class=dpmx>${tile("Máx. en contra",PM(-1)+(dS?` <i>· stop a ${PT(dS)} pts</i>`:""))}${tile("Máx. a favor",PM(1)+(dT?` <i>· objetivo a ${PT(dT)} pts</i>`:""))}</div>`;
   h+=`<div class=dpsec>Stop</div>`;
   const m0=movs[0];
   if(m0&&en!=null){const gn=(m0.precio-en)*dr,tk=Math.round(gn/.25),be=gn<=.75+1e-9,p0=pasos.find(p=>p.paso===m0.paso)||pasos[0];
