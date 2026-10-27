@@ -93,7 +93,7 @@ async function cycle() {
 
 // ---- Solo lectura para la granja: historial de trades, informes y luces de conexión ----
 const maskId = t => String(t ?? '').replace(/\b(LF[EF]\d)\d{3,}(\d{3})\b/g, '$1…$2');
-// Detalle de UN trade para la granja (SOLO LECTURA): junta, desde colchon-eventos.jsonl, el cierre (fin_trade), los movimientos del stop, el vigia visual y la comparacion broker/chart de esa operacion.
+// Detalle de UN trade para la granja (SOLO LECTURA): junta, desde colchon-eventos.jsonl, el cierre (fin_trade), los movimientos del stop y la comparacion broker/chart de esa operacion.
 function detalleTrade(at) {
   const T = Date.parse(at); if (!isFinite(T)) return { ok: false, err: 'Falta la hora del trade' };
   let L = []; try { L = fs.readFileSync(path.join(DIR, 'colchon-eventos.jsonl'), 'utf8').split('\n').filter(Boolean).map(x => { try { return JSON.parse(x); } catch { return null; } }).filter(x => x && x.at); } catch {}
@@ -105,11 +105,10 @@ function detalleTrade(at) {
   const movs = W.filter(x => x.type === 'mover_stop' && ms(x.at) <= t1 + 1e3).map(m => ({ at: m.at, paso: m.paso, precio: m.precio, ok: !!m.ok, verificado: m.verificado ?? null, via: m.via || null, ms: intento(m).ms ?? null, enSeg: Math.round((ms(m.at) - t0) / 100) / 10 }));
   const disparos = W.filter(x => x.type === 'disparo' && ms(x.at) <= t1).map(d => ({ at: d.at, paso: d.paso, pnl: d.pnl, disparoUSD: d.disparoUSD, precio: d.precio, slAntes: d.slAntes }));
   const lec = W.filter(x => x.type === 'lectura' && x.brokerPl != null && x.chartPl != null && ms(x.at) <= t1), dif = lec.map(x => Math.abs(x.brokerPl - x.chartPl));
-  const visual = W.filter(x => x.type === 'visual_stop').map(v => { const m = v.muestras || []; return { at: v.at, precio: v.precio, error: v.error || null, memoriaMs: v.primeraLecturaMemoriaMs ?? null, panelMs: v.primerTextoPanelMs ?? null, fotos: m.filter(z => z.foto).length, visible: (m.find(z => z.vis) || {}).vis || null, foco: (m.find(z => z.focus != null) || {}).focus ?? null, textoEnPanel: m.some(z => (z.domHits || []).length), carpeta: v.carpeta ? path.basename(String(v.carpeta).replace(/\\/g, '/')) : null }; });
   const aj = f.ajusteFill ? { ref: f.ajusteFill.ref, fill: f.ajusteFill.fill, slAntes: f.ajusteFill.slAntes, slNuevo: f.ajusteFill.slNuevo, tpAntes: f.ajusteFill.tpAntes, tpNuevo: f.ajusteFill.tpNuevo, seg: f.ajusteFill.seg ?? null, ok: f.ajusteFill.ok !== false, nada: !!f.ajusteFill.nada } : null;
   const lt = f.latencia || {};
   const fin = { direccion: f.direccion, tamano: f.tamano, motivo: f.motivo, estrategia: f.estrategia, estrategiaId: f.estrategiaId, modo: f.modo, cuenta: maskId(f.cuenta), abiertaEn: f.abiertaEn, cerradaEn: f.cerradaEn || f.fin, abiertaET: f.abiertaET, cerradaET: f.cerradaET, duracionSeg: f.duracionSeg ?? null, colchonTrasSeg: f.colchonTrasSeg ?? null, entrada: f.entrada ?? null, pnlFinalUSD: f.pnlFinalUSD ?? null, pnlFinalAprox: !!f.pnlFinalAprox, colchonMovido: !!f.colchonMovido, slColchon: f.slColchon ?? null, colchonUSD: f.colchonUSD ?? null, pasos: f.pasos || [], pasosTotal: f.pasosTotal ?? null, ajusteFill: aj, latencia: { metodo: lt.metodo || null, via: lt.via || null, modificarMs: lt.modificarMs ?? null, confirmarMs: lt.confirmarMs ?? null, totalMs: lt.totalDesdeLecturaMs ?? null }, fuenteLider: f.fuenteLider || null, fuenteModo: f.fuenteModo || null };
-  return { ok: true, fin, movs, disparos, lecturas: { n: lec.length, difMedia: dif.length ? Math.round(dif.reduce((a, b) => a + b, 0) / dif.length * 100) / 100 : null, difMax: dif.length ? Math.round(Math.max(...dif) * 100) / 100 : null }, visual };
+  return { ok: true, fin, movs, disparos, lecturas: { n: lec.length, difMedia: dif.length ? Math.round(dif.reduce((a, b) => a + b, 0) / dif.length * 100) / 100 : null, difMax: dif.length ? Math.round(Math.max(...dif) * 100) / 100 : null } };
 }
 function tradesFarm(dia) { let L = []; try { L = fs.readFileSync(path.join(DIR, 'colchon-eventos.jsonl'), 'utf8').split('\n').filter(Boolean).map(x => { try { return JSON.parse(x); } catch { return null; } }).filter(x => x && x.at && etDay(Date.parse(x.at)) === dia); } catch {}
   const out = []; let movs = [];

@@ -4682,6 +4682,11 @@ function qu(){dh.update();const n=Math.min(dh.getDelta(),jx);qo+=n;const e=qo;fo
 <div id="blobColors" class="glass"></div>
 <aside id="history" class="glass"></aside>
 <aside id="panel" class="glass"></aside>
+<style id="tlPanelDetIzq">/* Panel de detalle de cuentas (burbujas, flores, cuenta fondeada): siempre a la IZQUIERDA. Si el panel en vivo esta abierto, se acomoda a su derecha. */
+#panel{left:22px!important;right:auto!important;transform:translate(calc(-100% - 400px))!important}
+#panel.open{transform:none!important}
+body:has(#prLive[style*="block"]) #panel{left:358px!important}
+@media (max-width:760px){#panel{left:10px!important;width:min(320px,calc(100vw - 20px))!important;z-index:13}body:has(#prLive[style*="block"]) #panel{left:10px!important}}</style>
 <div id="toast" class="glass"></div>
 <script>/* TradingLink: lee accounts.json y actualiza la granja. LFE=evaluación, LFF=fondeada */
 (function(){async function sync(){try{const s=window.granjaStore;if(!s)return;const d=await (await fetch('/accounts.json',{cache:'no-store'})).json();
@@ -5213,8 +5218,6 @@ async function informe(t){const my=informe.n=(informe.n||0)+1;v.classList.add("d
   if(f&&f.modo)x+=`<p>Modo: ${f.modo==="real"?"real (el agente operó)":H(f.modo)}.</p>`;
   if(D&&!ok)x+=`<p>${H(D.err||"No hay registro detallado de este trade.")}</p>`;else if(!D)x+=`<p>Cargando el detalle…</p>`;
   h+=`<details class=dpd><summary>Detalles técnicos</summary><div class=dpx>${x}</div></details>`;
-  const vz=ok&&D.visual||[];
-  if(vz.length)h+=`<details class=dpd><summary>Verificación visual del stop</summary><div class=dpx>${vz.map(z=>z.error?`<p>Stop a ${N(z.precio)}: no se pudo revisar (${H(z.error)}).</p>`:`<p>Stop a ${N(z.precio)} · ${TT(z.at)}<br>Pestaña visible: ${z.visible?H(z.visible):"sin dato"}${z.foco!=null?" · con foco: "+(z.foco?"sí":"no"):""}<br>El texto del stop ${z.textoEnPanel?"apareció":"no apareció"} en el panel${z.panelMs!=null?" ("+(z.panelMs/1e3).toFixed(1)+" s)":""}${z.memoriaMs!=null?" · lectura en memoria a los "+(z.memoriaMs/1e3).toFixed(1)+" s":""}<br>Fotos guardadas: ${z.fotos||0}${z.carpeta?" · carpeta "+H(z.carpeta):""}</p>`).join("")}</div></details>`;
   h+=`<details class=dpd id=dpInf><summary>Ver informe completo</summary><div class=dpx><pre>Cargando…</pre></div></details></div>`;
   v.innerHTML=h;bindTop();
   const di=v.querySelector("#dpInf");di.addEventListener("toggle",async()=>{if(!di.open||di.dataset.ok)return;di.dataset.ok=1;let md="Este trade no tiene informe en reportes.";if(t.informe)try{md=await (await fetch("/api/colchon/informe?f="+encodeURIComponent(t.informe),{cache:"no-store"})).text()}catch(e){md="No pude leer el informe."}di.querySelector("pre").textContent=md})};

@@ -5,7 +5,6 @@ import { getStrategy, listStrategies, DEFAULT_STRATEGY } from './strategies.mjs'
 // CLI:      node colchon.mjs [--paper] [--short] [--mnq]   |   node colchon.mjs --selftest
 import { execFile } from 'node:child_process'; import path from 'node:path'; import fs from 'node:fs';
 import { dataDir, TV_CLI, TV_PKG } from './rutas.mjs';
-import { vigiaStop } from './vigia-visual.mjs';
 const DIR = dataDir();
 export const CFG = { SL_USD: 600, TP_USD: 1600, NET_USD: 100, SLIP_TICKS: 1, TRIGGER_EXTRA_USD: 15, POLL_MS: 500, FLAT_BY_MIN: 16 * 60 + 45 };
 export const SIZES = { NQ: 2, MNQ: 20 }; const PT_USD = { NQ: 20, MNQ: 2 }; export const TICK = 0.25;
@@ -382,7 +381,6 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
             for (const x of r.intentos || []) ev('intento_stop', { ...x, precio: d.price, paso: stp.n });
             const tDone = Date.now(); const lat = { metodo: r.method || '?', via: r.via || '?', leerMs: tSeen - tRead, modificarMs: r.modifyMs ?? null, confirmarMs: confirmMs, apiIntentoMs: r.method === 'ui' ? r.apiAttemptMs : (r.apiMs ?? null), uiMs: r.method === 'ui' ? ((r.modifyMs ?? 0) + (confirmMs ?? 0)) : null, apiError: r.apiErr || null, modificarYConfirmarMs: tDone - t0, totalDesdeLecturaMs: tDone - tRead, maxRetrasoPorPollMs: wait, fuente: pos.pnlSrc, intentos: r.intentos || [], real: !opts.ignoreClock }; S.latency = lat; try { fs.appendFileSync(path.join(path.dirname(logFile), 'colchon-latencia.log'), JSON.stringify({ at: new Date().toISOString(), ok: v === d.price, ...lat }) + '\n'); } catch {}
             ev('mover_stop', { paso: stp.n, precio: d.price, ok: v === d.price, verificado: v ?? null, via: r.via || null, intentos: r.intentos || [] });
-            if (real) { try { const sid = ((r.intentos || []).find(x => x.stopId) || {}).stopId || null; import('node:module').then(({ createRequire }) => { const CDP = createRequire(TV_PKG)('chrome-remote-interface'); return vigiaStop({ CDP, price: d.price, stopId: sid, readExpr: sid ? js.stopById(sid) : null, dir: path.dirname(logFile), ev, tag: 'paso' + stp.n }); }).catch(() => {}); } catch {} } // solo lectura, sin esperar
             log(`LATENCIA [${lat.metodo}/${lat.via}] leer ${sg(lat.leerMs)} · modificar ${sg(lat.modificarMs)} · confirmar ${sg(lat.confirmarMs)}${lat.metodo === 'ui' ? ` · intento API ${sg(lat.apiIntentoMs)} (${lat.apiError}) · UI ${sg(lat.uiMs)}` : ''} = ${sg(lat.totalDesdeLecturaMs)} (+ hasta ${sg(wait)} entre lecturas)`);
             log(`modify via ${r.via || '?'} (${sg(tDone - t0)}) -> verificado ${v}`, v === d.price ? 'OK' : 'NO coincide ' + (r.err || r.raw || ''));
             const stepRec = { paso: stp.n, disparoUSD: stp.triggerUsd, protegeUSD: stp.lockUsd, precio: d.price, pnlAlDisparar: pos.pnl, fuente: pos.pnlSrc, saltados: d.step - (st.step ?? 0), latencia: lat };
