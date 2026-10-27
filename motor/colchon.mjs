@@ -3,8 +3,9 @@ import { getStrategy, listStrategies, DEFAULT_STRATEGY } from './strategies.mjs'
 // La IA nunca coloca/modifica/cierra órdenes: solo el usuario arranca una prueba desde la Granja.
 // Servidor: import { colchon } from './colchon.mjs'  -> colchon.start({side,symbol,qty}), colchon.stop(), colchon.status()
 // CLI:      node colchon.mjs [--paper] [--short] [--mnq]   |   node colchon.mjs --selftest
-import { execFile } from 'node:child_process'; import path from 'node:path'; import fs from 'node:fs'; import { fileURLToPath } from 'node:url';
-const DIR = path.dirname(fileURLToPath(import.meta.url));
+import { execFile } from 'node:child_process'; import path from 'node:path'; import fs from 'node:fs';
+import { dataDir, TV_CLI, TV_PKG } from './rutas.mjs';
+const DIR = dataDir();
 export const CFG = { SL_USD: 600, TP_USD: 1600, NET_USD: 100, SLIP_TICKS: 1, TRIGGER_EXTRA_USD: 15, POLL_MS: 500, FLAT_BY_MIN: 16 * 60 + 45 };
 export const SIZES = { NQ: 2, MNQ: 20 }; const PT_USD = { NQ: 20, MNQ: 2 }; export const TICK = 0.25;
 export const ptsFor = (usd, symbol, qty) => Math.round(usd / (PT_USD[symbol] * qty) / TICK) * TICK;
@@ -170,7 +171,7 @@ export const WRITE = /placeOrder|modifyOrder|editPositionBrackets|closePosition|
 // Conexión CDP persistente (chrome-remote-interface, dependencia de tradingview-mcp). Inyectable para tests.
 export async function cdpEvaluator(port = 9222) {
   const { createRequire } = await import('node:module');
-  const req = createRequire(path.join(DIR, 'tradingview-mcp/package.json'));
+  const req = createRequire(TV_PKG);
   const CDP = req('chrome-remote-interface');
   const targets = await CDP.List({ port }); const tgt = targets.find(t => t.type === 'page' && /tradingview\.com\/chart/.test(t.url)) || targets.find(t => t.type === 'page');
   if (!tgt) throw new Error('No encuentro la página del chart en CDP');
@@ -260,7 +261,7 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
 
 // ---- Driver UI (respaldo): CLI de tradingview-mcp + clics. Selectores a verificar en HERO. ----
 export function uiDriver() {
-  const TV = path.join(DIR, 'tradingview-mcp/src/cli/index.js');
+  const TV = TV_CLI;
   const tv = (...a) => new Promise(r => execFile(process.execPath, [TV, ...a], { timeout: 15000 }, (e, o) => { try { r(JSON.parse(o)); } catch { r({ success: false, raw: String(o || e) }); } }));
   const ev = async j => (await tv('ui', 'eval', j)).result;
   return {
