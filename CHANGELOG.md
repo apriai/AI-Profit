@@ -7,11 +7,28 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Arreglo** (corrige algo sin agregar funciones): sube el último número. Ejemplo: `0.2.0` → `0.2.1`.
 - **Función nueva**: sube el número del medio y el último vuelve a cero. Ejemplo: `0.2.1` → `0.3.0`.
 - **`1.0.0`**: cuando la granja sea estable para que la usen otras personas.
-- **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
+- **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.3.0] - 2026-10-26
+Reorganización de carpetas y acceso de escritorio para Mac y Windows (PR #5 y #6 de Caroline, integrados y revisados por Bänéd).
+
+### Agregado
+- **Acceso de escritorio «AI Profit»** para Windows (`instalar-ai-profit.bat`) y Mac (`instalar-ai-profit.command`): un doble clic abre TradingView con el puerto 9222, el servidor y la granja. No envía órdenes. Iconos en `assets/`.
+- **`motor/rutas.mjs`**: decide dónde están los datos personales. Si la carpeta ya tenía datos en la raíz, los sigue usando ahí; una carpeta nueva usa `datos/`.
+- **Archivos de compatibilidad en la raíz** (`iniciar-tradinglink.bat`, `abrir-tradingview.bat`, `actualizar.bat`, `actualizar.ps1`): llaman a los de `acceso/`, así el acceso «Prop Farm» y el actualizador de siempre siguen funcionando.
+
+### Cambiado
+- **Carpetas ordenadas**: el código del servidor y la página pasan a `motor/`, los lanzadores y el actualizador a `acceso/`, la documentación a `docs/` y las imágenes a `assets/`. `VERSION` y `CHANGELOG.md` se quedan en la raíz.
+- **`Abrir Granja.bat` pide confirmación** antes de cerrar TradingView para reabrirlo conectado (por si hay una operación abierta).
+- **Mascota y agente** (PR #6): ya no se atraviesan al caminar; la mascota se aparta o se detiene un momento y el más cercano a la cámara se dibuja delante.
+
+### Notas de migración
+- Los archivos personales (`accounts.json`, `sod.json`, `negocio.json`, `backups-negocio/`, etc.) **no se mueven**: una instalación con datos en la raíz sigue usándolos ahí.
+- `acceso/actualizar.ps1` no borra nada: los archivos viejos de la raíz (`tradinglink.mjs`, `colchon.mjs`, etc.) quedan sin usar; el arranque ya usa `motor/`. Reiniciar el servidor solo sin operaciones abiertas.
+
 ## [0.2.0] - 2026-10-26
-Versión actual de `main`. Reúne lo que se agregó después de la primera publicación.
+Reúne lo que se agregó después de la primera publicación.
 
 ### Agregado
 - **Panel Operar, Negocio y estrategias** (PR #2, de Caroline): panel *Operar* más grande, con el orden cuenta → estrategia y BUY/SELL abajo; el *Negocio* (antes *Historial*) con ＋ para la comisión de afiliado; jardín de logros con flor de voxels; día y noche de 7:00 a 16:00 ET; montos en $ ocultos hasta hacer clic. Cuatro estrategias: *Evaluación* (predeterminada), *Evaluación con trailing*, *Día mínimo + colchón* y *Prueba BE*.

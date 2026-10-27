@@ -7,8 +7,8 @@ Sirve para traer la última versión del código desde el repositorio privado `h
 - La primera vez se abre una ventana del navegador para **iniciar sesión en GitHub** (Git Credential Manager). Después recuerda tu sesión.
 
 ## Cómo se usa
-1. Pon `actualizar.bat` y `actualizar.ps1` en la carpeta `TradingLink` (la misma donde está `tradinglink.mjs`).
-2. Doble clic en `actualizar.bat`.
+1. En la carpeta `TradingLink` (la que tiene `LEEME.md`), abre `acceso`.
+2. Doble clic en `actualizar.bat`. El script trabaja en la carpeta de arriba: ahí quedan `git-portable` y `backups`. El servidor está en `motor\tradinglink.mjs`.
 
 ## Qué hace
 1. Si falta `git-portable\cmd\git.exe`, descarga **Git portátil** (solo dentro de la carpeta; no instala nada en Windows ni cambia el PATH).
