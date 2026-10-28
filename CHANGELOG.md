@@ -10,6 +10,16 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.4.1] - 2026-10-28
+El acceso directo ahora levanta el servidor siempre, aunque TradingView esté cerrado o digas N.
+
+### Arreglado
+- **El acceso directo «AI Profit» no abría el servidor si TradingView estaba cerrado** (`acceso/Abrir Granja.bat`). Antes revisaba primero el puerto 9222 de TradingView y, si no respondía, preguntaba «¿Cerrar TradingView y abrirlo conectado? (S/N)»; con **N**, o si no se podía abrir TradingView, el archivo hacía `pause` y salía, así que el servidor nunca arrancaba y la granja no se abría. Ahora **el servidor arranca primero** (si `http://127.0.0.1:8787` no responde) y, con **N** o si falla la apertura de TradingView, solo avisa y sigue: la granja se abre igual y TradingView se conecta solo cuando lo abras con el puerto 9222.
+- Subrutina nueva `:arrancar_servidor` al final del archivo: busca Node (`node-win\node.exe`, `node\node.exe`, `node\bin\node.exe` y luego `where node`) y lo inicia en la ventana minimizada «TradingLink».
+
+### Notas
+- Solo cambia el lanzador de Windows y el texto de versión `v0.4.1` de la esquina. No se toca el motor ni las órdenes. El lanzador de Mac (`acceso/AI Profit.command`) no tenía este problema: ya arrancaba el servidor aunque TradingView no abriera.
+
 ## [0.4.0] - 2026-10-27
 Stop en break even con 3 ticks de ganancia, panel de operación nuevo a la izquierda y todos los paneles de detalle abiertos a la izquierda.
 
