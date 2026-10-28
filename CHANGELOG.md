@@ -10,6 +10,16 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.4.2] - 2026-10-28
+El acceso directo «AI Profit» ya no pregunta nada: reinicia TradingView solo.
+
+### Cambiado
+- **Sin pregunta S/N al abrir «AI Profit»** (`acceso/Abrir Granja.bat`). Antes, si el puerto 9222 no respondía, el lanzador preguntaba «¿Cerrar TradingView y abrirlo conectado? (S = sí, N = no)» y había que escribir S. Ahora no pregunta: al abrir AI Profit, TradingView se reinicia solo con el puerto de conexión. Se quitaron la pregunta y la rama de «N». Todo lo demás sigue igual: el servidor arranca primero, se cierra TradingView, se abre con el puerto 9222 y se espera la conexión; si no se puede abrir, la granja se abre igual.
+
+### Notas
+- Cerrar TradingView no cierra posiciones ni stops en el broker, pero la granja no puede moverlos hasta reconectar. Si tienes una operación abierta, no abras AI Profit hasta estar plana. El lanzador de Mac (`acceso/AI Profit.command`) ya reiniciaba TradingView sin preguntar, así que no cambia.
+- Solo cambia el lanzador de Windows y el texto de versión `v0.4.2` de la esquina. No se toca el motor ni las órdenes.
+
 ## [0.4.1] - 2026-10-28
 El acceso directo ahora levanta el servidor siempre, aunque TradingView esté cerrado o digas N.
 
