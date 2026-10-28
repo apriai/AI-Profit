@@ -52,6 +52,10 @@ Todo corre en tu propia PC con Windows. La página se sirve en `http://localhost
 | **Luces de conexión** | Servidor, TradingView (CDP 9222) y Tradovate, siempre visibles en la barra superior. |
 | **Actualización segura** | `acceso/actualizar.bat` descarga Git portátil, respalda lo que va a reemplazar y nunca toca tus archivos personales. |
 
+> **Modo Demo:** en el panel Negocio hay un botón «Demo» que muestra la granja con datos de ejemplo inventados (+$600 hoy, 14 trades ganadores, 2 cuentas de evaluación y 1 fondeada).
+> Sirve para enseñarla sin mostrar tus cuentas reales: solo dura esa carga de la página, bloquea toda escritura y no toca tus datos reales.
+> Al recargar la página vuelves a tus datos de siempre.
+
 <p align="center">
   <img src="assets/granja-isla.png" alt="La isla de la granja con el Jardín de logros" width="80%">
   <br>
