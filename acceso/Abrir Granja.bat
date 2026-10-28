@@ -12,6 +12,10 @@ if not exist "%ROOT%\motor\tradinglink.mjs" (
   exit /b 1
 )
 
+rem El servidor arranca primero, para que el atajo funcione aunque TradingView este cerrado.
+call :listening_http 8787
+if errorlevel 1 call :arrancar_servidor
+
 call :listening 9222
 if not errorlevel 1 goto server
 
@@ -22,17 +26,16 @@ echo Si tienes una operacion abierta, di que NO: cierra TradingView tu mismo cua
 choice /C SN /N /M "Cerrar TradingView y abrirlo conectado? (S = si, N = no): "
 if errorlevel 2 (
   echo No se cerro nada. Abre TradingView con el puerto 9222 cuando estes plana.
-  pause
-  exit /b 1
+  echo La granja se abre igual; TradingView se conecta solo cuando lo abras con el puerto.
+  goto server
 )
 taskkill /F /IM TradingView.exe >nul 2>&1
 ping -n 4 127.0.0.1 >nul
 set "GRANJA_CALL=1"
 call "%~dp0abrir-tradingview.bat"
 if errorlevel 1 (
-  echo No se pudo abrir TradingView con el puerto 9222.
-  pause
-  exit /b 1
+  echo No se pudo abrir TradingView con el puerto 9222. La granja se abre igual.
+  goto server
 )
 echo Esperando a TradingView...
 set "TRIES=0"
@@ -122,3 +125,17 @@ exit /b 0
 :listening_http_ps
 powershell -NoProfile -Command "try { $null = Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 'http://127.0.0.1:%PORT%/'; exit 0 } catch { exit 1 }"
 exit /b %errorlevel%
+
+:arrancar_servidor
+set "NODE="
+if exist "%ROOT%\node-win\node.exe" set "NODE=%ROOT%\node-win\node.exe"
+if not defined NODE if exist "%ROOT%\node\node.exe" set "NODE=%ROOT%\node\node.exe"
+if not defined NODE if exist "%ROOT%\node\bin\node.exe" set "NODE=%ROOT%\node\bin\node.exe"
+if not defined NODE (
+  for /f "delims=" %%N in ('where node 2^>nul') do (
+    if not defined NODE set "NODE=%%N"
+  )
+)
+if not defined NODE exit /b 1
+start "TradingLink" /MIN "%NODE%" "%ROOT%\motor\tradinglink.mjs"
+exit /b 0
