@@ -10,6 +10,20 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.4.3] - 2026-10-28
+El P&L del día ahora es el saldo real de TradingView menos el saldo inicial, e incluye comisiones.
+
+### Cambiado
+- **P&L del día = saldo real − saldo inicial** (`motor/Granja-de-Cuentas-v2.html`). La barra superior, la flor y el historial de trades muestran el saldo real de TradingView menos el saldo con que empezó el día (incluye comisiones). Antes mostraban la suma de los trades brutos, sin comisiones. Los trades brutos quedan como detalle: en el texto emergente de la barra superior y en una línea pequeña debajo del P&L del día del historial. Si todavía no hay saldo del día, se muestra el bruto como antes.
+- **Fila de la flor renombrada:** ahora dice «P&L total (desde 25,000)» (usa el saldo inicial de la cuenta).
+
+### Arreglado
+- **Cuentas de evaluación nuevas empezaban el día en la primera lectura** (`motor/tradinglink.mjs`). Si aparecía una cuenta de evaluación nueva (id `LFE…`) en una granja que ya tenía cuentas, el día empezaba en la primera lectura de saldo, que podía traer una posición abierta con ganancia o pérdida flotante y descuadrar el P&L del día. Ahora empieza en 25,000 y se guarda `inicio: 25000`.
+
+### Notas
+- La instalación nueva (sin cuentas guardadas) y las cuentas fondeadas no cambian: siguen empezando en la primera lectura.
+- El cambio del servidor solo toca cómo se guarda el saldo inicial del día de una cuenta nueva. No se toca `colchon.mjs`, `orders.mjs` ni `strategies.mjs`, ni las órdenes. Hay que reiniciar el servidor (solo sin operaciones abiertas) para que use el código nuevo; la página se actualiza al recargar.
+
 ## [0.4.2] - 2026-10-28
 El acceso directo «AI Profit» ya no pregunta nada: reinicia TradingView solo.
 
