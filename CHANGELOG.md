@@ -10,6 +10,18 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.5.0] - 2026-10-28
+Modo Demo: un botón en el panel Negocio muestra la granja con datos de ejemplo, para enseñarla sin mostrar tus cuentas reales.
+
+### Agregado
+- **Botón «Demo» en el panel Negocio** (`motor/Granja-de-Cuentas-v2.html`). Al pulsarlo, la página se recarga con datos de ejemplo inventados: +$600 de P&L del día, 14 trades ganadores, 2 cuentas de evaluación y 1 fondeada, y un Negocio de +$3,000. Aparece una marca pequeña y fina «demo» abajo a la derecha.
+- Funciona solo en el navegador y solo durante esa carga de la página: al recargar vuelves a tus datos reales. Mientras está activo **bloquea todas las peticiones de escritura** y no toca tus datos reales ni el `localStorage`.
+- Los datos de ejemplo no contienen nada personal ni real (ids de cuenta falsos, trades generados al azar y montos ilustrativos).
+
+### Notas
+- No cambia el motor: no se toca ningún archivo `.mjs`. El código de la demo va dentro de la propia página, en su propio bloque `<script>`.
+- La página se actualiza al recargar; no hace falta reiniciar el servidor.
+
 ## [0.4.3] - 2026-10-28
 El P&L del día ahora es el saldo real de TradingView menos el saldo inicial, e incluye comisiones.
 

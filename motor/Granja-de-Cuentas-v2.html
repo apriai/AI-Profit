@@ -9,6 +9,217 @@
 #fatal h2{font-size:19px;margin:0 0 6px}#fatal p{font-size:13.5px;opacity:.85;margin:0 0 10px;line-height:1.45}
 #fatal pre{white-space:pre-wrap;word-break:break-word;font-size:12px;background:rgba(0,0,0,.35);padding:10px 12px;border-radius:10px;max-height:40vh;overflow:auto;margin:0 0 12px}
 #fatal button{font:inherit;font-weight:600;color:#fff;cursor:pointer;padding:8px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.14);margin-right:8px}.label{min-width:0!important;padding:3px 10px 4px!important;font-size:11px!important;border-radius:999px!important;background:rgba(20,8,40,.32)!important;backdrop-filter:blur(4px);box-shadow:none!important;border:1px solid rgba(255,255,255,.14)!important}.lbl-head{font-size:10px!important;opacity:.8;gap:3px!important}.lbl-main{font-size:12px!important;margin-top:0!important}.lbl-main .of,.ej,.lbl-sub{display:none!important}.bar{height:3px!important;margin-top:3px!important;min-width:64px}.badge{font-size:10px!important;padding:2px 6px!important}.simbtn{font-size:10px!important;padding:2px 8px!important;margin-top:2px}#blobColorBtn{display:none!important}#blobColors{transform:translate(-50%,-8px) scale(.96)}</style>
+<script>
+/* MODO DEMO (ejemplo). Todos los datos de abajo son INVENTADOS: ids de cuenta falsos, operaciones generadas al azar y montos ilustrativos.
+   No hay ningun dato real ni personal. Se activa con el boton «Demo» del panel Negocio y vale para UNA sola carga de pagina:
+   al recargar (F5/Ctrl+F5) o al volver a pulsar el boton, vuelve lo real.
+   Nunca escribe en servidor ni en disco: fetch/XHR/beacon que no sean GET quedan bloqueados y localStorage es una copia en memoria. */
+(function () {
+  'use strict';
+  if (window.__tlxLoaded) return; window.__tlxLoaded = 1;
+  var NY = 'America/New_York', FLAG = 'tl_x_next', ON = false;
+  try { if (sessionStorage.getItem(FLAG) === '1') { ON = true; sessionStorage.removeItem(FLAG); } } catch (e) {}
+  window.__tlxLog = []; // peticiones de red que el ejemplo dejo pasar (solo GET de archivos estaticos) o bloqueo
+
+  /* ---------- UI: boton dentro del panel Negocio + marcador pequeno ---------- */
+  var css = document.createElement('style');
+  css.textContent =
+    '#tlxBtn{display:block;margin:14px 0 0 auto;background:transparent;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.42);font:500 11px Inter,system-ui,sans-serif;padding:5px 12px;border-radius:8px;cursor:pointer;transition:.2s}' +
+    '#tlxBtn:hover{color:#fff;border-color:rgba(255,255,255,.3)}#tlxBtn.on{color:#cdea1d;border-color:rgba(205,234,29,.5)}' +
+    '#tlxMark{position:fixed;right:10px;bottom:5px;z-index:2147483000;pointer-events:none;user-select:none;color:#fff;opacity:.5;font:200 11px "Segoe UI Light","Helvetica Neue",Inter,system-ui,sans-serif;letter-spacing:.6px}' +
+    (ON ? 'body [data-s],body [data-stop]{opacity:.4!important;cursor:not-allowed!important;pointer-events:none!important}' : '');
+  (document.head || document.documentElement).appendChild(css);
+
+  function ensureBtn() {
+    var h = document.getElementById('history');
+    if (!h) return;
+    var b = document.getElementById('tlxBtn');
+    if (b && b.parentNode === h && h.lastElementChild === b) return;
+    if (!b) {
+      b = document.createElement('button'); b.id = 'tlxBtn'; b.type = 'button'; b.textContent = 'Demo';
+      b.setAttribute('aria-pressed', ON ? 'true' : 'false'); if (ON) b.className = 'on';
+      b.addEventListener('click', function (e) {
+        e.stopPropagation();
+        try { if (!ON) sessionStorage.setItem(FLAG, '1'); else sessionStorage.removeItem(FLAG); } catch (x) {}
+        location.reload();
+      });
+    }
+    h.appendChild(b);
+  }
+  function ui() {
+    var tryHook = function () {
+      var h = document.getElementById('history');
+      if (!h || h.__tlx) return;
+      h.__tlx = 1; ensureBtn();
+      new MutationObserver(ensureBtn).observe(h, { childList: true });
+    };
+    new MutationObserver(tryHook).observe(document.documentElement, { childList: true, subtree: true });
+    tryHook();
+    if (ON) {
+      var mk = function () { if (document.getElementById('tlxMark') || !document.body) return;
+        var m = document.createElement('div'); m.id = 'tlxMark'; m.textContent = 'demo'; document.body.appendChild(m); };
+      document.addEventListener('DOMContentLoaded', mk); mk();
+    }
+  }
+  ui();
+  if (!ON) return; // modo real: no se toca nada mas
+
+  /* ---------- fechas (hora de Nueva York) ---------- */
+  var NYF = new Intl.DateTimeFormat('en-CA', { timeZone: NY, year: 'numeric', month: '2-digit', day: '2-digit' });
+  var NYH = new Intl.DateTimeFormat('en-US', { timeZone: NY, hour: 'numeric', hour12: false });
+  var simDay = parseInt(new URLSearchParams(location.search).get('simDay'), 10) || 0;
+  var TODAY = NYF.format(new Date(Date.now() + simDay * 864e5));
+  function addDays(s, n) { var t = new Date(s + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); }
+  function dow(s) { return new Date(s + 'T12:00:00Z').getUTCDay(); }
+  function prevTrading(s) { do { s = addDays(s, -1); } while (dow(s) === 0 || dow(s) === 6); return s; }
+  function etISO(day, h, m, s) {
+    var base = Date.UTC(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8, 10), h, m, s);
+    for (var off = 4; off <= 5; off++) { var t = new Date(base + off * 36e5); if (+NYH.format(t) % 24 === h) return t.toISOString(); }
+    return new Date(base + 5 * 36e5).toISOString();
+  }
+
+  /* ---------- DATOS DE EJEMPLO (inventados, no son reales) ---------- */
+  function rng(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function hash(s) { var h = 7; for (var i = 0; i < s.length; i++) h = Math.imul(h * 31 + s.charCodeAt(i), 1) | 0; return h; }
+  /* ids FALSOS de ejemplo (no son cuentas reales) */
+  var IDS = { A: 'LF' + 'E' + '02510000000' + '011', B: 'LF' + 'E' + '02510000000' + '022', C: 'LF' + 'F' + '02510000000' + '033' };
+  var DAYS = [TODAY]; for (var i = 0; i < 6; i++) DAYS.push(prevTrading(DAYS[DAYS.length - 1]));
+  var DAYPNL_TODAY = 600;
+  var ACC = [
+    { key: 'A', type: 'eval', bal: 25980, sod: 25730, peak: 25980, day: 250, at: [-2, 1], lead: 30, dx: 40 },
+    { key: 'B', type: 'eval', bal: 25420, sod: 25270, peak: 25420, day: 150, at: [5, -5], lead: 18, dx: 0 },
+    { key: 'C', type: 'funded', bal: 25640, sod: 25440, peak: 25640, day: 200, at: [4, 6], lead: 30, dx: 30 }
+  ];
+  var DAYS_DATA = {}; // day -> {trades,gross,qty}
+  function genDay(day) {
+    var isT = day === TODAY, n = isT ? 14 : 9 + (hash(day) & 3), best = null;
+    for (var seed = 1; seed < 6000; seed++) {
+      var R = rng(hash(day) + seed * 7919), arr = [], gross = 0, qsum = 0;
+      var mins = []; for (var k = 0; k < n; k++) mins.push(574 + Math.floor(R() * 370)); mins.sort(function (a, b) { return a - b; });
+      for (var j = 0; j < n; j++) {
+        var qty = [3, 4, 5, 6, 8, 10][Math.floor(R() * 6)], pts = 0.25 * (6 + Math.floor(R() * 19));
+        var long_ = R() < 0.55, en = 24100 + Math.floor(R() * 1600) * 0.25, sa = long_ ? en + pts : en - pts;
+        var pnl = Math.round(pts * 2 * qty * 100) / 100; gross += pnl; qsum += qty;
+        var ak = R() < 0.4 ? 'A' : R() < 0.5 ? 'B' : 'C', auto = R() < 0.72, dur = 40 + Math.floor(R() * 520);
+        var mm = mins[j], endMs = new Date(etISO(day, Math.floor(mm / 60), mm % 60, Math.floor(R() * 60))).getTime();
+        arr.push({ abierta: new Date(endMs - dur * 1000).toISOString(), at: new Date(endMs).toISOString(), direccion: long_ ? 'COMPRA' : 'VENTA',
+          tamano: qty + ' MNQ', entrada: en, salida: sa, pnl: pnl, pnlBruto: pnl, neto: false, fuente: 'broker', aprox: false, cuenta: IDS[ak],
+          modo: auto ? 'real' : null, estrategia: auto ? 'Evaluaci\u00f3n' : 'Manual / fuera de la granja', motivo: auto ? (R() < 0.8 ? 'Take profit' : 'Stop loss') : null,
+          stopMovido: auto ? R() < 0.45 : null, informe: auto ? day + '.md' : null, granja: auto, pnlGranja: pnl });
+      }
+      best = { trades: arr.reverse(), gross: Math.round(gross * 100) / 100, qty: qsum };
+      if (isT ? (gross >= 650 && gross <= 700) : (gross >= 330 && gross <= 900)) break;
+    }
+    return best;
+  }
+  DAYS.forEach(function (d) { DAYS_DATA[d] = genDay(d); });
+  var DAILY = {};
+  DAYS.forEach(function (d) { var x = DAYS_DATA[d]; DAILY[d] = d === TODAY ? DAYPNL_TODAY : Math.round((x.gross - x.qty * 1.1) / 0.5) * 0.5; });
+
+  function accountsJson() {
+    var o = { updated: new Date().toISOString(), accounts: {}, error: null, daily: DAILY, live: [] };
+    ACC.forEach(function (a) { var id = IDS[a.key];
+      o.accounts[id] = { id: id, type: a.type, balance: a.bal, equity: a.bal, profit: 0, readAt: new Date().toISOString(), startOfDay: a.sod, dayPnl: a.day,
+        totalPnl: a.bal - 25000, tradingDay: TODAY, peak: a.peak, floor: a.type === 'funded' ? 25100 : a.peak - 1000, locked: false, breached: false };
+      o.live.push(id); });
+    return o;
+  }
+  function tradesJson(dia) {
+    dia = DAYS_DATA[dia] ? dia : (dia ? dia : TODAY);
+    var x = DAYS_DATA[dia] || { trades: [], gross: 0 };
+    return { dia: dia, total: x.gross, totalNeto: false, saldoDia: DAILY[dia] != null ? DAILY[dia] : null, n: x.trades.length, ganados: x.trades.filter(function (t) { return t.pnl > 0; }).length,
+      trades: x.trades, dias: DAYS.slice(), fuente: 'broker' };
+  }
+  function detalleJson(at) {
+    var t = null; for (var d in DAYS_DATA) DAYS_DATA[d].trades.forEach(function (z) { if (z.at === at) t = z; });
+    if (!t) return { ok: false, err: 'Sin detalle' };
+    var pts = Math.abs(t.salida - t.entrada);
+    return { ok: true, puntos: { neg: -Math.round(pts * 0.3 * 4) / 4, pos: pts + 0.5 }, movs: [], fin: { entrada: t.entrada, abiertaEn: t.abierta, cerradaEn: t.at, pasos: [] } };
+  }
+  function api(path, q) {
+    if (path === '/accounts.json') return accountsJson();
+    if (path === '/logros.json' || path === '/metas.json') return {};
+    if (path === '/api/negocio') return { ok: true, data: null };
+    if (path === '/api/colchon/trades') return tradesJson(q.get('dia'));
+    if (path === '/api/colchon/conexion') return { servidor: true, tradingview: true, tradovate: true, broker: 'Tradovate', real: false, cuenta: IDS.A, lecturaOk: true, actualizado: new Date().toISOString() };
+    if (path === '/api/colchon/accounts') return { ok: true, brokerId: 'tradovate', broker: 'Tradovate', current: IDS.A, canSwitch: false,
+      accounts: ACC.map(function (a) { return { id: IDS[a.key], name: IDS[a.key], type: a.type, current: a.key === 'A', allowed: true, real: false, realLabel: '' }; }) };
+    if (path === '/api/colchon/strategies') return { ok: true, default: 'evaluacion-simple', strategies: [{ id: 'evaluacion-simple', name: 'Evaluaci\u00f3n', short: 'Stop y objetivo fijos; el stop se mueve a break even.', params: { SL_USD: 600, TP_USD: 1600, NET_USD: 100, SLIP_TICKS: 1, TRIGGER_EXTRA_USD: 15, DEFAULT_QTY: { MNQ: 5, NQ: 2 } } }] };
+    if (path === '/api/colchon/check') return { ok: true, real: false, paper: true, msg: '', realLabel: '', account: { broker: 'Tradovate', name: IDS.A } };
+    if (path === '/api/colchon/status') return { state: 'idle' };
+    if (path === '/api/colchon/summary') return { ok: false, err: 'Todav\u00eda no hay resumen' };
+    if (path === '/api/colchon/lectura') return { paused: false };
+    if (path === '/api/colchon/detalle') return detalleJson(q.get('at'));
+    return { ok: false, err: 'ruta desconocida' };
+  }
+  var TEXT = { '/api/colchon/informe': 'Informe de ejemplo.\n\nTrade cerrado con ganancia. Datos ilustrativos.', '/api/colchon/reporte': '# Reporte de ejemplo\n\nDatos ilustrativos.' };
+
+  /* ---------- localStorage en memoria (el real no se toca) ---------- */
+  var mem = {};
+  var fake = { getItem: function (k) { return Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null; }, setItem: function (k, v) { mem[String(k)] = String(v); },
+    removeItem: function (k) { delete mem[k]; }, clear: function () { mem = {}; }, key: function (i) { return Object.keys(mem)[i] || null; } };
+  Object.defineProperty(fake, 'length', { get: function () { return Object.keys(mem).length; } });
+  function seed() {
+    var ledger = [], n = 0;
+    function L(type, off, amount, note) { ledger.push({ id: 'x' + (n++), type: type, date: addDays(TODAY, off), amount: amount, note: note }); }
+    [-27, -26, -21, -14, -13, -9].forEach(function (o, i) { L('compra', o, 50, 'LucidFlex 25K #' + (1100 + i)); });
+    L('fondeo', -20, 0, 'Cuenta fondeada');
+    L('payout', -19, 1400, 'Payout');
+    L('curso', -12, 300, 'Comisi\u00f3n de afiliado'); L('curso', -8, 300, 'Comisi\u00f3n de afiliado'); L('curso', -3, 200, 'Comisi\u00f3n de afiliado');
+    L('payout', -6, 1100, 'Payout');
+    mem['tl_ledger_v1'] = JSON.stringify(ledger);
+    mem['tl_ledger_ver'] = '1'; mem['tl_ledger_seed_v1'] = '1'; mem['tl_ledger_seed_v2'] = '1'; mem['tl_price_mig50'] = '1'; mem['tl_price_50_mig'] = '1';
+    mem['tl_price'] = '50'; mem['tl_mode_mig1'] = '1'; mem['tl_mode'] = 'negocio'; mem['tl_daynight_mig1'] = '1'; mem['tl_ledger_cnt_v1'] = JSON.stringify({ p: 2, f: 1 });
+    mem['tl_seen_ids'] = JSON.stringify(ACC.map(function (a) { return IDS[a.key]; })); mem['tl_burned_ids'] = '[]';
+    var accounts = ACC.map(function (a, i) {
+      return { id: i + 1, name: IDS[a.key], type: a.type, start: 25000, bal: a.bal, peak: a.peak, pnlToday: a.day, pnlDate: TODAY, date: addDays(TODAY, -22 + i * 3),
+        payouts: a.type === 'funded' ? [{ amount: 1100, date: addDays(TODAY, -6) }] : [], at: a.at, lead: a.lead, dx: a.dx };
+    });
+    mem['granja.v2'] = JSON.stringify({ schema: 3, accounts: accounts, history: [], daily: DAILY, example: false, botEnabled: false, blobColor: 'white' });
+  }
+  seed();
+  try { Object.defineProperty(window, 'localStorage', { configurable: true, get: function () { return fake; } }); } catch (e) {}
+
+  /* ---------- red: solo lectura ---------- */
+  function jres(o, text) { return new Response(text != null ? text : JSON.stringify(o), { status: 200, headers: { 'content-type': text != null ? 'text/plain; charset=utf-8' : 'application/json' } }); }
+  function parse(u) { try { return new URL(u, location.href); } catch (e) { return null; } }
+  function decide(method, u) { // -> {kind:'pass'} | {kind:'fake',body,text} | {kind:'block'}
+    var url = parse(u); method = String(method || 'GET').toUpperCase();
+    if (!url) return { kind: 'block' };
+    var same = url.origin === location.origin, p = url.pathname;
+    if (method !== 'GET' && method !== 'HEAD') { window.__tlxLog.push('BLOQUEADO ' + method + ' ' + p); return { kind: 'block' }; }
+    if (same && (p === '/accounts.json' || p === '/logros.json' || p === '/metas.json' || p.indexOf('/api/') === 0)) {
+      if (TEXT[p]) return { kind: 'fake', text: TEXT[p] };
+      return { kind: 'fake', body: api(p, url.searchParams) };
+    }
+    return { kind: 'pass' };
+  }
+  var realFetch = window.fetch ? window.fetch.bind(window) : null;
+  window.fetch = function (input, init) {
+    var u = typeof input === 'string' ? input : (input && input.url) || String(input);
+    var m = (init && init.method) || (input && input.method) || 'GET', d = decide(m, u);
+    if (d.kind === 'block') return Promise.resolve(jres({ ok: false, err: 'Solo lectura' }));
+    if (d.kind === 'fake') return Promise.resolve(jres(d.body, d.text));
+    return realFetch(input, init);
+  };
+  var xOpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function (method, u) {
+    var d = decide(method, u), a = Array.prototype.slice.call(arguments);
+    if (d.kind === 'block') { a[0] = 'GET'; a[1] = 'data:application/json,' + encodeURIComponent('{"ok":false}'); }
+    else if (d.kind === 'fake') { a[0] = 'GET'; a[1] = 'data:' + (d.text != null ? 'text/plain,' + encodeURIComponent(d.text) : 'application/json,' + encodeURIComponent(JSON.stringify(d.body))); }
+    return xOpen.apply(this, a);
+  };
+  try { navigator.sendBeacon = function (u) { window.__tlxLog.push('BLOQUEADO beacon ' + u); return true; }; } catch (e) {}
+  ['WebSocket', 'EventSource'].forEach(function (n) { if (window[n]) window[n] = function () { throw new Error('Solo lectura'); }; });
+
+  /* ---------- botones de operar: no hacen nada ---------- */
+  function stop(e) { var t = e.target && e.target.closest && e.target.closest('[data-s],[data-stop]'); if (t) { e.stopImmediatePropagation(); e.preventDefault(); } }
+  ['click', 'mousedown', 'pointerdown', 'pointerup', 'mouseup', 'touchstart', 'keydown'].forEach(function (ev) { window.addEventListener(ev, stop, true); });
+  new MutationObserver(function () {
+    document.querySelectorAll('[data-s],[data-stop]').forEach(function (b) { if (!b.disabled) b.disabled = true; });
+  }).observe(document.documentElement, { childList: true, subtree: true });
+})();
+</script>
 <script>/* Negocio: copia del historial en el servidor (negocio.json). Si el navegador esta vacio lo restaura; si no, lo guarda (max 1 vez cada 10 s). */
 (function(){var API='/api/negocio',RX=/^(tl_|granja\.)/,last=null,timer=0;
 function ln(v){try{var a=JSON.parse(v);return Array.isArray(a)?a.length:0}catch(e){return 0}}
@@ -5469,7 +5680,7 @@ function hook(){const G=window.__granja&&window.__granja.pet;if(!G||!G.renderer|
  if(cfg.kind!=="perro"||cfg.body!==A.perro.b||cfg.accent!==A.perro.a){try{applyPet(G,cfg)}catch(err){console.warn("mascota",err)}}
  (function lab(){const p=window.__pet.screen();if(p&&cfg.name){tag.textContent=cfg.name;tag.style.left=p.x+"px";tag.style.top=(p.y-8)+"px";tag.style.display="block"}else tag.style.display="none";requestAnimationFrame(lab)})()}
 setTimeout(hook,600);})();</script>
-<div id="tl-version" style="position:fixed;right:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.4.3</div>
+<div id="tl-version" style="position:fixed;right:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.5.0</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/VERSION",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
 </body>
 </html>
