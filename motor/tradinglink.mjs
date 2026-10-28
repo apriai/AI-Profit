@@ -38,7 +38,9 @@ function save(c) {
   if (a.balance != null) {
     const s = sod.accounts[c.id];
     // cambio de día: se conservan peak y breachedAt (quema pegajosa; −$600 + −$600 en 2 días = −$1,200 → quemada)
-    if (!s || s.day !== day) sod.accounts[c.id] = { ...(s || {}), day, bal: s && s.lastBal != null ? s.lastBal : a.balance, lastBal: a.balance };
+    // cuenta de EVALUACION vista por primera vez en una granja que ya tenia cuentas: empieza el dia en el saldo inicial (25,000), no en la primera lectura (que puede traer una posicion abierta con P&L flotante). Instalacion nueva (sod vacio): se mantiene la primera lectura.
+    const nuevaEval = !s && /^LFE/.test(c.id) && Object.keys(sod.accounts).length > 0;
+    if (!s || s.day !== day) sod.accounts[c.id] = nuevaEval ? { day, bal: RULES.start, inicio: RULES.start, lastBal: a.balance } : { ...(s || {}), day, bal: s && s.lastBal != null ? s.lastBal : a.balance, lastBal: a.balance };
     else s.lastBal = a.balance;
     sod.accounts[c.id].readAt = a.readAt;
     sod.accounts[c.id].lastAt = a.readAt;
