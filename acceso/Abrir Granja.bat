@@ -22,13 +22,7 @@ if not errorlevel 1 goto server
 echo El puerto 9222 no responde.
 echo Se cierra TradingView si estaba abierto y se vuelve a abrir con depuracion.
 echo Esto no envia ordenes.
-echo Si tienes una operacion abierta, di que NO: cierra TradingView tu mismo cuando estes plana.
-choice /C SN /N /M "Cerrar TradingView y abrirlo conectado? (S = si, N = no): "
-if errorlevel 2 (
-  echo No se cerro nada. Abre TradingView con el puerto 9222 cuando estes plana.
-  echo La granja se abre igual; TradingView se conecta solo cuando lo abras con el puerto.
-  goto server
-)
+echo Reiniciando TradingView con el puerto 9222 (cerrarlo no cierra posiciones ni stops en el broker).
 taskkill /F /IM TradingView.exe >nul 2>&1
 ping -n 4 127.0.0.1 >nul
 set "GRANJA_CALL=1"
