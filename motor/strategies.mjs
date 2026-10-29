@@ -1,6 +1,6 @@
-// Registro de estrategias. Orden: Evaluación → Evaluación con trailing → Día mínimo + colchón → Prueba BE.
+// Registro de estrategias. Orden: Evaluación → Evaluación con trailing → Rascacielo + colchón → Rascacielo → Fast Breakeven.
 // Explicaciones al estilo flecha: +$300 → protege $100. Todas usan el mismo motor colchon (modifyOrder / Tradovate·Bit).
-export const STRATEGY_ORDER = ['evaluacion-simple', 'evaluacion', 'dia-minimo-colchon', 'prueba-be'];
+export const STRATEGY_ORDER = ['evaluacion-simple', 'evaluacion', 'dia-minimo-colchon', 'rascacielo', 'prueba-be'];
 export const STRATEGIES = {
   'evaluacion-simple': {
     id: 'evaluacion-simple', name: 'Evaluación',
@@ -15,15 +15,21 @@ export const STRATEGIES = {
     params: { SL_USD: 630, TP_USD: 630, STEPS: [{ trigger: 200, lock: 0 }, { trigger: 300, lock: 100 }, { trigger: 500, lock: 200 }], DEFAULT_QTY: { MNQ: 5, NQ: 1 } },
   },
   'dia-minimo-colchon': {
-    id: 'dia-minimo-colchon', name: 'Día mínimo + colchón',
-    short: "Operación: SL −$600 / TP +$1,600\n~+$115 → protege ~$100",
-    description: "Operación: entra a mercado con SL −$600 y TP +$1,600. AI: ~+$115 → el stop sube para proteger ~$100 netos. Solo sube, nunca baja.",
+    id: 'dia-minimo-colchon', name: 'Rascacielo + colchón',
+    short: "Rascacielo + colchón. Operación: SL −$600 / TP +$1,600\n~+$115 → protege ~$100",
+    description: "Rascacielo + colchón. Operación: entra a mercado con SL −$600 y TP +$1,600. AI: ~+$115 → el stop sube para proteger ~$100 netos. Solo sube, nunca baja.",
     params: { SL_USD: 600, TP_USD: 1600, NET_USD: 100, COMM_RT: { MNQ: 1, NQ: 3.5 }, SLIP_TICKS: 1, TRIGGER_EXTRA_USD: 15, DEFAULT_QTY: { MNQ: 5, NQ: 2 } },
   },
+  'rascacielo': {
+    id: 'rascacielo', name: 'Rascacielo',
+    short: "Operación: SL −$600 / TP +$104\nAI: el stop no se mueve",
+    description: "Rascacielo. Operación: entra a mercado con SL −$600 y TP +$104. AI: el stop no se mueve; termina en TP, en SL o si la cierras tú.",
+    params: { SL_USD: 600, TP_USD: 104, STEPS: [], DEFAULT_QTY: { MNQ: 5, NQ: 1 } },
+  },
   'prueba-be': {
-    id: 'prueba-be', name: 'Prueba BE',
-    short: "Operación: SL −$630 / TP +$630\n+$15 → stop a entrada +3 ticks (cubre la comisión)",
-    description: "Operación: entra a mercado con SL −$630 y TP +$630. AI: +$15 → el stop sube a la entrada +3 ticks de ganancia (0.75 pts), para cubrir al menos la comisión. Se mueve una sola vez.",
+    id: 'prueba-be', name: 'Fast Breakeven',
+    short: "Fast Breakeven. Operación: SL −$630 / TP +$630\n+$15 → stop a entrada +3 ticks (cubre la comisión)",
+    description: "Fast Breakeven. Operación: entra a mercado con SL −$630 y TP +$630. AI: +$15 → el stop sube a la entrada +3 ticks de ganancia (0.75 pts), para cubrir al menos la comisión. Se mueve una sola vez.",
     params: { SL_USD: 630, TP_USD: 630, STEPS: [{ trigger: 15, lockTicks: 3 }], PROB: 'tp', DEFAULT_QTY: { MNQ: 5, NQ: 1 } },
   },
 };

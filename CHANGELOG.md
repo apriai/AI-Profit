@@ -10,6 +10,20 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.7.0] - 2026-10-29
+Catálogo de estrategias: nombres nuevos y la estrategia Rascacielo, sin colchón.
+
+### Agregado
+- **Estrategia `rascacielo`** («Rascacielo», `motor/strategies.mjs`). SL −$600 / TP +$104. El stop no se mueve (`STEPS` vacío). Cantidad por defecto: 5 MNQ o 1 NQ.
+
+### Cambiado
+- **`dia-minimo-colchon`** se muestra como «Rascacielo + colchón». El id y los parámetros no cambian (SL 600, TP 1600, neto 100, comisión, 1 tick de deslizamiento, disparo extra 15, 5 MNQ / 2 NQ).
+- **`prueba-be`** se muestra como «Fast Breakeven». El id y los parámetros no cambian (SL/TP 630, un escalón a +$15 con el stop a entrada +3 ticks, probabilidad del TP, 5 MNQ / 1 NQ).
+- Orden del selector: Evaluación, Evaluación con trailing, Rascacielo + colchón, Rascacielo, Fast Breakeven. Evaluación sigue siendo la predeterminada.
+
+### Notas
+- Solo cambia el registro de estrategias. No se toca el motor de órdenes ni la página, salvo el texto de respaldo de la versión. Hay que reiniciar el servidor (solo sin operaciones abiertas ni órdenes pendientes) para que el selector use el catálogo nuevo; la página se actualiza al recargar (F5).
+
 ## [0.6.0] - 2026-10-29
 Jardín de logros: las rosas pasan a ser un cerezo rosa de voxels, con una manzana por certificado.
 
