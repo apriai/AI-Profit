@@ -1,6 +1,6 @@
 # AGENTS.md: reglas para cualquier agente (Grok) que trabaje en este repositorio
 
-Repositorio privado de Prop Farm / TradingLink (motor y página, sin datos personales). Los pasos para actualizar están en `docs/INSTRUCCIONES-GROK.md`. El servidor está en `motor/`.
+Repositorio privado de Prop Farm / TradingLink (motor y página, sin datos personales). Los pasos para actualizar están en `docs/INSTRUCCIONES-GROK.md`. **Antes de nada lee `ESTADO-Y-VERSIONES.md` (en esta misma carpeta): tiene la versión actual, lo último que cambió y las reglas clave.** El servidor está en `motor/`.
 
 ## Reglas que no se rompen
 1. Nunca abras, modifiques, canceles ni cierres órdenes reales por tu cuenta. Solo Caroline lo hace desde la granja.
