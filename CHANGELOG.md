@@ -10,6 +10,21 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.6.0] - 2026-10-29
+Jardín de logros: las rosas pasan a ser un cerezo rosa de voxels, con una manzana por certificado.
+
+### Agregado
+- **Cerezo rosa junto a la casa** (a la izquierda) en `motor/Granja-de-Cuentas-v2.html`. Copa densa de cubos rosa más chicos, en racimos como nubes; tronco marrón grueso y texturado; flores pequeñas de adorno en el suelo, alrededor de la base.
+- **Una manzana roja por logro** (certificado de cuenta fondeada). Las manzanas quedan siempre en la cara de la copa que mira a la cámara. Al pulsar una manzana se abre el panel «Certificado verificado», con la imagen y el botón de borrar (🗑).
+- **Clic en el cerezo** abre el alta de certificado. El botón de confirmar dice «Crear logro». Se quitó el ＋ flotante.
+
+### Cambiado
+- Las parcelas de plantas y flores de las cuentas fondeadas que ocupaban el sitio del árbol se mueven solo en la escena, para no tapar el tronco. No cambia el esquema de datos (`logros.json`, cuentas ni el motor).
+
+### Notas
+- Solo cambia la página. No se toca el motor ni las órdenes. La página se actualiza al recargar (F5). No hace falta reiniciar el servidor.
+- El texto de respaldo de la esquina queda en `v0.6.0` (en `0.5.1` se había quedado `vv0.5.1`).
+
 ## [0.5.1] - 2026-10-28
 El día de la granja ahora cierra a las 16:00 ET, el pico del max loss solo sube con saldos de cierre, y una cuenta marcada «quemada» por error se corrige sola.
 
