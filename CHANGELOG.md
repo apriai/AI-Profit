@@ -10,6 +10,28 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.5.1] - 2026-10-28
+El día de la granja ahora cierra a las 16:00 ET, el pico del max loss solo sube con saldos de cierre, y una cuenta marcada «quemada» por error se corrige sola.
+
+### Arreglado
+- **Cuenta de evaluación marcada «quemada» sin estarlo** (`motor/tradinglink.mjs`, `motor/Granja-de-Cuentas-v2.html`). El pico (peak) subía con cualquier saldo intradía y el piso se calculaba desde ese pico, así que una ganancia pasajera durante el día levantaba el piso y una pérdida normal después se marcaba como max loss roto (sticky `breachedAt`, estado «Quemada»). En LucidFlex el max loss es trailing de fin de día (EOD): el pico es el **mayor saldo de cierre de sesión**, no el mayor saldo del día.
+  - El servidor solo sube el pico con lecturas de la ventana de cierre (17:00 a 17:59 ET, mercado en pausa y todo plano). Un saldo intradía ya no lo sube.
+  - Si el servidor estaba apagado en el cierre, la primera lectura del día nuevo usa el último saldo del día anterior como cierre.
+  - `breachedAt` solo se marca si el saldo llega al piso calculado desde el pico de cierre (pico − $1,000).
+  - La página ya no sube el pico por su cuenta con el saldo intradía (`setDaily`) y una cuenta nueva ya no nace con el saldo como pico: sigue el pico que manda el servidor.
+- **La página se corrige sola:** si el servidor dice que la cuenta no está quemada y la página todavía tiene la marca `burnedAt`, la quita y toma el pico del servidor. Evita que una cuenta marcada por error sea archivada en Negocio. Hay que recargar la página (F5) una vez.
+
+### Cambiado
+- **El día de la granja termina a las 16:00 America/New_York** (fin de las sesiones de Nueva York), en lugar de las 18:00 o la medianoche (`motor/colchon.mjs`, `motor/tradinglink.mjs`, `motor/Granja-de-Cuentas-v2.html`). Desde las 16:00 todo cuenta como el día siguiente; sábado y domingo cuentan como lunes (viernes 16:00 pasa a lunes). Una sola regla (`diaFarm()`) para el P&L del día, la barra superior, el historial de trades, el reporte diario y el Negocio. El horario de verano lo resuelve la zona `America/New_York`.
+  - A las 16:00 la barra superior vuelve a $0 y el historial «de hoy» queda vacío. El cierre del día anterior se guarda (`prev` en `sod.json`) y sus trades siguen visibles en el historial de ese día.
+  - Hasta una hora después del cierre se siguen guardando los últimos trades del día que acaba de cerrar.
+
+### Notas
+- Reinicia el servidor solo sin operaciones abiertas ni órdenes pendientes. La página se actualiza al recargar (F5).
+- No se tocan `orders.mjs`, `strategies.mjs`, stops ni órdenes.
+- Las carpetas `historial/` ya guardadas siguen agrupadas con la regla vieja; los días nuevos usan la regla de las 16:00.
+- Eval vs fondeada: se mantiene el candado de la fondeada de antes (piso 25,100 al superar 26,100). La documentación de Lucid y de terceros no coincide en si la evaluación topa el piso en 25,000 o en 25,100; solo importa si un cierre pasa de 26,000, así que no se cambió.
+
 ## [0.5.0] - 2026-10-28
 Modo Demo: un botón en el panel Negocio muestra la granja con datos de ejemplo, para enseñarla sin mostrar tus cuentas reales.
 
