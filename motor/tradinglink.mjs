@@ -3,7 +3,7 @@
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
 import * as orders from './orders.mjs';
 import { negocio } from './negocio.mjs';
-import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, etDay, cdpEvaluator, PAGE } from './colchon.mjs';
+import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, diaFarm, cdpEvaluator, PAGE } from './colchon.mjs';
 import { execFile } from 'node:child_process';
 import { dataDir, ROOT, HTML, TV_CLI } from './rutas.mjs';
 const DIR = dataDir();
@@ -15,12 +15,12 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const typeOf = id => id.startsWith('LFF') ? 'funded' : id.startsWith('LFE') ? 'eval' : 'unknown';
 const num = s => +String(s).replace(/[^0-9.-]/g, '');
 let state = { updated: null, accounts: {}, error: null, daily: {} };
-// Dia de trading (ET): la sesion empieza a las 6 PM ET -> despues de las 18:00 cuenta como el dia siguiente.
+// Dia de trading (ET): el dia termina a las 16:00 ET (fin de las sesiones de Nueva York) -> desde las 16:00 cuenta como el dia siguiente; sabado/domingo -> lunes. Una sola regla para todo: diaFarm() en colchon.mjs.
 const SOD_FILE = path.join(DIR, 'sod.json');
 let sod = { accounts: {}, daily: {} }; try { sod = { accounts: {}, daily: {}, ...JSON.parse(fs.readFileSync(SOD_FILE, 'utf8')) }; } catch {}
 // Semilla: al reiniciar, las cuentas no activas no se releen (p.ej. con pausa-lectura.flag); se publica su ÚLTIMO saldo real conocido (sod.lastBal) marcado stale para que la granja pueda marcar quemada una fondeada.
 for (const [id, s] of Object.entries(sod.accounts || {})) if (/^LF[EF]/.test(id) && s && s.lastBal != null && !s.gone) state.accounts[id] = { id, type: typeOf(id), balance: s.lastBal, equity: s.lastBal, profit: null, readAt: s.readAt || null, startOfDay: s.bal, dayPnl: Math.round((s.lastBal - s.bal) * 100) / 100, totalPnl: Math.round((s.lastBal - 25000) * 100) / 100, tradingDay: s.day, stale: true };
-function tradingDay() { const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false }).formatToParts(new Date()).map(x => [x.type, x.value])); const d = new Date(Date.UTC(+p.year, +p.month - 1, +p.day)); if ((+p.hour % 24) >= 18) d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); }
+function tradingDay() { return diaFarm(); }
 
 const readCurrent = () => ev(`(()=>{const n=document.querySelector('[class*=accountName]');const f=[...document.querySelectorAll('[class*=accountSummaryField]')].map(e=>e.innerText.split('\\n'));const p=(document.querySelector('[class*=accountManager]')||{}).innerText||'';return JSON.stringify({id:n&&n.innerText.trim(),f,busy:/Positions\\s*\\(?[1-9]|Orders\\s*\\(?[1-9]/.test(p)})})()`).then(s => JSON.parse(s || '{}'));
 const center = () => ev(`(()=>{const r=document.querySelector('[class*=accountName]').getBoundingClientRect();return (r.x+r.width/2|0)+' '+(r.y+r.height/2|0)})()`);
@@ -40,7 +40,7 @@ function save(c) {
     // cambio de día: se conservan peak y breachedAt (quema pegajosa; −$600 + −$600 en 2 días = −$1,200 → quemada)
     // cuenta de EVALUACION vista por primera vez en una granja que ya tenia cuentas: empieza el dia en el saldo inicial (25,000), no en la primera lectura (que puede traer una posicion abierta con P&L flotante). Instalacion nueva (sod vacio): se mantiene la primera lectura.
     const nuevaEval = !s && /^LFE/.test(c.id) && Object.keys(sod.accounts).length > 0;
-    if (!s || s.day !== day) sod.accounts[c.id] = nuevaEval ? { day, bal: RULES.start, inicio: RULES.start, lastBal: a.balance } : { ...(s || {}), day, bal: s && s.lastBal != null ? s.lastBal : a.balance, lastBal: a.balance };
+    if (!s || s.day !== day) sod.accounts[c.id] = nuevaEval ? { day, bal: RULES.start, inicio: RULES.start, lastBal: a.balance } : { ...(s || {}), ...(s && s.lastBal != null && ![16, 17].includes(horaET()) ? { peak: Math.max(RULES.start, s.peak ?? 0, s.lastBal) } : {}), day, bal: s && s.lastBal != null ? s.lastBal : a.balance, lastBal: a.balance, ...(s && s.day && s.lastBal != null && s.bal != null ? { prev: { day: s.day, pnl: Math.round((s.lastBal - s.bal) * 100) / 100 } } : {}) };
     else s.lastBal = a.balance;
     sod.accounts[c.id].readAt = a.readAt;
     sod.accounts[c.id].lastAt = a.readAt;
@@ -54,10 +54,13 @@ function save(c) {
 // FIX quema fondeada: piso de max loss calculado en el servidor (mismas reglas que Ln() de la granja) para que
 // una fondeada que rompe el max loss SIEMPRE se marque, aunque la lectura completa esté en pausa.
 const RULES = { start: 25000, dd: 1000, lockTriggerOver: 1100, lockFloorOver: 100 };
-function peakDe(id, bal) { const s = sod.accounts[id] || {}; let p = Math.max(RULES.start, s.peak ?? 0, bal ?? 0);
+// PICO = mayor SALDO DE CIERRE de sesion (regla Lucid EOD trailing). Un saldo intradia NUNCA sube el pico: solo cuenta si la lectura es de la ventana de cierre (17:00-17:59 ET, mercado en pausa y todo plano) o via el cambio de dia.
+const horaET = () => +new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: '2-digit', hourCycle: 'h23' }).format(new Date());
+const enCierre = () => horaET() === 17;
+function peakDe(id, bal, cierre) { const s = sod.accounts[id] || {}; let p = Math.max(RULES.start, s.peak ?? 0, cierre ? (bal ?? 0) : 0);
   try { const d = JSON.parse(fs.readFileSync(path.join(DIR, 'days.json'), 'utf8'))[id] || []; for (const x of d) p = Math.max(p, x.close ?? 0); } catch {}
   if (sod.accounts[id]) sod.accounts[id].peak = p; return p; }
-function riesgo(a) { if (!a || a.balance == null) return; const peak = peakDe(a.id, a.balance), locked = a.type === 'funded' && peak > RULES.start + RULES.lockTriggerOver;
+function riesgo(a) { if (!a || a.balance == null) return; const peak = peakDe(a.id, a.balance, enCierre()), locked = a.type === 'funded' && peak > RULES.start + RULES.lockTriggerOver;
   a.peak = peak; a.floor = locked ? RULES.start + RULES.lockFloorOver : peak - RULES.dd; a.locked = locked; const sa = sod.accounts[a.id]; // REGLA FONDEADA 25K: perder $1,000 (desde el pico, o en total desde 25,000 aunque sea en varios días) = QUEMADA para siempre
   a.breached = a.balance <= a.floor || a.balance <= RULES.start - RULES.dd || !!(sa && sa.breachedAt); if (a.breached && sa && !sa.breachedAt) { sa.breachedAt = new Date().toISOString(); try { fs.writeFileSync(SOD_FILE, JSON.stringify(sod, null, 2)); } catch {} } if (a.breached && a.type === "funded") { a.burned = true; a.breachedAt = sa && sa.breachedAt; }
   if (a.breached) console.log('MAX LOSS roto:', a.id, a.type, 'saldo', a.balance, '<= piso', a.floor); }
@@ -114,7 +117,7 @@ function detalleTrade(at) {
   const fin = { direccion: f.direccion, tamano: f.tamano, motivo: f.motivo, estrategia: f.estrategia, estrategiaId: f.estrategiaId, modo: f.modo, cuenta: maskId(f.cuenta), abiertaEn: f.abiertaEn, cerradaEn: f.cerradaEn || f.fin, abiertaET: f.abiertaET, cerradaET: f.cerradaET, duracionSeg: f.duracionSeg ?? null, colchonTrasSeg: f.colchonTrasSeg ?? null, entrada: f.entrada ?? null, pnlFinalUSD: f.pnlFinalUSD ?? null, pnlFinalAprox: !!f.pnlFinalAprox, colchonMovido: !!f.colchonMovido, slColchon: f.slColchon ?? null, colchonUSD: f.colchonUSD ?? null, pasos: f.pasos || [], pasosTotal: f.pasosTotal ?? null, ajusteFill: aj, latencia: { metodo: lt.metodo || null, via: lt.via || null, modificarMs: lt.modificarMs ?? null, confirmarMs: lt.confirmarMs ?? null, totalMs: lt.totalDesdeLecturaMs ?? null }, fuenteLider: f.fuenteLider || null, fuenteModo: f.fuenteModo || null };
   return { ok: true, fin, movs, disparos, puntos: maxPuntos(W, t1, f.tamano), lecturas: { n: lec.length, difMedia: dif.length ? Math.round(dif.reduce((a, b) => a + b, 0) / dif.length * 100) / 100 : null, difMax: dif.length ? Math.round(Math.max(...dif) * 100) / 100 : null } };
 }
-function tradesFarm(dia) { let L = []; try { L = fs.readFileSync(path.join(DIR, 'colchon-eventos.jsonl'), 'utf8').split('\n').filter(Boolean).map(x => { try { return JSON.parse(x); } catch { return null; } }).filter(x => x && x.at && etDay(Date.parse(x.at)) === dia); } catch {}
+function tradesFarm(dia) { let L = []; try { L = fs.readFileSync(path.join(DIR, 'colchon-eventos.jsonl'), 'utf8').split('\n').filter(Boolean).map(x => { try { return JSON.parse(x); } catch { return null; } }).filter(x => x && x.at && diaFarm(Date.parse(x.at)) === dia); } catch {}
   const out = []; let movs = [];
   for (const x of L) { if (x.type === 'mover_stop' && x.ok) movs.push(x); if (x.type !== 'fin_trade') continue;
     const sid = x.estrategiaId || ''; const cand = [sid && `${sid}-${dia}.md`, `${dia}.md`].filter(Boolean).filter(f => fs.existsSync(path.join(DIR, 'reportes', f)));
@@ -134,16 +137,17 @@ function histDia(dia, f) { const h = histLeer(dia); if (!h) return null; const c
   const out = [...tr, ...farm.map(m => ({ ...m, fuente: 'granja', granja: true }))].sort((a, b) => Date.parse(b.at) - Date.parse(a.at)); const v = out.filter(t => typeof t.pnl === 'number');
   const sd = cs.map(([, c]) => c.saldoDia).filter(x => typeof x === 'number');
   return { dia, total: Math.round(v.reduce((a, t) => a + t.pnl, 0) * 100) / 100, saldoDia: sd.length ? Math.round(sd.reduce((a, x) => a + x, 0) * 100) / 100 : null, n: out.length, ganados: v.filter(t => t.pnl > 0).length, trades: out, dias: f.dias, cuenta: cs.length === 1 ? cs[0][0] : null, fuente: 'historial guardado (' + (cs[0][1].fuente || 'bróker') + ')' }; }
-async function tradesDe(dia) { const r = await tradesDe0(dia); if (dia === etDay() && r.fuente && /bróker/.test(r.fuente) && !/^historial/.test(r.fuente)) histGuardar(r); return r; }
-async function tradesDe0(dia) { const f = tradesFarm(dia); const b = dia === etDay() ? await brokerExecs() : null;
+const diaVivo = d => d === diaFarm() || d === diaFarm(Date.now() - 36e5);
+async function tradesDe(dia) { const r = await tradesDe0(dia); if (diaVivo(dia) && r.fuente && /bróker/.test(r.fuente) && !/^historial/.test(r.fuente)) histGuardar(r); return r; }
+async function tradesDe0(dia) { const f = tradesFarm(dia); const b = diaVivo(dia) ? await brokerExecs() : null;
   if (!b || !b.ex) { const h = histDia(dia, f); if (h) return h; f.fuente = 'informes de la granja (estimado; sin ejecuciones del bróker)'; return f; }
-  const rt = roundTrips(b.ex).filter(t => etDay(Date.parse(t.at)) === dia);
+  const rt = roundTrips(b.ex).filter(t => diaFarm(Date.parse(t.at)) === dia);
   const farm = [...f.trades]; const out = rt.map(t => { const k = farm.findIndex(x => Math.abs(Date.parse(x.at) - Date.parse(t.at)) < 15000 && x.direccion === t.direccion);
     const m = k >= 0 ? farm.splice(k, 1)[0] : null; return { ...t, aprox: t.fuente === 'broker' ? false : !t.neto, cuenta: maskId(b.cuenta), modo: m ? m.modo : null, estrategia: m ? m.estrategia : 'Manual / fuera de la granja', motivo: m ? m.motivo : null, stopMovido: m ? m.stopMovido : null, informe: m ? m.informe : null, granja: !!m, pnlGranja: m ? m.pnl : null }; });
   for (const m of farm) out.push({ ...m, fuente: 'granja', granja: true });
   out.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)); const v = out.filter(t => typeof t.pnl === 'number');
   const acc = Object.values(state.accounts).find(a => a.id === b.cuenta);
-  return { dia, total: Math.round(v.reduce((a, t) => a + t.pnl, 0) * 100) / 100, totalNeto: v.every(t => t.neto !== false), saldoDia: acc && acc.tradingDay === dia ? acc.dayPnl : null, n: out.length, ganados: v.filter(t => t.pnl > 0).length, trades: out, dias: f.dias, cuenta: maskId(b.cuenta),
+  return { dia, total: Math.round(v.reduce((a, t) => a + t.pnl, 0) * 100) / 100, totalNeto: v.every(t => t.neto !== false), saldoDia: acc && acc.tradingDay === dia ? acc.dayPnl : (acc && sod.accounts[acc.id] && sod.accounts[acc.id].prev && sod.accounts[acc.id].prev.day === dia ? sod.accounts[acc.id].prev.pnl : null), n: out.length, ganados: v.filter(t => t.pnl > 0).length, trades: out, dias: f.dias, cuenta: maskId(b.cuenta),
     fuente: 'ejecuciones reales del bróker (TradingView)' + (v.every(t => t.neto !== false) ? ', netas de comisiones' : ', P&L bruto sin comisiones') }; }
 function diasHist() { try { return fs.readdirSync(HDIR).filter(f => /^\d{4}-\d{2}-\d{2}\.json$/.test(f)).map(f => f.slice(0, 10)); } catch { return []; } }
 function diasConTrades() { try { return [...new Set(fs.readdirSync(path.join(DIR, 'reportes')).map(f => (f.match(/(\d{4}-\d{2}-\d{2})\.md$/) || [])[1]).filter(Boolean))].sort().reverse(); } catch { return []; } }
@@ -170,14 +174,14 @@ async function conexion() { if (conn.v && Date.now() - conn.at < 10000) return c
   if (cdp && st.state !== 'running') { try { const c = await Promise.race([colchon.check(), sleep(4000).then(() => null)]); if (c && c.account) { broker = c.account.broker || c.account.brokerId || null; tdv = /tradovate/i.test(`${broker} ${c.account.brokerId || ''}`) && !!c.account.name; real = !!c.real; cuenta = maskId(c.account.name); } } catch {} }
   if (!cdp) tdv = false; if (st.state === 'running' && st.mode === 'real') real = true;
   conn = { at: Date.now(), v: { servidor: true, tradingview: cdp, tradovate: tdv, broker, real, cuenta, lecturaOk: !state.error, actualizado: state.updated } }; return conn.v; }
-const negocioH = negocio({ dir: DIR, port: PORT, day: () => etDay() }); // /api/negocio: copia del historial del Negocio (negocio.json)
+const negocioH = negocio({ dir: DIR, port: PORT, day: () => diaFarm() }); // /api/negocio: copia del historial del Negocio (negocio.json)
 http.createServer((q, r) => {
   if (negocioH(q, r)) return;
   if (/^\/(logros|metas)\.json/.test(q.url)) { let t='{}'; try { t = fs.readFileSync(path.join(DIR, q.url.startsWith('/logros') ? 'logros.json' : 'metas.json'), 'utf8'); } catch {} r.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); return r.end(t); }
   if (q.url.startsWith('/accounts.json')) { r.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); return r.end(JSON.stringify(state)); }
   if (q.url.startsWith('/api/colchon/')) { let b=''; q.on('data',c=>b+=c); q.on('end', async()=>{ let j={}; try{j=JSON.parse(b||'{}')}catch{} let out;
     try {
-      if (q.url.startsWith('/api/colchon/reporte')) { const d = new URL(q.url, 'http://x').searchParams.get('dia'); const md = buildReport(DIR, /^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d : etDay());
+      if (q.url.startsWith('/api/colchon/reporte')) { const d = new URL(q.url, 'http://x').searchParams.get('dia'); const md = buildReport(DIR, /^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d : diaFarm());
         r.writeHead(200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-store' }); return r.end(md); }
       if (q.url.startsWith('/api/colchon/informe')) { const f = path.basename(new URL(q.url, 'http://x').searchParams.get('f') || ''); let md = 'No encontré ese informe.';
         if (/^[\w.-]+\.md$/.test(f)) try { md = maskId(fs.readFileSync(path.join(DIR, 'reportes', f), 'utf8')); } catch {}
@@ -186,7 +190,7 @@ http.createServer((q, r) => {
       if (q.url.startsWith('/api/colchon/lectura')) { const f = path.join(DIR, 'pausa-lectura.flag');
         if (q.method === 'POST') { const p = j.pause ?? !fs.existsSync(f); if (p) fs.writeFileSync(f, 'pausa manual ' + new Date().toISOString()); else fs.rmSync(f, { force: true }); }
         out = { paused: fs.existsSync(f), ultimaLecturaCompleta: lastFull ? new Date(lastFull).toISOString() : null, ultimaActividad: new Date(lastBusy).toISOString(), esperaSeg: Math.max(0, Math.ceil((QUIET_MS - (Date.now() - lastBusy)) / 1000)) }; }
-      else if (q.url.startsWith('/api/colchon/trades')) { const d = new URL(q.url, 'http://x').searchParams.get('dia'); out = await tradesDe(/^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d : etDay()); }
+      else if (q.url.startsWith('/api/colchon/trades')) { const d = new URL(q.url, 'http://x').searchParams.get('dia'); out = await tradesDe(/^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d : diaFarm()); }
       else if (q.url.startsWith('/api/colchon/conexion')) out = await conexion();
       else if (q.url.startsWith('/api/colchon/status')) out = { ...colchon.status(), cfg: colchonCFG };
       else if (q.url.startsWith('/api/colchon/summary')) out = colchon.summary() || { ok: false, err: 'Todavía no hay resumen' };
@@ -214,5 +218,6 @@ http.createServer((q, r) => {
 let lastFull = 0, lastFunded = 0, lastBusy = Date.now(); const FULL_MS = EVERY_MS, QUIET_MS = 5 * 60 * 1000;
 cycle(); setInterval(cycle, 30 * 1000);
 
-setInterval(() => { tradesDe(etDay()).catch(() => {}); }, 3 * 60 * 1000);
-setTimeout(() => { tradesDe(etDay()).catch(() => {}); }, 15000);
+const guardarHist = () => { for (const d of new Set([diaFarm(), diaFarm(Date.now() - 36e5)])) tradesDe(d).catch(() => {}); };
+setInterval(guardarHist, 3 * 60 * 1000);
+setTimeout(guardarHist, 15000);
