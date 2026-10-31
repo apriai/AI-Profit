@@ -152,6 +152,83 @@ async function tradesDe0(dia) { const f = tradesFarm(dia); const b = diaVivo(dia
 function diasHist() { try { return fs.readdirSync(HDIR).filter(f => /^\d{4}-\d{2}-\d{2}\.json$/.test(f)).map(f => f.slice(0, 10)); } catch { return []; } }
 function diasConTrades() { try { return [...new Set(fs.readdirSync(path.join(DIR, 'reportes')).map(f => (f.match(/(\d{4}-\d{2}-\d{2})\.md$/) || [])[1]).filter(Boolean))].sort().reverse(); } catch { return []; } }
 
+// === metricas: funciones puras ===
+// Resumen del historial de trades de ESTA máquina. No lee negocio.json ni otra contabilidad.
+const ISO_DIA = /^\d{4}-\d{2}-\d{2}$/;
+const r2m = x => Math.round(x * 100) / 100;
+const r1m = x => Math.round(x * 10) / 10;
+const shiftISO = (iso, n) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const lunesDe = iso => { const w = new Date(iso + 'T00:00:00Z').getUTCDay(); return shiftISO(iso, w === 0 ? -6 : 1 - w); };
+function rangoMetricas(params, hoy, conocidos) {
+  const desdeQ = params.get('desde'), hastaQ = params.get('hasta');
+  const ord = [...(conocidos || [])].filter(d => ISO_DIA.test(d)).sort();
+  let desde, hasta;
+  if (ISO_DIA.test(desdeQ || '') || ISO_DIA.test(hastaQ || '')) {
+    hasta = ISO_DIA.test(hastaQ || '') ? hastaQ : hoy;
+    desde = ISO_DIA.test(desdeQ || '') ? desdeQ : (ord[0] || hasta);
+  } else {
+    const rango = String(params.get('rango') || 'hoy').toLowerCase();
+    if (rango === 'semana') { desde = lunesDe(hoy); hasta = hoy; }
+    else if (rango === 'mes') { desde = hoy.slice(0, 8) + '01'; hasta = hoy; }
+    else if (rango === 'todo') { desde = ord[0] || hoy; hasta = ord.length && ord[ord.length - 1] > hoy ? ord[ord.length - 1] : hoy; }
+    else { desde = hasta = hoy; }
+  }
+  if (desde > hasta) { const t = desde; desde = hasta; hasta = t; }
+  return { desde, hasta };
+}
+function diasEnRango(desde, hasta, hoy, conocidos) {
+  const set = new Set((conocidos || []).filter(d => ISO_DIA.test(d) && d >= desde && d <= hasta));
+  if (ISO_DIA.test(hoy || '') && hoy >= desde && hoy <= hasta) set.add(hoy);
+  return [...set].sort();
+}
+function fuenteMetricas(rows) {
+  if (!rows.length) return 'sin trades en el rango';
+  let hist = false, broker = false, farm = false;
+  for (const r of rows) { const f = String(r.fuente || ''); if (/^historial/.test(f)) hist = true; else if (/^ejecuciones reales del bróker/.test(f)) broker = true; else farm = true; }
+  const bits = []; if (broker) bits.push('ejecuciones del bróker'); if (hist) bits.push('historial guardado'); if (farm) bits.push('estimados de la granja');
+  return bits.join(' + ');
+}
+function agregarMetricas(porDia, meta) {
+  const days = []; const all = []; const usados = [];
+  for (const r of porDia || []) {
+    const trades = (r.trades || []).filter(t => typeof t.pnl === 'number' && isFinite(t.pnl));
+    if (!trades.length || !ISO_DIA.test(r.dia || '')) continue;
+    const pnl = r2m(trades.reduce((a, t) => a + t.pnl, 0));
+    days.push({ dia: r.dia, pnl, n: trades.length, ganados: trades.filter(t => t.pnl > 0).length });
+    all.push(...trades); usados.push(r);
+  }
+  days.sort((a, b) => a.dia < b.dia ? -1 : a.dia > b.dia ? 1 : 0);
+  let cum = 0; const series = days.map(d => { cum = r2m(cum + d.pnl); return { dia: d.dia, pnl: d.pnl, cum }; });
+  const wins = all.filter(t => t.pnl > 0), losses = all.filter(t => t.pnl < 0);
+  const ganados = wins.length, perdidos = losses.length, n = all.length, decided = ganados + perdidos;
+  const grossWin = wins.reduce((a, t) => a + t.pnl, 0), grossLoss = losses.reduce((a, t) => a + t.pnl, 0);
+  const totalPnl = r2m(all.reduce((a, t) => a + t.pnl, 0));
+  const avgWin = ganados ? r2m(grossWin / ganados) : null;
+  const avgLoss = perdidos ? r2m(grossLoss / perdidos) : null;
+  const best = days.reduce((m, d) => Math.max(m, d.pnl), days.length ? -Infinity : 0);
+  return {
+    desde: meta.desde, hasta: meta.hasta, totalPnl, n, ganados, perdidos,
+    winRate: decided ? r1m(ganados / decided * 100) : null,
+    avgWin, avgLoss,
+    winLossRatio: avgWin != null && avgLoss ? r2m(avgWin / Math.abs(avgLoss)) : null,
+    dayWinRate: days.length ? r1m(days.filter(d => d.pnl > 0).length / days.length * 100) : null,
+    profitFactor: grossLoss < 0 ? r2m(grossWin / Math.abs(grossLoss)) : null,
+    bestDayPct: days.length && best > 0 && totalPnl > 0 ? r1m(best / totalPnl * 100) : null,
+    days, series, fuente: fuenteMetricas(usados),
+  };
+}
+async function metricasDe(url) {
+  const q = new URL(url, 'http://x').searchParams;
+  const hoy = diaFarm();
+  const conocidos = [...new Set([...diasConTrades(), ...diasHist()])];
+  const { desde, hasta } = rangoMetricas(q, hoy, conocidos);
+  const dias = diasEnRango(desde, hasta, hoy, conocidos);
+  const porDia = [];
+  for (const dia of dias) porDia.push(await tradesDe(dia));
+  return agregarMetricas(porDia, { desde, hasta });
+}
+// === fin metricas puras ===
+
 // Ejecuciones reales del bróker (solo lectura: ab.executions) -> trades ida y vuelta con P&L bruto (sin comisiones)
 const PV = s => { const r = String(s || '').replace(/^.*:/, ''); return /^MNQ/.test(r) ? 2 : /^NQ/.test(r) ? 20 : /^MES/.test(r) ? 5 : /^ES/.test(r) ? 50 : /^M2K/.test(r) ? 5 : /^RTY/.test(r) ? 50 : /^MYM/.test(r) ? 0.5 : /^YM/.test(r) ? 5 : null; };
 let execCache = { at: 0, v: null };
@@ -190,6 +267,7 @@ http.createServer((q, r) => {
       if (q.url.startsWith('/api/colchon/lectura')) { const f = path.join(DIR, 'pausa-lectura.flag');
         if (q.method === 'POST') { const p = j.pause ?? !fs.existsSync(f); if (p) fs.writeFileSync(f, 'pausa manual ' + new Date().toISOString()); else fs.rmSync(f, { force: true }); }
         out = { paused: fs.existsSync(f), ultimaLecturaCompleta: lastFull ? new Date(lastFull).toISOString() : null, ultimaActividad: new Date(lastBusy).toISOString(), esperaSeg: Math.max(0, Math.ceil((QUIET_MS - (Date.now() - lastBusy)) / 1000)) }; }
+      else if (q.url.startsWith('/api/colchon/metricas')) out = await metricasDe(q.url);
       else if (q.url.startsWith('/api/colchon/trades')) { const d = new URL(q.url, 'http://x').searchParams.get('dia'); out = await tradesDe(/^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d : diaFarm()); }
       else if (q.url.startsWith('/api/colchon/conexion')) out = await conexion();
       else if (q.url.startsWith('/api/colchon/status')) out = { ...colchon.status(), cfg: colchonCFG };

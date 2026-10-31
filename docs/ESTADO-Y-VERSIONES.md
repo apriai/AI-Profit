@@ -3,13 +3,14 @@
 Documento de relevo para cualquier agente (Grok) que trabaje en este repositorio. Sin datos personales: no hay cuentas, saldos ni claves aquí.
 
 ## Versión actual
-- **Última versión: 0.6.0** (2026-10-29). Está en el archivo `VERSION` y se ve en la esquina inferior derecha de la granja.
+- **Última versión: 0.6.1** (2026-10-31). Está en el archivo `VERSION` y se ve en la esquina inferior derecha de la granja.
 - Historial completo y detallado: `CHANGELOG.md`. Cada versión tiene su release en GitHub (`v0.5.1`, etc.).
 - **Al terminar un cambio, actualiza este documento** (versión, fecha y la lista de abajo).
 
-## Lo que cambió (29 oct 2026)
+## Lo que cambió (31 oct 2026)
 | Versión | Qué cambió |
 |---|---|
+| 0.6.1 | Panel Métrica: botón junto al historial de trades y `GET /api/colchon/metricas`. Resume el historial de esta máquina (P&L, aciertos, profit factor, gráfica). No lee `negocio.json`. |
 | 0.4.1 | El acceso (`Abrir Granja.bat`) arranca primero el servidor y luego abre TradingView. |
 | 0.4.2 | Al abrir AI Profit, TradingView se reinicia solo con el puerto 9222, sin preguntar. |
 | 0.4.3 | P&L del día = saldo real de TradingView − saldo inicial (incluye comisiones). Las cuentas de evaluación nuevas empiezan el día en 25,000. |
