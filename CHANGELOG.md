@@ -10,6 +10,20 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.6.1] - 2026-10-31
+Panel Métrica: el resumen del historial de trades de esta máquina (P&L, aciertos, profit factor y gráfica).
+
+### Agregado
+- **Botón «📊 Métrica»** junto a Historial de trades (`motor/Granja-de-Cuentas-v2.html`). Abre el panel con filtros HOY, SEMANA, MES y TODO. Abrir Métrica cierra el historial, y al revés.
+- **Tarjetas:** P&L total, % de aciertos (ganados y perdidos), ganancia y pérdida media, % de días ganadores, profit factor y mejor día como % del P&L total (solo si ese total es positivo).
+- **Gráfica** del P&L de cada día y del acumulado, más la lista de días. Si no hay trades cerrados, el panel lo dice.
+- **`GET /api/colchon/metricas`** (`motor/tradinglink.mjs`). Acepta `rango=hoy|semana|mes|todo` o `desde=` y `hasta=` (`AAAA-MM-DD`). Junta cada día con los mismos cálculos que el historial (`tradesDe`: `historial/` de esta máquina y, si falta el archivo, los informes de la granja; el día en curso, las ejecuciones del bróker). No lee `negocio.json`.
+
+### Notas
+- Cada instalación ve solo su carpeta `historial/`. Esos archivos siguen fuera del repositorio.
+- El modo Demo responde la misma ruta con los datos de ejemplo ya inventados.
+- Hay que reiniciar el servidor (solo sin operaciones abiertas ni órdenes pendientes) para la ruta nueva. La página se actualiza al recargar (F5).
+
 ## [0.6.0] - 2026-10-29
 Jardín de logros: las rosas pasan a ser un cerezo rosa de voxels, con una manzana por certificado.
 

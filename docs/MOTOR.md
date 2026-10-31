@@ -208,6 +208,14 @@ Parámetros comunes: `SL_USD`, `TP_USD` (bracket en $), `STEPS` (escalones `{tri
 - Se muestra un único P&L: la suma de trades del bróker (bruto). La barra superior dice "P&L −$X hoy". En Historial solo queda "P&L del día"; se quitaron "Saldo del día (neto)" y las notas de neto/bruto/comisiones.
 - El neto sigue guardándose en JSON (window.__tlPnl.neto, saldoDia), pero ya no se muestra.
 
+## 20. Métrica del historial (31 oct 2026)
+- `GET /api/colchon/metricas?rango=hoy|semana|mes|todo` (también `desde=` y `hasta=`, `AAAA-MM-DD`). Solo lectura. No abre órdenes y no lee `negocio.json`.
+- Por cada día del rango llama a `tradesDe` (lo mismo que `/api/colchon/trades`): historial de esta máquina, informes de la granja si no hay archivo, y el bróker solo en el día en curso.
+- Respuesta: `{desde,hasta,totalPnl,n,ganados,perdidos,winRate,avgWin,avgLoss,winLossRatio,dayWinRate,profitFactor,bestDayPct,days:[{dia,pnl,n,ganados}],series:[{dia,pnl,cum}],fuente}`.
+- `winRate` y `dayWinRate` van en porcentaje (0–100). `avgLoss` es negativo. `profitFactor` = ganancia bruta / |pérdida bruta| (`null` si no hubo pérdidas). `bestDayPct` = P&L del mejor día / P&L total × 100, solo si ambos son positivos.
+- En la página: botón `#metricaBtn` («📊 Métrica») al lado de `#tradesBtn`. El panel `#metricaView` usa el mismo vidrio que el historial. Abrir uno cierra el otro.
+- Backup: `backups\pre-metrica-20261031`.
+
 ## 19. Jardín de logros, barras de meta y verde lima (23-oct-2026, 6:25 PM ET)
 - Bloque `<script>/* Prop Farm: Jardín de logros…` al final de la página. El bundle solo cambia en `window.__gx={wt,Jr,Wu,…}` (Group y MeshStandardMaterial expuestos).
 - **Jardín de logros** (rincón trasero izquierdo, `GP=[-7.6,-6.4]`, cartel «🌸 Jardín de logros»): árboles en flor rosados con brillo y chispas. Entradas: plantas `kind==="tree"` (fondeadas no quemadas), recuerdos `memorial` («🏆 Mi primer pago»; su planta original se oculta y pasa al jardín), ids `LFF…` de `/accounts.json` `live`, y `logros.json` (`{"logros":[{"cuenta","firma","tipo","fecha"}]}`). Quemadas no aparecen. Sin fecha ni P&L. Clic en ✨ → modal `#pfCert` «Certificado de prueba superada» (logo, cuenta enmascarada 4…3, firma). `window.__pfGarden.cert/entries/build`.
