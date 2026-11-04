@@ -5687,7 +5687,7 @@ window.__pfGarden={cert,build,entries:()=>items};
 .tlAT.fd{background:linear-gradient(90deg,rgba(205,234,29,.24),rgba(120,220,120,.18));color:#e8ffb0}
 </style><script>/* Título de tipo de cuenta, sin número */
 (function(){
-window.__tlAcctT=function(t){t=String(t||"");if(/LFF/i.test(t))return'<span class="tlAT fd">🌳 Cuenta fondeada</span>';if(/LFE/i.test(t))return'<span class="tlAT ev">🌱 Evaluación · no fondeada</span>';return t?t.replace(/([A-Z]{2,4})\d{4,}(\d{3})/g,"$1••••$2"):"Cuenta real"};
+window.__tlAcctT=function(t){t=String(t||"");if(/LFF/i.test(t))return'<span class="tlAT fd">🌳 Cuenta fondeada</span>';if(/LFE/i.test(t))return'<span class="tlAT ev">🌱 Evaluación</span>';return t?t.replace(/([A-Z]{2,4})\d{4,}(\d{3})/g,"$1••••$2"):"Cuenta real"};
 const RX=/\bLF([EF])\d{6,}\b/g;
 function scrub(root){if(!root)return;const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);const ns=[];while(w.nextNode()){RX.lastIndex=0;if(RX.test(w.currentNode.nodeValue))ns.push(w.currentNode)}ns.forEach(n=>{n.nodeValue=n.nodeValue.replace(RX,(m,k)=>k==="F"?"Cuenta fondeada":"Evaluación (no fondeada)")})}
 function run(){["prLive","panel"].forEach(id=>scrub(document.getElementById(id)))}
@@ -5797,7 +5797,7 @@ function hook(){const G=window.__granja&&window.__granja.pet;if(!G||!G.renderer|
  if(cfg.kind!=="perro"||cfg.body!==A.perro.b||cfg.accent!==A.perro.a){try{applyPet(G,cfg)}catch(err){console.warn("mascota",err)}}
  (function lab(){const p=window.__pet.screen();if(p&&cfg.name){tag.textContent=cfg.name;tag.style.left=p.x+"px";tag.style.top=(p.y-8)+"px";tag.style.display="block"}else tag.style.display="none";requestAnimationFrame(lab)})()}
 setTimeout(hook,600);})();</script>
-<div id="tl-version" style="position:fixed;right:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.6.3</div>
+<div id="tl-version" style="position:fixed;right:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.6.4</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/VERSION",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
 </body>
 </html>
