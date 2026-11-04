@@ -10,6 +10,15 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.7.0] - 2026-11-04
+### Arreglado
+- **La mascota (Profito) volvía a quedarse quieta por una planta del Jardín de logros:** las parcelas movidas por el cerezo caían junto al punto de inicio del campesino y lo dejaban encerrado. Ahora se mueven a un sitio libre (`CZ_FLOW_TO`).
+### Agregado
+- **Profito sale dormido:** al abrir o recargar la granja, empieza en pausa y Profito duerme en su banco hasta que se active el agente. Es la pausa visual de la granja; no toca el motor de trading ni los stops.
+- **Profito riega con laptop durante un trade:** mientras hay una operación activa («Operando…»), se acerca a una planta y la riega con una regadera de voxels (con gotas) mientras sostiene una laptop pequeña con la pantalla encendida. El trade tiene prioridad sobre la pausa. Al terminar vuelve a lo normal.
+- **Marcadores de etapa ⭐/💎 con saldo:** en el selector de cuentas del panel de trade, cada cuenta muestra su saldo entre paréntesis y un marcador: 💎 fondeada (`LFF…`), ⭐ evaluación con un trade positivo (saldo ≥ inicial + $550; le falta uno), ✖ quemada. Orden: fondeadas, ⭐, el resto, quemadas. Las barras de progreso de la granja muestran el mismo marcador (una sola regla compartida). No cambia la cuenta elegida por defecto ni la lógica de órdenes.
+- **Ojito de privacidad:** botón con un ojo abajo a la derecha. Al cerrarlo se difuminan todos los importes ($, saldos, P&L, panel Negocio), también los que se actualizan en vivo; en el selector de cuentas el saldo se cambia por «(•••)». Los % y ⭐/💎 siguen visibles. Se guarda en el navegador (`tl_privado`), sigue después de F5.
+
 ## [0.6.4] - 2026-11-04
 ### Cambiado
 - La etiqueta de las cuentas de evaluación (`LFE…`) dice solo «🌱 Evaluación» (antes «Evaluación · no fondeada»). Solo texto.
