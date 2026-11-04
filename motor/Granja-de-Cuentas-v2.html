@@ -5139,7 +5139,7 @@ let clk=0;function bind(){const sun=document.querySelector("#hud .sun");if(!sun)
 sun.addEventListener("click",e=>{e.stopPropagation();clearTimeout(clk);clk=setTimeout(()=>{mode=isNight()?"day":"night";localStorage.setItem(K,mode);apply()},230)});
 sun.addEventListener("dblclick",e=>{e.stopPropagation();clearTimeout(clk);mode="auto";localStorage.setItem(K,mode);apply()});apply()}
 bind();setInterval(()=>{if(mode==="auto")apply()},60000);window.__dayNight=()=>({mode,night:isNight(),exposure:window.__gx&&window.__gx.It.toneMappingExposure});})();</script><script>/* Prueba colchón: el pill del agente abre directamente el panel (estrategia/cuenta/símbolo, BUY/SELL, probabilidad). Sin botón Prueba. */
-(function(){const K="tl_prueba";let on=true,phase="off",sym="MNQ",qty=8,accs=null,accId=null,strs=null,stratId="evaluacion",chk={paper:false,msg:"Revisando…",account:{}},prevBot=null,pollT=0,lastSum=null;
+(function(){const K="tl_prueba";let on=true,phase="off",sym="MNQ",qty=8,accs=null,accId=null,strs=null,stratId="evaluacion-simple",chk={paper:false,msg:"Revisando…",account:{}},prevBot=null,pollT=0,lastSum=null;
 const st=document.createElement("style");st.textContent=`
 #prBtn{position:fixed;right:22px;top:84px;z-index:12;display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:999px;background:rgba(12,8,24,.72);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.78);font:600 12px Inter,system-ui;letter-spacing:.3px;cursor:pointer;transition:.25s}
 #prBtn:hover{color:#fff;border-color:rgba(255,255,255,.22)}#prBtn .d{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.35);transition:.25s}#prBtn.on{color:#ffe7a3;border-color:rgba(255,216,107,.45);box-shadow:0 0 18px rgba(255,190,40,.2)}#prBtn.on .d{background:#ffb300;box-shadow:0 0 8px #ffb300}
@@ -5797,7 +5797,7 @@ function hook(){const G=window.__granja&&window.__granja.pet;if(!G||!G.renderer|
  if(cfg.kind!=="perro"||cfg.body!==A.perro.b||cfg.accent!==A.perro.a){try{applyPet(G,cfg)}catch(err){console.warn("mascota",err)}}
  (function lab(){const p=window.__pet.screen();if(p&&cfg.name){tag.textContent=cfg.name;tag.style.left=p.x+"px";tag.style.top=(p.y-8)+"px";tag.style.display="block"}else tag.style.display="none";requestAnimationFrame(lab)})()}
 setTimeout(hook,600);})();</script>
-<div id="tl-version" style="position:fixed;right:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.6.2</div>
+<div id="tl-version" style="position:fixed;right:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.6.3</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/VERSION",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
 </body>
 </html>

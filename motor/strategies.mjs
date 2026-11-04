@@ -27,6 +27,6 @@ export const STRATEGIES = {
     params: { SL_USD: 630, TP_USD: 630, STEPS: [{ trigger: 15, lockTicks: 3 }], PROB: 'tp', DEFAULT_QTY: { MNQ: 8, NQ: 1 } },
   },
 };
-export const DEFAULT_STRATEGY = 'evaluacion';
+export const DEFAULT_STRATEGY = 'evaluacion-simple';
 export const getStrategy = id => STRATEGIES[id ?? DEFAULT_STRATEGY] || null;
 export const listStrategies = () => STRATEGY_ORDER.map(id => STRATEGIES[id]).filter(Boolean).map(({ id, name, short, description, params }) => ({ id, name, short, description, params, default: id === DEFAULT_STRATEGY }));
