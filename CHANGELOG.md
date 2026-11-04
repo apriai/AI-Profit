@@ -10,6 +10,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.6.4] - 2026-11-04
+### Cambiado
+- La etiqueta de las cuentas de evaluación (`LFE…`) dice solo «🌱 Evaluación» (antes «Evaluación · no fondeada»). Solo texto.
+
 ## [0.6.3] - 2026-11-04
 ### Cambiado
 - **Estrategia por defecto de vuelta a «Evaluación»** (`evaluacion-simple`) en la página y el servidor. Se mantienen 8 contratos MNQ por defecto.
