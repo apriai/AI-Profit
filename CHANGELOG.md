@@ -10,6 +10,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.6.2] - 2026-11-04
+Valores por defecto al abrir una operación.
+
+### Cambiado
+- **Estrategia por defecto: «Evaluación con trailing»** (`evaluacion`) en la página y en el servidor (`DEFAULT_STRATEGY` en `motor/strategies.mjs`).
+- **8 contratos por defecto** (MNQ) en la página y en el servidor (`DEFAULT_QTY` MNQ de todas las estrategias). Se pueden cambiar como siempre. No cambia la lógica del motor.
+
 ## [0.6.1] - 2026-10-31
 Panel Métrica: el resumen del historial de trades de esta máquina (P&L, aciertos, profit factor y gráfica).
 
