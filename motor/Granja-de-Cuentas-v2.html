@@ -5689,7 +5689,7 @@ window.__pfGarden={cert,build,entries:()=>items};
 (function(){
 window.__tlAcctT=function(t){t=String(t||"");if(/LFF/i.test(t))return'<span class="tlAT fd">🌳 Cuenta fondeada</span>';if(/LFE/i.test(t))return'<span class="tlAT ev">🌱 Evaluación</span>';return t?t.replace(/([A-Z]{2,4})\d{4,}(\d{3})/g,"$1••••$2"):"Cuenta real"};
 const RX=/\bLF([EF])\d{6,}\b/g;
-function scrub(root){if(!root)return;const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);const ns=[];while(w.nextNode()){RX.lastIndex=0;if(RX.test(w.currentNode.nodeValue))ns.push(w.currentNode)}ns.forEach(n=>{n.nodeValue=n.nodeValue.replace(RX,(m,k)=>k==="F"?"Cuenta fondeada":"Evaluación (no fondeada)")})}
+function scrub(root){if(!root)return;const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);const ns=[];while(w.nextNode()){RX.lastIndex=0;if(RX.test(w.currentNode.nodeValue))ns.push(w.currentNode)}ns.forEach(n=>{n.nodeValue=n.nodeValue.replace(RX,(m,k)=>k==="F"?"Cuenta fondeada":"Evaluación")})}
 function run(){["prLive","panel"].forEach(id=>scrub(document.getElementById(id)))}
 new MutationObserver(run).observe(document.body,{subtree:true,childList:true,characterData:true});run();
 })();</script>
