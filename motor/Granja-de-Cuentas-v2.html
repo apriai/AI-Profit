@@ -5850,7 +5850,7 @@ setInterval(scan,700);set(on)})();
 </script>
 <style>#tlMute{position:fixed;right:14px;bottom:64px;z-index:2147483000;width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(20,18,30,.35);backdrop-filter:blur(6px);color:#fff;opacity:.55;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;font-size:19px;line-height:1;transition:opacity .2s}#tlMute:hover{opacity:.95}#tlConfeti{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:2147482990}</style>
 <button id=tlMute title="Silenciar/activar sonidos" aria-label="Silenciar/activar sonidos" aria-pressed="false">&#x1F50A;</button>
-<script>/* 0.7.1: celebraci\u00f3n al ganar (confeti + Profito salta + sonido), bot\u00f3n de silencio y arreglo del resumen repetido al recargar. Solo visual: no toca el motor de trading. */
+<script>/* 0.7.1: celebraci\u00f3n al ganar (confeti + Profito salta + sonido), nube gris y tono suave al perder, bot\u00f3n de silencio y arreglo del resumen repetido al recargar. Solo visual: no toca el motor de trading. */
 (function(){const KS="tl_ultimoResumen",KM="tl_silencio",LOAD=Date.now();
 let muted=false;try{muted=localStorage.getItem(KM)==="1"}catch(e){}
 /* 1) Resumen nuevo: m\u00e1s reciente que el \u00faltimo visto Y que la carga de la p\u00e1gina */
@@ -5872,8 +5872,18 @@ function confeti(big){const c=document.createElement("canvas");c.id="tlConfeti";
 /* Profito salta (si la escena est\u00e1 accesible) */
 function salto(big){const g=window.__gx;if(!g||!g.ci)return false;const o=g.ci,T0=performance.now(),DUR=big?2400:1400,y0=o.position.y,r0=o.rotation.y;
  (function f(now){const k=(now-T0)/DUR;if(k>=1){o.position.y=y0;o.rotation.y=r0;return}const ph=k*(big?5:3)*Math.PI;o.position.y=y0+Math.abs(Math.sin(ph))*(big?.55:.35);if(big)o.rotation.y=r0+k*Math.PI*2;requestAnimationFrame(f)})(T0);return true}
-window.__tlCelebrate=function(sm){const p=Number(sm&&sm.pnlFinalUSD);if(!(p>0))return null;const big=sm.motivo==="Take profit"&&!sm.pnlFinalAprox;
- confeti(big);const j=salto(big),s=play(big);return{big,salto:j,sonido:s}};
+/* P\u00e9rdida: nube gris suave sobre la planta de esa cuenta (Profito sigue normal) y tono bajo muy suave */
+function playPerdida(){if(muted||!ac||ac.state!=="running")return false;const t=ac.currentTime+.02,o=ac.createOscillator(),g=ac.createGain();o.type="sine";o.frequency.setValueAtTime(330,t);o.frequency.exponentialRampToValueAtTime(247,t+.45);
+ g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.035,t+.06);g.gain.exponentialRampToValueAtTime(.0001,t+.6);o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+.65);return true}
+function nube(cuenta){const g=window.__gx;if(!g||!g.At||!g.Xt||!g.wt||!g.P)return false;const n=g.At.find(x=>x&&!x.removed&&x.a&&x.a.name===cuenta&&x.g);if(!n)return false;
+ const Box=g.Yn||g.bn,Mat=g.Jr,Mesh=g.ht;if(!Box||!Mat||!Mesh)return false;const G=new g.wt(),mats=[];
+ [[0,0,0,.7],[.45,.05,.1,.55],[-.45,0,-.05,.55],[.2,.25,0,.5],[-.2,.22,.1,.45],[0,.05,.35,.45],[0,0,-.35,.45]].forEach(([x,y,z,s],i)=>{const m=new Mat({color:i%2?0x9aa1ab:0xb4bac3,roughness:1,transparent:true,opacity:0});mats.push(m);const b=new Mesh(new Box(s,s*.7,s),m);b.position.set(x,y,z);G.add(b)});
+ const w=n.g.getWorldPosition(new g.P);G.position.set(w.x,w.y+(n.h||2)+1.3,w.z);g.Xt.add(G);const T0=performance.now(),DUR=5000;
+ (function f(now){const k=(now-T0)/DUR;if(k>=1){G.removeFromParent();return}const op=.75*Math.min(1,k*5,(1-k)*4);mats.forEach(m=>m.opacity=op);G.position.x=w.x+Math.sin(k*3)*.15;requestAnimationFrame(f)})(T0);return true}
+window.__tlCelebrate=function(sm){const p=Number(sm&&sm.pnlFinalUSD);
+ if(p>0){const big=sm.motivo==="Take profit"&&!sm.pnlFinalAprox;confeti(big);const j=salto(big),s=play(big);return{tipo:"gana",big,salto:j,sonido:s}}
+ if(p<0||(sm&&sm.motivo==="Stop loss")){const c=p<0?nube(sm.cuenta):false,s=playPerdida();return{tipo:"pierde",nube:c,sonido:s}}
+ return null};
 /* 3) Bot\u00f3n de silencio */
 const B=document.getElementById("tlMute");function set(v){muted=!!v;try{localStorage.setItem(KM,muted?"1":"0")}catch(e){}B.innerHTML=muted?"\u{1F507}":"\u{1F50A}";B.setAttribute("aria-pressed",String(muted))}
 B.addEventListener("click",e=>{e.stopPropagation();unlock();set(!muted);if(!muted)play(false)});["pointerdown","mousedown"].forEach(t=>B.addEventListener(t,e=>e.stopPropagation()));

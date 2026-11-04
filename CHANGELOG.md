@@ -13,7 +13,9 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 ## [0.7.1] - 2026-11-04
 ### Agregado
 - **Celebración al ganar:** cuando un trade termina en ganancia (P&L final > 0), aparece confeti en toda la granja, Profito salta y suena una moneda (Web Audio, sin archivos). Con Take profit la celebración es grande y lleva fanfarria, y Profito además da una vuelta. Otras ganancias, o un P&L aproximado, tienen una celebración pequeña. Solo en tu computadora; no se envía nada.
-- **Botón de silencio 🔊/🔇** encima del ojito, abajo a la derecha. Se guarda en el navegador (`tl_silencio`). El sonido se activa con el primer clic en la página (regla de los navegadores).
+- **Al perder, una nube gris suave:** si un trade cierra en negativo, una nube gris aparece unos segundos sobre la planta de esa cuenta y se desvanece. Profito sigue con su comportamiento normal.
+- **Tono de stop loss:** al cerrar por stop loss o con P&L negativo suena un tono bajo, corto y muy suave. No hay sonido aparte para el Take profit: el sonido de la celebración es el de ganar.
+- **Botón de silencio 🔊/🔇** encima del ojito, abajo a la derecha. Se guarda en el navegador (`tl_silencio`). Silencia también el tono de pérdida. El sonido se activa con el primer clic en la página (regla de los navegadores).
 ### Arreglado
 - **El resumen del último trade volvía a aparecer al recargar (F5):** ahora solo se muestra (y se celebra) si es más reciente que el último visto (`tl_ultimoResumen`) y que la carga de la página.
 ### Cambiado
