@@ -5195,7 +5195,7 @@ const nn=box.querySelector("[data-qn]");if(nn)nn.textContent=q;r.setAttribute("a
 const tk=box.querySelector("[data-qtk]");if(tk&&tk.dataset.k!==mn+"-"+mx){tk.dataset.k=mn+"-"+mx;tk.innerHTML=[...new Set([mn,5,10,mx].filter(v=>v>=mn&&v<=mx))].map(v=>'<i style="left:calc(9px + (100% - 18px) * '+f(v).toFixed(4)+')">'+v+'</i>').join("")}
 const e=q*k,tier=e<=5?"Tamaño tranquilo":e<=10?"Tamaño moderado":e<=15?"Tamaño alto":"Tamaño máximo",h=box.querySelector("[data-qh]");if(h){const P=SPf(),pv=PV[y]*q,fp=u=>String(Math.round(u/pv/.25)*.25);h.textContent=(P.TP_USD>0&&P.SL_USD>0)?fp(P.TP_USD)+" pts al TP · "+fp(P.SL_USD)+" pts al SL":tier+" · "+fm(PV[y]*q)+" por punto";const d2=box.querySelector("[data-qd]");if(d2){const ok=P.TP_USD>0&&P.SL_USD>0;d2.textContent=ok?fm(PV[y]*q)+" por punto":"";d2.style.display=ok?"":"none"}};qRisk((e-5)/15)}
 
-const accOpts=()=>!accs?'<option value="">Cargando cuentas…</option>':!accs.ok?'<option value="">Sin cuentas ('+(accs.err||"?")+')</option>':accs.accounts.map(a=>`<option value="${a.id}"${a.allowed?"":" disabled"}${a.id===accId?" selected":""}>${a.name}${a.real?" · REAL "+(a.realLabel||""):""}${a.current?" · activa":""}${a.allowed?"":" · bloqueada"}</option>`).join("");
+const accOpts=()=>!accs?'<option value="">Cargando cuentas…</option>':!accs.ok?'<option value="">Sin cuentas ('+(accs.err||"?")+')</option>':(window.__tlAccSort?window.__tlAccSort(accs.accounts):accs.accounts).map(a=>`<option value="${a.id}"${a.allowed?"":" disabled"}${a.id===accId?" selected":""}${window.__tlAccSty?window.__tlAccSty(a):""}>${window.__tlAccTag?window.__tlAccTag(a):""}${a.name}${window.__tlAccBal?window.__tlAccBal(a):""}${a.real?" · REAL "+(a.realLabel||""):""}${a.current?" · activa":""}${a.allowed?"":" · bloqueada"}</option>`).join("");
 setInterval(()=>{if(phase==="choose")loadAccs()},30000);
 async function loadAccs(){J("/api/colchon/strategies").then(r=>{if(r&&r.ok){strs=r.strategies;if(!strs.some(x=>x.id===stratId))stratId=r.default;if(phase==="choose")setPhase("choose")}});accs=await J("/api/colchon/accounts");if(accs.ok){const cur=accs.accounts.find(a=>a.current);if(!accId||!accs.accounts.some(a=>a.id===accId&&a.allowed))accId=cur&&cur.allowed?cur.id:((accs.accounts.find(a=>a.allowed)||{}).id||null)}if(phase==="choose"){const e=card.querySelector("[data-acc]");if(e)e.innerHTML=accOpts();const t=card.querySelector("[data-acct-title]");t&&(t.textContent=__acT())}}
 function __acT(){const a=accs&&accs.ok&&(accs.accounts||[]).find(x=>x.id===accId);const k=JSON.stringify(a||{})+" "+(accId||"")+" "+(chk&&chk.realLabel||"");return /LFF|funded|fondead/i.test(k)?"Fondeada":"Evaluación"}
@@ -5619,7 +5619,7 @@ function cherryVox(){const n=[],T=[0x6b3f22,0x5a3219,0x7a4a2a,0x4a2914];let sd=1
  const P=[0xeb9cc0,0xf3b0cf,0xf8c0da,0xfbcfe3,0xfddbea,0xffe8f2];
  has.forEach((t,k)=>{const [x,y,z]=k.split(",").map(Number);if(W.has(k))return;const inner=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]].every(([a,b,c])=>has.has((x+a)+","+(y+b)+","+(z+c)));if(inner)return;const i=Math.max(0,Math.min(5,Math.floor((t+1)*3)));put(x,y,z,P[i])});
  return n}
-const CZ_POS=[-5.8,-5.2],CZ_FLOW_FROM=[[-7,-5]],CZ_FLOW_TO=[-4.6,3.2];
+const CZ_POS=[-5.8,-5.2],CZ_FLOW_FROM=[[-7,-5]],CZ_FLOW_TO=[-6,1];
 function cherry(gx){const g=new gx.wt();g.position.set(CZ_POS[0],0,CZ_POS[1]);const vs=.08;
  try{const v=cherryVox();if(gx.jt){const m=gx.jt(v,vs,{roughness:.85,metalness:.04},[0,0,0]);m.castShadow=true;m.receiveShadow=true;g.add(m)}else{const Box=gx.Yn||gx.bn,Mat=gx.Jr,Mesh=gx.ht;const geo=new Box(vs*.96,vs*.96,vs*.96),mats={};v.forEach(([vx,vy,vz,c])=>{const m=new Mesh(geo,mats[c]||(mats[c]=new Mat({color:c,roughness:.85,metalness:.04})));m.position.set(vx*vs,(vy+.5)*vs,vz*vs);g.add(m)})}g.scale.setScalar(3.4)}catch(err){console.warn("jardin cerezo",err)}return g}
 function czMoveFlowers(gx){(gx.At||[]).forEach(n=>{if(n.removed||!n.g)return;const p=n.g.position;if(n.g.userData.czMoved)return;if(CZ_FLOW_FROM.some(([x,z])=>Math.hypot(p.x-x,p.z-z)<1.2)||Math.hypot(p.x-CZ_POS[0],p.z-CZ_POS[1])<2.2){p.x=CZ_FLOW_TO[0];p.z=CZ_FLOW_TO[1];n.g.userData.czMoved=1}})}
@@ -5651,7 +5651,7 @@ function loop(t){requestAnimationFrame(loop);const gx=window.__gx;if(!gx||!gx.Lt
  items.forEach(e=>{const gl=e.obj.userData.glow;if(gl)gl.material.opacity=.09+.05*Math.sin(s*1.5);const p=scr(gx,e.obj,0);if(p){e.tag.style.display="";e.tag.style.left=p.x+"px";e.tag.style.top=p.y+14+"px"}else e.tag.style.display="none"});
 
  const seen=new Set();(gx.At||[]).forEach(n=>{if(n.removed||!n.a||n.a.memorial||!n.d||n.d.kind==="wither"||!n.g.visible)return;seen.add(n);let b=bars.get(n);if(!b){b=document.createElement("div");b.className="pfMeta";b.innerHTML='<div class="t"><i></i></div><span></span>';document.body.appendChild(b);bars.set(n,b)}
-  const pr=prog(n.a);b.firstChild.firstChild.style.width=Math.round(pr.p*100)+"%";b.lastChild.textContent=Math.round(pr.p*100)+"%";b.title=pr.lbl;
+  const pr=prog(n.a);b.firstChild.firstChild.style.width=Math.round(pr.p*100)+"%";b.lastChild.textContent=(window.__tlStageMark?window.__tlStageMark(n.a.name):"")+Math.round(pr.p*100)+"%";b.title=pr.lbl;
   const p=scr(gx,n.g,(n.h||2)+.6);if(p){b.style.display="flex";b.style.left=p.x+"px";b.style.top=p.y+"px"}else b.style.display="none"});
  bars.forEach((b,n)=>{if(!seen.has(n)){b.remove();bars.delete(n)}})}
 // barra en el panel de detalle
@@ -5797,7 +5797,56 @@ function hook(){const G=window.__granja&&window.__granja.pet;if(!G||!G.renderer|
  if(cfg.kind!=="perro"||cfg.body!==A.perro.b||cfg.accent!==A.perro.a){try{applyPet(G,cfg)}catch(err){console.warn("mascota",err)}}
  (function lab(){const p=window.__pet.screen();if(p&&cfg.name){tag.textContent=cfg.name;tag.style.left=p.x+"px";tag.style.top=(p.y-8)+"px";tag.style.display="block"}else tag.style.display="none";requestAnimationFrame(lab)})()}
 setTimeout(hook,600);})();</script>
-<div id="tl-version" style="position:fixed;right:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.6.4</div>
+<div id="tl-version" style="position:fixed;right:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.7.0</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/VERSION",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
+<script>/* 0.7.0: Profito duerme al abrir (granja en pausa), riega con laptop durante un trade, y etiquetas de cuentas con saldo y etapa. Solo visual: no toca el motor de trading. */
+(function(){
+const st=()=>window.granjaStore,acc=n=>{const s=st();return s&&(s.get().accounts||[]).find(a=>a.name===n)},
+ fmt=v=>Number(v).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}),
+ stage=a=>{const g=acc(a.name);if(/^LFF/i.test(a.name)||(g&&g.type==="funded"))return 2;if(!g)return 0;const d=st().derive(g);if(d.burned||g.burnedAt)return -1;return g.bal-g.start>=550?1:0};
+window.__tlAccTag=a=>({2:"\u{1F48E} ",1:"\u2B50 ",0:"",[-1]:"\u2716 "})[stage(a)];
+window.__tlStageMark=n=>({2:"\u{1F48E} ",1:"\u2B50 "})[stage({name:n})]||"";window.__tlAccBal=a=>{const g=acc(a.name);return g&&isFinite(+g.bal)?" ("+fmt(g.bal)+")":""};
+window.__tlAccSty=a=>({2:' style="color:#7fd8ff"',1:' style="color:#ffd86b"',[-1]:' style="color:#888"'})[stage(a)]||"";
+window.__tlAccSort=l=>l.map((a,i)=>[a,i]).sort((x,y)=>stage(y[0])-stage(x[0])||x[1]-y[1]).map(x=>x[0]);
+const running=()=>{try{return window.__tlWaterForce??(window.__prueba&&window.__prueba().phase==="running")}catch(e){return false}};
+function init(){const g=window.__gx;if(!g||!g.ci||!g.Wu||!g.Jr||!(g.Yn||g.bn)||!st())return setTimeout(init,300);
+ // 1) Al abrir: granja en pausa y Profito dormido en su banco (salvo que haya un trade activo)
+ if(!running()){st().setBot(false);const s=g.Wu.state;g.ci.position.set(1.75,0,-3);s.mode="sit";s.sit=1;s.route=[];s.after=null}
+ // 2) Regadera + laptop (voxel) para cuando hay un trade activo
+ const Box=g.Yn||g.bn,M=g.Jr,Mesh=g.ht,G=g.wt,par=g.ci.parent;
+ const mk=(grp,w,h,d,c,x,y,z,em)=>{const m=new Mesh(new Box(w,h,d),new M(em?{color:c,emissive:c,emissiveIntensity:1.4,roughness:.4}:{color:c,roughness:.6,metalness:.1}));m.position.set(x,y,z);m.castShadow=true;grp.add(m);return m};
+ const can=new G();mk(can,.2,.17,.15,0x3fa7d6,0,0,0);mk(can,.21,.03,.16,0x2b7fa8,0,.09,0);mk(can,.04,.1,.04,0x2b7fa8,-.13,.04,0);mk(can,.2,.04,.04,0x3fa7d6,.18,.08,0).rotation.z=.6;mk(can,.05,.05,.07,0x9fd7f0,.27,.14,0);
+ const drops=[];for(let i=0;i<6;i++){const d=mk(can,.035,.035,.035,0x8fd6ff,.3,.1,0,true);d.material.transparent=true;drops.push(d)}
+ const lap=new G();mk(lap,.26,.02,.18,0x2a2d36,0,0,0);const scr=new G();scr.position.set(-.09,.01,0);lap.add(scr);mk(scr,.02,.17,.18,0x2a2d36,0,.085,0);mk(scr,.005,.14,.15,0x5cf0c8,.012,.085,0,true);scr.rotation.z=-.25;
+ can.visible=lap.visible=false;par.add(can);par.add(lap);
+ let wasRun=false;
+ (function loop(t){requestAnimationFrame(loop);const run=!!running(),s=g.Wu.state;
+  if(run&&!st().botEnabled())st().setBot(true);// el trade tiene prioridad sobre la pausa (solo visual)
+  if(!run&&wasRun){/* al terminar vuelve a lo normal; el panel ya pone setAwake(false) */}
+  wasRun=run;
+  if(run&&s.mode==="inspect")s.timer=Math.max(s.timer,1);// se queda regando la planta
+  const on=run&&s.mode==="inspect";can.visible=lap.visible=on;if(!on)return;
+  const h=s.heading,fx=Math.cos(h),fz=-Math.sin(h),sx=Math.sin(h),sz=Math.cos(h),p=g.ci.position,k=t/1000;
+  can.position.set(p.x+fx*.38+sx*.32,p.y+.5,p.z+fz*.38+sz*.32);can.rotation.set(0,h,-.35-.1*Math.sin(k*2));
+  lap.position.set(p.x+fx*.3-sx*.34,p.y+.45,p.z+fz*.3-sz*.34);lap.rotation.set(0,h+Math.PI,0);
+  drops.forEach((d,i)=>{const f=((k*1.6+i/drops.length)%1);d.position.set(.3+f*.12,.12-f*.5,(i%3-1)*.025);d.material.opacity=1-f})})(0);
+ window.__tlProfito={can,lap,running}}
+init()})();
+</script>
+<style>#tlEye{position:fixed;right:14px;bottom:14px;z-index:2147483000;width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(20,18,30,.35);backdrop-filter:blur(6px);color:#fff;opacity:.55;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:opacity .2s}#tlEye:hover{opacity:.95}#tlEye svg{width:24px;height:24px}#tlEye .sl{display:none}body.tl-privado #tlEye .sl{display:inline}body.tl-privado #tlEye{opacity:.8}
+body.tl-privado .tlPv{filter:blur(7px)!important;user-select:none}</style>
+<button id=tlEye title="Ocultar/mostrar datos privados" aria-label="Ocultar/mostrar datos privados" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5.5 4.8 12 4.8 22.5 12 22.5 12 18.5 19.2 12 19.2 1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/><path class=sl d="M3.5 3.5l17 17"/></svg></button>
+<script>/* 0.7.0: ojito de privacidad. Solo visual: difumina importes en toda la pagina; los % y marcadores siguen visibles. */
+(function(){const K="tl_privado",RX=/\$\s?\d|\d{1,3}(,\d{3})+(\.\d+)?|\b\d+\.\d{2}\b/,B=document.getElementById("tlEye");
+let on=false;try{on=localStorage.getItem(K)==="1"}catch(e){}
+window.__tlPrivado=()=>on;
+function scan(){if(!on)return;const w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);let n;while(n=w.nextNode()){const e=n.parentElement;if(!e||e.classList.contains("tlPv")||e.closest("script,style,#tlEye"))continue;if(e.tagName==="OPTION")continue;if(RX.test(n.textContent))e.classList.add("tlPv")}
+ document.querySelectorAll("option").forEach(o=>{if(o.dataset.tlOrig==null&&RX.test(o.textContent)){o.dataset.tlOrig=o.textContent;o.textContent=o.textContent.replace(/\s*\([^)]*\d[^)]*\)/g," (\u2022\u2022\u2022)").replace(/[-+]?\$\s?[\d,.]+/g,"$\u2022\u2022\u2022")}})}
+function clear(){document.querySelectorAll(".tlPv").forEach(e=>e.classList.remove("tlPv"));document.querySelectorAll("option[data-tl-orig]").forEach(o=>{o.textContent=o.dataset.tlOrig;delete o.dataset.tlOrig})}
+function set(v){on=!!v;try{localStorage.setItem(K,on?"1":"0")}catch(e){}document.body.classList.toggle("tl-privado",on);B.setAttribute("aria-pressed",String(on));on?scan():clear()}
+B.addEventListener("click",e=>{e.stopPropagation();set(!on)});["pointerdown","mousedown"].forEach(t=>B.addEventListener(t,e=>e.stopPropagation()));
+let q=0;new MutationObserver(()=>{if(on&&!q){q=1;requestAnimationFrame(()=>{q=0;scan()})}}).observe(document.body,{subtree:true,childList:true,characterData:true});
+setInterval(scan,700);set(on)})();
+</script>
 </body>
 </html>
