@@ -3,7 +3,7 @@
 Documento de relevo para cualquier agente (Grok) que trabaje en este repositorio. Sin datos personales: no hay cuentas, saldos ni claves aquí.
 
 ## Versión actual
-- **Última versión: 0.6.1** (2026-10-31). Está en el archivo `VERSION` y se ve en la esquina inferior derecha de la granja.
+- **Última versión: 0.6.2** (2026-11-04). Está en el archivo `VERSION` y se ve en la esquina inferior derecha de la granja.
 - Historial completo y detallado: `CHANGELOG.md`. Cada versión tiene su release en GitHub (`v0.5.1`, etc.).
 - **Al terminar un cambio, actualiza este documento** (versión, fecha y la lista de abajo).
 
@@ -16,6 +16,7 @@ Documento de relevo para cualquier agente (Grok) que trabaje en este repositorio
 | 0.4.3 | P&L del día = saldo real de TradingView − saldo inicial (incluye comisiones). Las cuentas de evaluación nuevas empiezan el día en 25,000. |
 | 0.5.0 | Modo Demo: botón «Demo» en el panel Negocio con datos de ejemplo inventados. Solo en el navegador, una carga de página, bloquea toda escritura. |
 | 0.5.1 | El día de la granja termina a las 16:00 ET. El pico del max loss sube solo con saldos de cierre (corrige falsas cuentas «quemadas»). La página corrige sola un `burnedAt` erróneo. |
+| 0.6.2 | Por defecto: estrategia «Evaluación con trailing» y 8 contratos (página y servidor). Se pueden cambiar. |
 | 0.6.0 | Jardín de logros: cerezo rosa de voxels junto a la casa, una manzana por certificado, clic en el árbol para «Crear logro». Las parcelas que tapaban el tronco se mueven solo en la escena. |
 
 ## Datos clave que debes saber
