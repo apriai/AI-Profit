@@ -5237,7 +5237,7 @@ async function poll(){clearTimeout(pollT);if(!on)return;const s=await J("/api/co
  if(s.state==="running"){live.style.display="block";live.innerHTML=liveRun(s);
   live.querySelector("[data-stop]").onclick=async()=>{if(!confirm(`¿Detener la prueba y cerrar la posición en ${s.mode==="real"?"la CUENTA REAL":"Paper"}?`))return;await J("/api/colchon/stop",{flatten:true});poll()};
   pollT=setTimeout(poll,1000);return}
- if(phase==="running"||s.summary){const sm=await J("/api/colchon/summary");if(sm&&sm.direccion&&sm.fin!==lastSum){lastSum=sm.fin;showSummary(sm)}}}
+ if(phase==="running"||s.summary){const sm=await J("/api/colchon/summary");if(sm&&sm.direccion&&sm.fin!==lastSum){lastSum=sm.fin;if(!window.__tlSumNew||window.__tlSumNew(sm)){showSummary(sm);window.__tlCelebrate&&window.__tlCelebrate(sm)}}}}
 function showSummary(m){setPhase("summary");const l=m.latencia;live.style.display="block";live.innerHTML=`<div class=h><span>Resumen · ${m.estrategia||"Prueba"}</span><span>${window.__tlAcctT&&/LF[EF]/i.test(m.modo||"")?window.__tlAcctT(m.modo):(m.modo||"")}</span></div>
 <div style="font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:rgba(255,255,255,.42)">P&L final${m.pnlFinalAprox?" (aprox.)":""}</div><div class=big style="color:${(m.pnlFinalUSD||0)>=0?"#ffd86b":"#ff9bb0"}">${usd(m.pnlFinalUSD)}</div>
 <div class=kv><div>Dirección<b>${m.direccion}</b></div><div>Tamaño<b>${m.tamano}</b></div><div>Motivo<b>${m.motivo}</b></div>${m.pasosTotal===0?`<div>Stop<b>fijo · sin movimientos</b></div>`:`<div>Colchón ${m.colchonUSD!=null?"+"+fm(m.colchonUSD):""}<b>${m.colchonMovido?"Movido ✓ "+(m.slColchon??""):"No se activó"}</b></div>`}<div>Duración<b>${dur(m.duracionSeg)}</b></div><div>Colchón a los<b>${m.colchonTrasSeg!=null?dur(m.colchonTrasSeg):"—"}</b></div></div>${(m.pasos&&m.pasos.length)?`<div class=lat style="background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.08)">${m.pasos.map(p=>`Paso <b>${p.paso}/${m.pasosTotal}</b> · protege <b>+${fm(p.protegeUSD)}</b> (SL ${p.precio}) a los <b>${dur(p.enSeg)}</b>${p.saltados?` · saltó ${p.saltados}`:""}`).join("<br>")}</div>`:""}<div class=lat style="background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.08)">Abierta <b>${m.abiertaET||"—"}</b> · Cerrada <b>${m.cerradaET||"—"}</b><br><span style="opacity:.55">precisión ±${ms(Math.abs(parseFloat(String(m.precisionMs||"").replace("±",""))||0))}</span></div>${latHTML(l)}${beHTML(m.probabilidadNecesaria&&m.probabilidadNecesaria.pct)}
@@ -5797,7 +5797,7 @@ function hook(){const G=window.__granja&&window.__granja.pet;if(!G||!G.renderer|
  if(cfg.kind!=="perro"||cfg.body!==A.perro.b||cfg.accent!==A.perro.a){try{applyPet(G,cfg)}catch(err){console.warn("mascota",err)}}
  (function lab(){const p=window.__pet.screen();if(p&&cfg.name){tag.textContent=cfg.name;tag.style.left=p.x+"px";tag.style.top=(p.y-8)+"px";tag.style.display="block"}else tag.style.display="none";requestAnimationFrame(lab)})()}
 setTimeout(hook,600);})();</script>
-<div id="tl-version" style="position:fixed;right:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.7.0</div>
+<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.7.1</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/VERSION",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
 <script>/* 0.7.0: Profito duerme al abrir (granja en pausa), riega con laptop durante un trade, y etiquetas de cuentas con saldo y etapa. Solo visual: no toca el motor de trading. */
 (function(){
@@ -5847,6 +5847,47 @@ function set(v){on=!!v;try{localStorage.setItem(K,on?"1":"0")}catch(e){}document
 B.addEventListener("click",e=>{e.stopPropagation();set(!on)});["pointerdown","mousedown"].forEach(t=>B.addEventListener(t,e=>e.stopPropagation()));
 let q=0;new MutationObserver(()=>{if(on&&!q){q=1;requestAnimationFrame(()=>{q=0;scan()})}}).observe(document.body,{subtree:true,childList:true,characterData:true});
 setInterval(scan,700);set(on)})();
+</script>
+<style>#tlMute{position:fixed;right:14px;bottom:64px;z-index:2147483000;width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(20,18,30,.35);backdrop-filter:blur(6px);color:#fff;opacity:.55;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;font-size:19px;line-height:1;transition:opacity .2s}#tlMute:hover{opacity:.95}#tlConfeti{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:2147482990}</style>
+<button id=tlMute title="Silenciar/activar sonidos" aria-label="Silenciar/activar sonidos" aria-pressed="false">&#x1F50A;</button>
+<script>/* 0.7.1: celebraci\u00f3n al ganar (confeti + Profito salta + sonido), nube gris y tono suave al perder, bot\u00f3n de silencio y arreglo del resumen repetido al recargar. Solo visual: no toca el motor de trading. */
+(function(){const KS="tl_ultimoResumen",KM="tl_silencio",LOAD=Date.now();
+let muted=false;try{muted=localStorage.getItem(KM)==="1"}catch(e){}
+/* 1) Resumen nuevo: m\u00e1s reciente que el \u00faltimo visto Y que la carga de la p\u00e1gina */
+window.__tlSumNew=function(sm){const t=Date.parse(sm&&sm.fin);if(!isFinite(t))return false;let last=0;try{last=+(localStorage.getItem(KS)||0)||0}catch(e){}
+ const nuevo=t>last&&t>LOAD;if(t>last){try{localStorage.setItem(KS,String(t))}catch(e){}}return nuevo};
+/* 2) Sonido (Web Audio): se desbloquea con el primer clic */
+let ac=null;function unlock(){try{if(!ac){const C=window.AudioContext||window.webkitAudioContext;if(C)ac=new C()}if(ac&&ac.state==="suspended")ac.resume()}catch(e){}}
+["pointerdown","keydown","touchstart"].forEach(t=>addEventListener(t,unlock,{capture:true,passive:true}));
+function tone(f,at,dur,type,vol){const o=ac.createOscillator(),g=ac.createGain();o.type=type||"square";o.frequency.setValueAtTime(f,at);g.gain.setValueAtTime(0,at);g.gain.linearRampToValueAtTime(vol||.12,at+.01);g.gain.exponentialRampToValueAtTime(.0001,at+dur);o.connect(g);g.connect(ac.destination);o.start(at);o.stop(at+dur+.02)}
+function play(big){if(muted||!ac||ac.state!=="running")return false;const t=ac.currentTime+.02;tone(988,t,.09,"square",.1);tone(1319,t+.08,.35,"square",.1);
+ if(big){[523,659,784,1047].forEach((f,i)=>tone(f,t+.5+i*.13,.22,"triangle",.14));tone(784,t+1.05,.12,"triangle",.12);tone(1047,t+1.18,.6,"triangle",.16)}return true}
+/* Confeti en canvas sobre toda la p\u00e1gina */
+function confeti(big){const c=document.createElement("canvas");c.id="tlConfeti";document.body.appendChild(c);const x=c.getContext("2d"),W=c.width=innerWidth,H=c.height=innerHeight;
+ const cols=["#ffd86b","#7fd8ff","#ff7aa8","#8dff9a","#c99bff","#ffffff"],N=big?320:120,P=[];
+ for(let i=0;i<N;i++){const b=big&&i%2;P.push({x:b?(i%4<2?0:W):W*Math.random(),y:b?H*.7:-20-H*.3*Math.random(),vx:b?(i%4<2?1:-1)*(4+6*Math.random()):(Math.random()-.5)*2,vy:b?-(8+8*Math.random()):2+3*Math.random(),r:Math.random()*6.3,vr:(Math.random()-.5)*.3,w:5+5*Math.random(),h:8+6*Math.random(),c:cols[i%cols.length]})}
+ const T0=performance.now(),DUR=big?4500:2800;(function f(now){const k=now-T0;x.clearRect(0,0,W,H);x.globalAlpha=Math.max(0,Math.min(1,(DUR-k)/700));
+  for(const p of P){p.vy+=.18;p.vx*=.99;p.x+=p.vx;p.y+=p.vy;p.r+=p.vr;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.w/2,-p.h/4,p.w,p.h/2*Math.abs(Math.cos(p.r*2))+1);x.restore()}
+  if(k<DUR)requestAnimationFrame(f);else c.remove()})(T0)}
+/* Profito salta (si la escena est\u00e1 accesible) */
+function salto(big){const g=window.__gx;if(!g||!g.ci)return false;const o=g.ci,T0=performance.now(),DUR=big?2400:1400,y0=o.position.y,r0=o.rotation.y;
+ (function f(now){const k=(now-T0)/DUR;if(k>=1){o.position.y=y0;o.rotation.y=r0;return}const ph=k*(big?5:3)*Math.PI;o.position.y=y0+Math.abs(Math.sin(ph))*(big?.55:.35);if(big)o.rotation.y=r0+k*Math.PI*2;requestAnimationFrame(f)})(T0);return true}
+/* P\u00e9rdida: nube gris suave sobre la planta de esa cuenta (Profito sigue normal) y tono bajo muy suave */
+function playPerdida(){if(muted||!ac||ac.state!=="running")return false;const t=ac.currentTime+.02,o=ac.createOscillator(),g=ac.createGain();o.type="sine";o.frequency.setValueAtTime(330,t);o.frequency.exponentialRampToValueAtTime(247,t+.45);
+ g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.035,t+.06);g.gain.exponentialRampToValueAtTime(.0001,t+.6);o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+.65);return true}
+function nube(cuenta){const g=window.__gx;if(!g||!g.At||!g.Xt||!g.wt||!g.P)return false;const n=g.At.find(x=>x&&!x.removed&&x.a&&x.a.name===cuenta&&x.g);if(!n)return false;
+ const Box=g.Yn||g.bn,Mat=g.Jr,Mesh=g.ht;if(!Box||!Mat||!Mesh)return false;const G=new g.wt(),mats=[];
+ [[0,0,0,.7],[.45,.05,.1,.55],[-.45,0,-.05,.55],[.2,.25,0,.5],[-.2,.22,.1,.45],[0,.05,.35,.45],[0,0,-.35,.45]].forEach(([x,y,z,s],i)=>{const m=new Mat({color:i%2?0x9aa1ab:0xb4bac3,roughness:1,transparent:true,opacity:0});mats.push(m);const b=new Mesh(new Box(s,s*.7,s),m);b.position.set(x,y,z);G.add(b)});
+ const w=n.g.getWorldPosition(new g.P);G.position.set(w.x,w.y+(n.h||2)+1.3,w.z);g.Xt.add(G);const T0=performance.now(),DUR=5000;
+ (function f(now){const k=(now-T0)/DUR;if(k>=1){G.removeFromParent();return}const op=.75*Math.min(1,k*5,(1-k)*4);mats.forEach(m=>m.opacity=op);G.position.x=w.x+Math.sin(k*3)*.15;requestAnimationFrame(f)})(T0);return true}
+window.__tlCelebrate=function(sm){const p=Number(sm&&sm.pnlFinalUSD);
+ if(p>0){const big=sm.motivo==="Take profit"&&!sm.pnlFinalAprox;confeti(big);const j=salto(big),s=play(big);return{tipo:"gana",big,salto:j,sonido:s}}
+ if(p<0||(sm&&sm.motivo==="Stop loss")){const c=p<0?nube(sm.cuenta):false,s=playPerdida();return{tipo:"pierde",nube:c,sonido:s}}
+ return null};
+/* 3) Bot\u00f3n de silencio */
+const B=document.getElementById("tlMute");function set(v){muted=!!v;try{localStorage.setItem(KM,muted?"1":"0")}catch(e){}B.innerHTML=muted?"\u{1F507}":"\u{1F50A}";B.setAttribute("aria-pressed",String(muted))}
+B.addEventListener("click",e=>{e.stopPropagation();unlock();set(!muted);if(!muted)play(false)});["pointerdown","mousedown"].forEach(t=>B.addEventListener(t,e=>e.stopPropagation()));
+window.__tlMuted=()=>muted;set(muted)})();
 </script>
 </body>
 </html>
