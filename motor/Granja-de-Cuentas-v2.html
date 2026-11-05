@@ -5667,7 +5667,7 @@ function loop(t){requestAnimationFrame(loop);const gx=window.__gx;if(!gx||!gx.Lt
   if(nmEl)nmEl.textContent=mk0+nm0+" · $"+bal0.toLocaleString("en-US",{maximumFractionDigits:0});
   const neg=b.querySelector("i.neg"),pos=b.querySelector("i.pos");
   if(cl>=0){pos.style.width=w0+"%";neg.style.width="0"}else{neg.style.width=w0+"%";pos.style.width="0"}
-  const listo=pnl0<=-600;if(doneEl){doneEl.classList.toggle("on",listo);doneEl.setAttribute("aria-hidden",listo?"false":"true")}
+  const dayPn=Number(n.a.pnlToday),listo=Number.isFinite(dayPn)&&!!n.a.pnlDate&&dayPn<=-600;if(doneEl){doneEl.classList.toggle("on",listo);doneEl.setAttribute("aria-hidden",listo?"false":"true")}
   b.title=(listo?"Listo por hoy (P&L del día ≤ −$600) · ":"")+"P&L "+(pnl0>=0?"+":"")+Math.round(pnl0)+" (−1000…+1000)";
   const p=scr(gx,n.g,(n.h||2)+.6);if(p){b.style.display="flex";b.style.left=p.x+"px";b.style.top=p.y+"px"}else b.style.display="none"});
  bars.forEach((b,n)=>{if(!seen.has(n)){b.remove();bars.delete(n)}})}
@@ -5814,7 +5814,7 @@ function hook(){const G=window.__granja&&window.__granja.pet;if(!G||!G.renderer|
  if(cfg.kind!=="perro"||cfg.body!==A.perro.b||cfg.accent!==A.perro.a){try{applyPet(G,cfg)}catch(err){console.warn("mascota",err)}}
  (function lab(){const p=window.__pet.screen();if(p&&cfg.name){tag.textContent=cfg.name;tag.style.left=p.x+"px";tag.style.top=(p.y-8)+"px";tag.style.display="block"}else tag.style.display="none";requestAnimationFrame(lab)})()}
 setTimeout(hook,600);})();</script>
-<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.8.1</div>
+<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.8.2</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/VERSION",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
 <script>/* 0.7.0: Profito duerme al abrir (granja en pausa), riega con laptop durante un trade, y etiquetas de cuentas con saldo y etapa. Solo visual: no toca el motor de trading. */
 (function(){
