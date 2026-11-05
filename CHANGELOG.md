@@ -10,6 +10,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.8.1] - 2026-11-05
+### Agregado
+- **Listo por hoy:** si el P&L del día de una planta (saldo − inicial, mismo que la barra) llega a ≤ −$600, aparece arriba un letrero verde tipo pastilla/cristal que dice «Listo por hoy». Solo página; no cambia el motor ni las órdenes. El límite de $600 es el opcional diario de Lucid LucidFlex.
+
 ## [0.8.0] - 2026-11-05
 ### Agregado
 - **Rascacielo** (`rascacielo`): estrategia nueva de Karol (PR #19). SL −$600 / TP +$104, stop fijo. Por defecto 8 MNQ / 1 NQ.
