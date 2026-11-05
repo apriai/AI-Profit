@@ -10,6 +10,17 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.8.0] - 2026-11-05
+### Agregado
+- **Rascacielo** (`rascacielo`): estrategia nueva de Karol (PR #19). SL −$600 / TP +$104, stop fijo. Por defecto 8 MNQ / 1 NQ.
+### Cambiado
+- **`dia-minimo-colchon`** se muestra como **Rascacielo (Dia Minimo+Colchon)** (mismo id y parámetros: SL 600, TP 1600, colchón ~$100). Idea y nombre de Karol (PR #19).
+- **`prueba-be`** se muestra como **Fast Breakeven** (mismo id y parámetros). Idea y nombre de Karol (PR #19).
+- Orden del selector: Evaluación → Evaluación con trailing → Rascacielo (Dia Minimo+Colchon) → Rascacielo → Fast Breakeven → (propias al final).
+### Notas
+- Se conservan evaluación por defecto, 8 contratos MNQ, estrategia propia (0.7.4), barra de trades del día (0.7.5) y el resto de main.
+- Crédito: Karol (@karocerquera), PR #19; integrado sobre main 0.7.5.
+
 ## [0.7.5] - 2026-11-05
 ### Cambiado
 - **Barra superior:** ya no muestra el P&L en dólares. Muestra los trades de hoy de la granja: total, cuántos positivos y cuántos negativos (`Hoy N trades · X+ · Y−`). Usa el mismo día de la granja (`diaFarm` / `_pd`, desde las 4 PM ET). Solo página.
