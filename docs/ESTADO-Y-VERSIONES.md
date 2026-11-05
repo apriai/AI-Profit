@@ -3,13 +3,14 @@
 Documento de relevo para cualquier agente (Grok) que trabaje en este repositorio. Sin datos personales: no hay cuentas, saldos ni claves aquí.
 
 ## Versión actual
-- **Última versión: 0.7.5** (2026-11-05). Está en el archivo `VERSION` y se ve en la esquina inferior izquierda de la granja.
+- **Última versión: 0.8.0** (2026-11-05). Está en el archivo `VERSION` y se ve en la esquina inferior izquierda de la granja.
 - Historial completo y detallado: `CHANGELOG.md`. Cada versión tiene su release en GitHub (`v0.5.1`, etc.).
 - **Al terminar un cambio, actualiza este documento** (versión, fecha y la lista de abajo).
 
 ## Lo que cambió (31 oct 2026)
 | Versión | Qué cambió |
 |---|---|
+| 0.8.0 | Estrategias de Karol (PR #19): Rascacielo (Dia Minimo+Colchon), Rascacielo (SL600/TP104) y Fast Breakeven. Ids estables; 8 MNQ por defecto. |
 | 0.7.5 | Barra superior: trades del día (total / positivos / negativos) en vez del P&L en dólares. Mismo día granja 4 PM ET. Solo página. |
 | 0.7.4 | Estrategia propia (nombre, SL, TP, hasta 3 pasos) guardada solo en `estrategias-propias.json` de esta computadora. El botón de operar espera como máximo ~2.5 s a una lectura de cuentas en curso. Las estrategias de serie no cambian (Rascacielo sigue en el PR #19). |
 | 0.7.3 | Nombre de planta (persistente), saldo arriba de la planta, selector sin nombre duplicado, barra P&L −1000…+1000. Solo página. |
