@@ -10,6 +10,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.7.5] - 2026-11-05
+### Cambiado
+- **Barra superior:** ya no muestra el P&L en dólares. Muestra los trades de hoy de la granja: total, cuántos positivos y cuántos negativos (`Hoy N trades · X+ · Y−`). Usa el mismo día de la granja (`diaFarm` / `_pd`, desde las 4 PM ET). Solo página.
+
 ## [0.7.4] - 2026-11-05
 ### Agregado
 - **Estrategia propia:** en el panel de la cuenta (junto al selector de estrategia) el botón «Estrategia propia» abre un cuadro centrado. Ahí se pone el nombre, el stop loss, el take profit y hasta 3 pasos (cuando el trade llega a +$X, protege $Y), con controles deslizantes. Se guarda solo en `estrategias-propias.json`, en la raíz de esta computadora. No se sube a GitHub. La estrategia aparece en el mismo selector que las de siempre y el motor la usa igual (`propia: true`). Rutas: `GET` / `POST` / `DELETE /api/estrategias-propias`.
