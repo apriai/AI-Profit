@@ -5550,6 +5550,9 @@ const st=document.createElement("style");st.textContent=`
 #panel label.pname{display:block;margin:10px 0 6px;font:12px Inter,system-ui;color:#ccc}#panel label.pname input{display:block;width:100%;margin-top:4px;padding:6px 8px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.25);color:#fff;font:13px Inter,system-ui}
 .pfMeta{position:fixed;z-index:4;pointer-events:none;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;gap:3px;font:600 10px Inter,system-ui;color:#f3ffc2;text-shadow:0 1px 2px #000a;min-width:90px}
 .pfMeta .nm{white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
+.pfMeta .doneHoy{display:none;align-items:center;justify-content:center;gap:4px;margin:0 0 1px;padding:3px 10px 4px;border-radius:999px;font:600 9px/1.15 Inter,system-ui,-apple-system,sans-serif;letter-spacing:.03em;color:#eaffd4;background:linear-gradient(165deg,rgba(190,255,140,.28),rgba(80,160,60,.22));border:1px solid rgba(200,255,160,.42);box-shadow:0 4px 14px rgba(30,80,20,.28),0 0 0 1px rgba(0,0,0,.12),inset 0 1px 0 rgba(255,255,255,.35);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);text-shadow:0 1px 2px rgba(0,40,0,.35);white-space:nowrap;pointer-events:none}
+.pfMeta .doneHoy.on{display:inline-flex}
+.pfMeta .doneHoy::before{content:"";width:6px;height:6px;border-radius:50%;background:#b8f06a;box-shadow:0 0 6px #cdea1d}
 .pfMeta .t{width:72px;height:7px;border-radius:4px;background:rgba(20,10,40,.55);box-shadow:0 0 0 1px rgba(255,255,255,.18);position:relative;overflow:hidden}
 .pfMeta .t::after{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,255,255,.45);transform:translateX(-50%);z-index:1}
 .pfMeta .t i{position:absolute;top:0;bottom:0;height:100%;border-radius:3px}
@@ -5657,13 +5660,15 @@ function loop(t){requestAnimationFrame(loop);const gx=window.__gx;if(!gx||!gx.Lt
  sparks.forEach(p=>{const u=p.userData;p.position.set(Math.cos(u.a+s*u.v)*u.r,u.y+Math.sin(s*1.3+u.a)*.25,Math.sin(u.a+s*u.v)*u.r);p.scale.setScalar(.7+.5*Math.sin(s*3+u.a))});
  items.forEach(e=>{const gl=e.obj.userData.glow;if(gl)gl.material.opacity=.09+.05*Math.sin(s*1.5);const p=scr(gx,e.obj,0);if(p){e.tag.style.display="";e.tag.style.left=p.x+"px";e.tag.style.top=p.y+14+"px"}else e.tag.style.display="none"});
 
- const seen=new Set();(gx.At||[]).forEach(n=>{if(n.removed||!n.a||n.a.memorial||!n.d||n.d.kind==="wither"||!n.g.visible)return;seen.add(n);let b=bars.get(n);if(!b){b=document.createElement("div");b.className="pfMeta";b.innerHTML='<div class="nm"></div><div class="t"><i class="neg"></i><i class="pos"></i></div>';document.body.appendChild(b);bars.set(n,b)}
+ const seen=new Set();(gx.At||[]).forEach(n=>{if(n.removed||!n.a||n.a.memorial||!n.d||n.d.kind==="wither"||!n.g.visible)return;seen.add(n);let b=bars.get(n);if(!b){b=document.createElement("div");b.className="pfMeta";b.innerHTML='<div class="doneHoy" aria-hidden="true">Listo por hoy</div><div class="nm"></div><div class="t"><i class="neg"></i><i class="pos"></i></div>';document.body.appendChild(b);bars.set(n,b)}
   const st0=+n.a.start||25000,bal0=+(n.a.bal??st0),pnl0=bal0-st0,cl=Math.max(-1000,Math.min(1000,pnl0)),w0=Math.abs(cl)/1000*50;
   const nm0=(n.a.plantName&&String(n.a.plantName).trim())||n.a.name,mk0=window.__tlStageMark?window.__tlStageMark(n.a.name):"";
-  b.firstChild.textContent=mk0+nm0+" · $"+bal0.toLocaleString("en-US",{maximumFractionDigits:0});
+  const nmEl=b.querySelector(".nm"),doneEl=b.querySelector(".doneHoy");
+  if(nmEl)nmEl.textContent=mk0+nm0+" · $"+bal0.toLocaleString("en-US",{maximumFractionDigits:0});
   const neg=b.querySelector("i.neg"),pos=b.querySelector("i.pos");
   if(cl>=0){pos.style.width=w0+"%";neg.style.width="0"}else{neg.style.width=w0+"%";pos.style.width="0"}
-  b.title="P&L "+(pnl0>=0?"+":"")+Math.round(pnl0)+" (−1000…+1000)";
+  const listo=pnl0<=-600;if(doneEl){doneEl.classList.toggle("on",listo);doneEl.setAttribute("aria-hidden",listo?"false":"true")}
+  b.title=(listo?"Listo por hoy (P&L del día ≤ −$600) · ":"")+"P&L "+(pnl0>=0?"+":"")+Math.round(pnl0)+" (−1000…+1000)";
   const p=scr(gx,n.g,(n.h||2)+.6);if(p){b.style.display="flex";b.style.left=p.x+"px";b.style.top=p.y+"px"}else b.style.display="none"});
  bars.forEach((b,n)=>{if(!seen.has(n)){b.remove();bars.delete(n)}})}
 // barra en el panel de detalle
@@ -5809,7 +5814,7 @@ function hook(){const G=window.__granja&&window.__granja.pet;if(!G||!G.renderer|
  if(cfg.kind!=="perro"||cfg.body!==A.perro.b||cfg.accent!==A.perro.a){try{applyPet(G,cfg)}catch(err){console.warn("mascota",err)}}
  (function lab(){const p=window.__pet.screen();if(p&&cfg.name){tag.textContent=cfg.name;tag.style.left=p.x+"px";tag.style.top=(p.y-8)+"px";tag.style.display="block"}else tag.style.display="none";requestAnimationFrame(lab)})()}
 setTimeout(hook,600);})();</script>
-<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.8.0</div>
+<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.8.1</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/VERSION",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
 <script>/* 0.7.0: Profito duerme al abrir (granja en pausa), riega con laptop durante un trade, y etiquetas de cuentas con saldo y etapa. Solo visual: no toca el motor de trading. */
 (function(){
