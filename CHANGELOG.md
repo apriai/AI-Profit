@@ -10,14 +10,26 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
-## [0.7.3] - 2026-11-05
+## [0.7.4] - 2026-11-05
 ### Agregado
 - **Estrategia propia:** en el panel de la cuenta (junto al selector de estrategia) el botón «Estrategia propia» abre un cuadro centrado. Ahí se pone el nombre, el stop loss, el take profit y hasta 3 pasos (cuando el trade llega a +$X, protege $Y), con controles deslizantes. Se guarda solo en `estrategias-propias.json`, en la raíz de esta computadora. No se sube a GitHub. La estrategia aparece en el mismo selector que las de siempre y el motor la usa igual (`propia: true`). Rutas: `GET` / `POST` / `DELETE /api/estrategias-propias`.
 ### Arreglado
 - **El botón de operar ya no se queda esperando la lectura de todas las cuentas.** Si hay una lectura completa en curso, se espera como máximo unos 2.5 segundos y se sigue. Un segundo clic mientras arranca dice «esperando lectura…». Mientras arranca un trade no se inicia un recorrido nuevo de cuentas (ni el de todas ni el de solo fondeadas) y esa espera cuenta como actividad reciente.
 ### Notas
-- Las estrategias de serie quedan como en 0.7.2. El PR #19 (Rascacielo, Rascacielo + colchón y Fast Breakeven) sigue aparte: conviene mezclarlo por su lado; este cambio no las renombra.
+- Las estrategias de serie no cambian. El PR #19 (Rascacielo, Rascacielo + colchón y Fast Breakeven) sigue aparte.
+- Se conserva lo de 0.7.3 (nombre de planta, saldo arriba y barra de P&L). Esta entrada pasa a 0.7.4 porque 0.7.3 ya está en main.
 - Hay que reiniciar el servidor (solo sin posición abierta ni órdenes pendientes) para la ruta nueva y para el arreglo de la espera. La página se actualiza al recargar (F5).
+
+## [0.7.3] - 2026-11-05
+Nombres de planta, saldo arriba y barra de P&L centrada (−1000…+1000). Solo página.
+
+### Agregado
+- **Nombre de planta:** en el panel de la cuenta (y en Editar) puedes poner un nombre propio. Se guarda en `granja.v2` (localStorage) y se sincroniza con `negocio.json`. No cambia el id de la cuenta en Tradovate.
+- Arriba de cada planta se ven el nombre (o el de la cuenta) y el saldo.
+
+### Cambiado
+- **Selector de cuentas del panel de trade:** muestra nombre de planta + número corto (LFE…019), con ⭐/💎/✖. Ya no se repite el nombre por el texto «REAL · …».
+- **Barra encima de cada planta:** de −$1,000 a +$1,000 centrada en 0, según el P&L de la cuenta (saldo − inicial). Roja a la izquierda si es negativo, verde a la derecha si es positivo.
 
 ## [0.7.2] - 2026-11-04
 ### Arreglado
