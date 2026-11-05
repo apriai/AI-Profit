@@ -10,6 +10,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.8.4] — 2026-11-05
+### Cambiado
+- **Etiqueta arriba de cada planta:** si hay nombre propio (`plantName`), se muestra ese. Si no, solo los últimos 3 caracteres del número de cuenta. Vale para el letrero de la planta (árbol fondeado, flor de evaluación y quemada) y para la línea visible de encima (`pfMeta`). El saldo, la barra de P&L y el ojito de privacidad siguen igual. Solo página.
+
 ## [0.8.3] — 2026-11-05
 ### Corregido
 - Estrategia «Evaluación con trailing»: ya no muestra «Probabilidad del trade 100%» (era falso; salía del lock a $0 / breakeven). Con trailing (pasos STEPS) la página muestra que mueve el stop a breakeven y protege ganancias, sin porcentaje inventado. Solo página.
