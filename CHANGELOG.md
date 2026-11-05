@@ -10,6 +10,17 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.7.3] - 2026-11-05
+Nombres de planta, saldo arriba y barra de P&L centrada (−1000…+1000). Solo página.
+
+### Agregado
+- **Nombre de planta:** en el panel de la cuenta (y en Editar) puedes poner un nombre propio. Se guarda en `granja.v2` (localStorage) y se sincroniza con `negocio.json`. No cambia el id de la cuenta en Tradovate.
+- Arriba de cada planta se ven el nombre (o el de la cuenta) y el saldo.
+
+### Cambiado
+- **Selector de cuentas del panel de trade:** muestra nombre de planta + número corto (LFE…019), con ⭐/💎/✖. Ya no se repite el nombre por el texto «REAL · …».
+- **Barra encima de cada planta:** de −$1,000 a +$1,000 centrada en 0, según el P&L de la cuenta (saldo − inicial). Roja a la izquierda si es negativo, verde a la derecha si es positivo.
+
 ## [0.7.2] - 2026-11-04
 ### Arreglado
 - **Selector de cuenta legible:** en el panel de trading en vivo, las cuentas con ⭐ / 💎 / ✖ tenían el texto en color (amarillo `#ffd86b`, celeste `#7fd8ff`, gris `#888`) y no se leían bien sobre la lista blanca de Windows. Ahora usan el color normal (negro sobre blanco en la lista, blanco en el selector cerrado); ⭐ y 💎 van en negrita. La diferencia la da el emoji. Solo página.
