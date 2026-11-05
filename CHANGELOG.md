@@ -10,6 +10,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.8.3] — 2026-11-05
+### Corregido
+- Estrategia «Evaluación con trailing»: ya no muestra «Probabilidad del trade 100%» (era falso; salía del lock a $0 / breakeven). Con trailing (pasos STEPS) la página muestra que mueve el stop a breakeven y protege ganancias, sin porcentaje inventado. Solo página.
+
 ## [0.8.2] - 2026-11-05
 ### Arreglado
 - **Listo por hoy usa el P&L del día:** el letrero de 0.8.1 comparaba `saldo − inicial` (P&L total desde 25,000) en vez del P&L del día (`pnlToday` / `dayPnl`). Una cuenta que empezó el día arriba de 25,000 y perdió ≈$600 no mostraba el aviso. Ahora usa `pnlToday` (con `pnlDate`) y el umbral sigue en ≤ −$600. La barra ±1000 no cambia. Solo página.
