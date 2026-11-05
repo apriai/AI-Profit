@@ -10,6 +10,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.7.2] - 2026-11-04
+### Arreglado
+- **Selector de cuenta legible:** en el panel de trading en vivo, las cuentas con ⭐ / 💎 / ✖ tenían el texto en color (amarillo `#ffd86b`, celeste `#7fd8ff`, gris `#888`) y no se leían bien sobre la lista blanca de Windows. Ahora usan el color normal (negro sobre blanco en la lista, blanco en el selector cerrado); ⭐ y 💎 van en negrita. La diferencia la da el emoji. Solo página.
+
 ## [0.7.1] - 2026-11-04
 ### Agregado
 - **Celebración al ganar:** cuando un trade termina en ganancia (P&L final > 0), aparece confeti en toda la granja, Profito salta y suena una moneda (Web Audio, sin archivos). Con Take profit la celebración es grande y lleva fanfarria, y Profito además da una vuelta. Otras ganancias, o un P&L aproximado, tienen una celebración pequeña. Solo en tu computadora; no se envía nada.
