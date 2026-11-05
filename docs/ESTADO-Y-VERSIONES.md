@@ -3,13 +3,14 @@
 Documento de relevo para cualquier agente (Grok) que trabaje en este repositorio. Sin datos personales: no hay cuentas, saldos ni claves aquí.
 
 ## Versión actual
-- **Última versión: 0.8.3** (2026-11-05). Está en el archivo `VERSION` y se ve en la esquina inferior izquierda de la granja.
+- **Última versión: 0.8.4** (2026-11-05). Está en el archivo `VERSION` y se ve en la esquina inferior izquierda de la granja.
 - Historial completo y detallado: `CHANGELOG.md`. Cada versión tiene su release en GitHub (`v0.5.1`, etc.).
 - **Al terminar un cambio, actualiza este documento** (versión, fecha y la lista de abajo).
 
 ## Lo que cambió (31 oct 2026)
 | Versión | Qué cambió |
 |---|---|
+| 0.8.4 | Etiqueta arriba de la planta: nombre propio si existe; si no, solo los últimos 3 caracteres de la cuenta (letrero y línea `pfMeta`). Saldo y privacidad igual. Solo página. |
 | 0.8.3 | «Evaluación con trailing»: quita el falso «Probabilidad del trade 100%»; con trailing describe breakeven/protege ganancias, sin %. Solo página. |
 | 0.8.2 | Listo por hoy: usa P&L del día (`pnlToday`), no saldo−inicial. Solo página. |
 | 0.8.1 | Letrero verde «Listo por hoy» encima de plantas con P&L del día ≤ −$600 (límite diario LucidFlex). Solo página. |
