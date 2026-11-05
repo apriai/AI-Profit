@@ -1,5 +1,8 @@
 // Registro de estrategias. Orden: Evaluación → Evaluación con trailing → Día mínimo + colchón → Prueba BE.
 // Explicaciones al estilo flecha: +$300 → protege $100. Todas usan el mismo motor colchon (modifyOrder / Tradovate·Bit).
+// Las de serie quedan como en main 0.7.2. Rascacielo / Fast Breakeven están en el PR #19: no se renombran aquí.
+// Las propias (estrategias-propias.json, solo esta computadora) se agregan al final con propia:true y no pisan un id de serie.
+import { getPropia, listPropias } from './estrategias-propias.mjs';
 export const STRATEGY_ORDER = ['evaluacion-simple', 'evaluacion', 'dia-minimo-colchon', 'prueba-be'];
 export const STRATEGIES = {
   'evaluacion-simple': {
@@ -28,5 +31,16 @@ export const STRATEGIES = {
   },
 };
 export const DEFAULT_STRATEGY = 'evaluacion-simple';
-export const getStrategy = id => STRATEGIES[id ?? DEFAULT_STRATEGY] || null;
-export const listStrategies = () => STRATEGY_ORDER.map(id => STRATEGIES[id]).filter(Boolean).map(({ id, name, short, description, params }) => ({ id, name, short, description, params, default: id === DEFAULT_STRATEGY }));
+const pubBuilt = s => { const { id, name, short, description, params } = s; return { id, name, short, description, params, default: id === DEFAULT_STRATEGY, propia: false }; };
+export const getStrategy = id => {
+  const key = id ?? DEFAULT_STRATEGY;
+  const built = STRATEGIES[key];
+  if (built) return built;
+  if (typeof key === 'string' && key.startsWith('propia-')) return getPropia(key);
+  return null;
+};
+export const listStrategies = () => {
+  const built = STRATEGY_ORDER.map(id => STRATEGIES[id]).filter(Boolean).map(pubBuilt);
+  const have = new Set(built.map(s => s.id));
+  return built.concat(listPropias().filter(s => s && s.id && !have.has(s.id)));
+};

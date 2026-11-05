@@ -19,6 +19,9 @@ historial/
 # Copia del historial del Negocio (personal, nunca se sube)
 negocio.json
 negocio.json.tmp-*
+# Estrategias propias de esta computadora (nunca se suben)
+estrategias-propias.json
+estrategias-propias.json.tmp-*
 backups-negocio/
 reportes/
 backups/
