@@ -3,13 +3,14 @@
 Documento de relevo para cualquier agente (Grok) que trabaje en este repositorio. Sin datos personales: no hay cuentas, saldos ni claves aquí.
 
 ## Versión actual
-- **Última versión: 0.7.1** (2026-11-04). Está en el archivo `VERSION` y se ve en la esquina inferior derecha de la granja.
+- **Última versión: 0.7.2** (2026-11-04). Está en el archivo `VERSION` y se ve en la esquina inferior derecha de la granja.
 - Historial completo y detallado: `CHANGELOG.md`. Cada versión tiene su release en GitHub (`v0.5.1`, etc.).
 - **Al terminar un cambio, actualiza este documento** (versión, fecha y la lista de abajo).
 
 ## Lo que cambió (31 oct 2026)
 | Versión | Qué cambió |
 |---|---|
+| 0.7.2 | Selector de cuenta legible: sin texto amarillo/celeste/gris en las opciones ⭐/💎/✖ (negrita en ⭐/💎). Solo página. |
 | 0.7.1 | Celebración al ganar (confeti, Profito salta, moneda; grande con Take profit). Al perder: nube gris sobre la planta y tono suave. Botón 🔊/🔇. Arreglo: el resumen ya no se repite al recargar. Versión abajo a la izquierda. Solo página. |
 | 0.7.0 | Arreglo mascota quieta (`CZ_FLOW_TO`). Profito sale dormido y la granja en pausa al abrir; riega con regadera y laptop durante un trade. Marcadores ⭐/💎 con saldo en el selector de cuentas y en las barras. Ojito de privacidad abajo a la derecha. Solo página. |
 | 0.6.1 | Panel Métrica: botón junto al historial de trades y `GET /api/colchon/metricas`. Resume el historial de esta máquina (P&L, aciertos, profit factor, gráfica). No lee `negocio.json`. |

@@ -5152,7 +5152,7 @@ const st=document.createElement("style");st.textContent=`
 #prCard .bs{display:grid;grid-template-columns:1fr 1fr;gap:10px}#prCard .bs button{border:none;border-radius:13px;padding:14px 0;font:800 15px Inter,system-ui;letter-spacing:.8px;cursor:pointer;transition:transform .15s,filter .15s}#prCard .bs button:hover{transform:translateY(-1px);filter:brightness(1.08)}
 #prCard .buy{background:linear-gradient(135deg,#7dff8a,#3ccf5a);color:#062a0e}#prCard .sell{background:linear-gradient(135deg,#ff8fa3,#ff4d6d);color:#2a0610}
 #prCard .sz{margin-top:12px;text-align:center;font-size:12px;color:rgba(255,255,255,.55)}#prCard .sz a{color:#ffe7a3;cursor:pointer;text-decoration:none;border-bottom:1px dashed rgba(255,231,163,.5)}
-#prCard .sz select,#prCard .sz input{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;border-radius:10px;padding:7px 8px;font:600 13px Inter,system-ui}#prCard .sz input{width:58px;text-align:center}#prCard .sz option{color:#000}#prCard button:disabled{opacity:.4;cursor:not-allowed}
+#prCard .sz select,#prCard .sz input{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;border-radius:10px;padding:7px 8px;font:600 13px Inter,system-ui}#prCard .sz input{width:58px;text-align:center}#prCard .sz option{color:#000;background:#fff}#prCard button:disabled{opacity:.4;cursor:not-allowed}
 #prCard .msg{margin-top:11px;font-size:12px;line-height:1.45;color:rgba(255,255,255,.6)}#prCard .msg.no{color:#ffb3c0}#prCard .msg[data-sd]{white-space:pre-line;color:rgba(255,255,255,.72);font-size:12px;line-height:1.5;margin:0 0 10px!important}
 #prLive{position:fixed;left:22px;right:auto;top:92px;z-index:12;width:316px;max-width:calc(100vw - 20px);max-height:calc(100vh - 180px);overflow-y:auto;padding:14px;border-radius:16px;background:rgba(12,8,24,.86);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border:1px solid rgba(255,255,255,.08);font:12px Inter,system-ui;color:#ececf3;display:none;font-variant-numeric:tabular-nums}
 #prLive .h{display:flex;justify-content:space-between;font-weight:600;margin-bottom:10px}#prLive .h span:last-child{font-weight:500;font-size:11px;color:rgba(255,255,255,.5)}
@@ -5797,7 +5797,7 @@ function hook(){const G=window.__granja&&window.__granja.pet;if(!G||!G.renderer|
  if(cfg.kind!=="perro"||cfg.body!==A.perro.b||cfg.accent!==A.perro.a){try{applyPet(G,cfg)}catch(err){console.warn("mascota",err)}}
  (function lab(){const p=window.__pet.screen();if(p&&cfg.name){tag.textContent=cfg.name;tag.style.left=p.x+"px";tag.style.top=(p.y-8)+"px";tag.style.display="block"}else tag.style.display="none";requestAnimationFrame(lab)})()}
 setTimeout(hook,600);})();</script>
-<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.7.1</div>
+<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.7.2</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/VERSION",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
 <script>/* 0.7.0: Profito duerme al abrir (granja en pausa), riega con laptop durante un trade, y etiquetas de cuentas con saldo y etapa. Solo visual: no toca el motor de trading. */
 (function(){
@@ -5806,7 +5806,7 @@ const st=()=>window.granjaStore,acc=n=>{const s=st();return s&&(s.get().accounts
  stage=a=>{const g=acc(a.name);if(/^LFF/i.test(a.name)||(g&&g.type==="funded"))return 2;if(!g)return 0;const d=st().derive(g);if(d.burned||g.burnedAt)return -1;return g.bal-g.start>=550?1:0};
 window.__tlAccTag=a=>({2:"\u{1F48E} ",1:"\u2B50 ",0:"",[-1]:"\u2716 "})[stage(a)];
 window.__tlStageMark=n=>({2:"\u{1F48E} ",1:"\u2B50 "})[stage({name:n})]||"";window.__tlAccBal=a=>{const g=acc(a.name);return g&&isFinite(+g.bal)?" ("+fmt(g.bal)+")":""};
-window.__tlAccSty=a=>({2:' style="color:#7fd8ff"',1:' style="color:#ffd86b"',[-1]:' style="color:#888"'})[stage(a)]||"";
+window.__tlAccSty=a=>({2:' style="font-weight:700"',1:' style="font-weight:700"'})[stage(a)]||"";
 window.__tlAccSort=l=>l.map((a,i)=>[a,i]).sort((x,y)=>stage(y[0])-stage(x[0])||x[1]-y[1]).map(x=>x[0]);
 const running=()=>{try{return window.__tlWaterForce??(window.__prueba&&window.__prueba().phase==="running")}catch(e){return false}};
 function init(){const g=window.__gx;if(!g||!g.ci||!g.Wu||!g.Jr||!(g.Yn||g.bn)||!st())return setTimeout(init,300);
