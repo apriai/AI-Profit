@@ -185,6 +185,7 @@
     if (path === '/api/colchon/summary') return { ok: false, err: 'Todav\u00eda no hay resumen' };
     if (path === '/api/colchon/lectura') return { paused: false };
     if (path === '/api/colchon/detalle') return detalleJson(q.get('at'));
+    if (path === '/api/estrategias-propias') return { ok: true, strategies: [] };
     return { ok: false, err: 'ruta desconocida' };
   }
   var TEXT = { '/api/colchon/informe': 'Informe de ejemplo.\n\nTrade cerrado con ganancia. Datos ilustrativos.', '/api/colchon/reporte': '# Reporte de ejemplo\n\nDatos ilustrativos.' };
@@ -5139,7 +5140,7 @@ let clk=0;function bind(){const sun=document.querySelector("#hud .sun");if(!sun)
 sun.addEventListener("click",e=>{e.stopPropagation();clearTimeout(clk);clk=setTimeout(()=>{mode=isNight()?"day":"night";localStorage.setItem(K,mode);apply()},230)});
 sun.addEventListener("dblclick",e=>{e.stopPropagation();clearTimeout(clk);mode="auto";localStorage.setItem(K,mode);apply()});apply()}
 bind();setInterval(()=>{if(mode==="auto")apply()},60000);window.__dayNight=()=>({mode,night:isNight(),exposure:window.__gx&&window.__gx.It.toneMappingExposure});})();</script><script>/* Prueba colchón: el pill del agente abre directamente el panel (estrategia/cuenta/símbolo, BUY/SELL, probabilidad). Sin botón Prueba. */
-(function(){const K="tl_prueba";let on=true,phase="off",sym="MNQ",qty=8,accs=null,accId=null,strs=null,stratId="evaluacion-simple",chk={paper:false,msg:"Revisando…",account:{}},prevBot=null,pollT=0,lastSum=null;
+(function(){const K="tl_prueba";let on=true,phase="off",sym="MNQ",qty=8,accs=null,accId=null,strs=null,stratId="evaluacion-simple",stratGen=0,chk={paper:false,msg:"Revisando…",account:{}},prevBot=null,pollT=0,lastSum=null;
 const st=document.createElement("style");st.textContent=`
 #prBtn{position:fixed;right:22px;top:84px;z-index:12;display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:999px;background:rgba(12,8,24,.72);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.78);font:600 12px Inter,system-ui;letter-spacing:.3px;cursor:pointer;transition:.25s}
 #prBtn:hover{color:#fff;border-color:rgba(255,255,255,.22)}#prBtn .d{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.35);transition:.25s}#prBtn.on{color:#ffe7a3;border-color:rgba(255,216,107,.45);box-shadow:0 0 18px rgba(255,190,40,.2)}#prBtn.on .d{background:#ffb300;box-shadow:0 0 8px #ffb300}
@@ -5182,7 +5183,7 @@ const el=(id,tag="div")=>{const e=document.createElement(tag);e.id=id;document.b
 const bub=el("prBub"),card=el("prCard"),live=el("prLive");
 const J=(u,b)=>fetch(u,b?{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(b)}:{cache:"no-store"}).then(r=>r.json()).catch(e=>({ok:false,err:String(e)}));
 const MAX={MNQ:20,NQ:2},PV={MNQ:2,NQ:20},CR={MNQ:1,NQ:3.5};const beU=(y,q,P=SPf())=>{const st=P.STEPS?stepsU(y,q,P):[1];const rw=(P.STEPS&&!P.STEPS.length)||P.PROB==="tp"?P.TP_USD:(P.NET_USD!=null?P.NET_USD:st[0].lockUsd);return Math.round(P.SL_USD/(P.SL_USD+rw)*1000)/10},beHTML=v=>v==null?"":`<div style="margin-top:8px;text-align:center"><div style="font-size:11px;opacity:.7">Probabilidad del trade</div><div style="font-size:26px;font-weight:800;color:#3ddc84;line-height:1.1">${(+v).toFixed(1)}%</div><div style="font-size:10px;opacity:.55">de llegar al objetivo antes que al stop</div></div>`,defQ=y=>y==="MNQ"?8:(((SPf().DEFAULT_QTY||{})[y])||2);const stepsU=(y,q,P=SPf())=>{const t=PV[y]*.25*q,pp=PV[y]*q;return P.STEPS?P.STEPS.map((x,i)=>{const tk=x.lockTicks!=null,l=tk?Math.round(x.lockTicks*t*100)/100:Math.round(Math.ceil(x.lock/t-1e-9)*t*100)/100;return {n:i+1,triggerUsd:tk?Math.max(x.trigger,Math.round((l+t)*100)/100):x.trigger,lockUsd:l,lockPts:Math.round(l/pp/.25)*.25}}):[{n:1,triggerUsd:trigU(y,q,P),lockUsd:lockU(y,q,P),lockPts:Math.round(lockU(y,q,P)/pp/.25)*.25}]};
-const SPf=()=>((strs&&strs.find(x=>x.id===stratId))||{params:{SL_USD:600,TP_USD:1600,NET_USD:100,COMM_RT:CR,SLIP_TICKS:1,TRIGGER_EXTRA_USD:15,DEFAULT_QTY:{MNQ:5,NQ:2}}}).params;const lockU=(y,q,P=SPf())=>{const t=PV[y]*.25*q;return Math.round(Math.ceil(((P.NET_USD||0)+((P.COMM_RT||CR)[y]||0)*q+(P.SLIP_TICKS||0)*t)/t-1e-9)*t*100)/100},trigU=(y,q,P=SPf())=>{const t=PV[y]*.25*q;return Math.round((lockU(y,q,P)+Math.ceil((P.TRIGGER_EXTRA_USD||0)/t-1e-9)*t)*100)/100},fm=v=>"$"+(+v).toLocaleString("en-US",{maximumFractionDigits:2});const dur=v=>v==null?"—":v<1?v.toFixed(2)+" s":v<60?v.toFixed(1)+" s":Math.floor(v/60)+":"+String(Math.round(v%60)).padStart(2,"0");const strOpts=()=>!strs?'<option value="evaluacion-simple">Evaluación</option>':strs.map(x=>`<option value="${x.id}"${x.id===stratId?" selected":""}>${x.name}</option>`).join(""),strDesc=()=>((strs||[]).find(x=>x.id===stratId)||{short:""}).short;
+const SPf=()=>((strs&&strs.find(x=>x.id===stratId))||{params:{SL_USD:600,TP_USD:1600,NET_USD:100,COMM_RT:CR,SLIP_TICKS:1,TRIGGER_EXTRA_USD:15,DEFAULT_QTY:{MNQ:5,NQ:2}}}).params;const lockU=(y,q,P=SPf())=>{const t=PV[y]*.25*q;return Math.round(Math.ceil(((P.NET_USD||0)+((P.COMM_RT||CR)[y]||0)*q+(P.SLIP_TICKS||0)*t)/t-1e-9)*t*100)/100},trigU=(y,q,P=SPf())=>{const t=PV[y]*.25*q;return Math.round((lockU(y,q,P)+Math.ceil((P.TRIGGER_EXTRA_USD||0)/t-1e-9)*t)*100)/100},fm=v=>"$"+(+v).toLocaleString("en-US",{maximumFractionDigits:2});const dur=v=>v==null?"—":v<1?v.toFixed(2)+" s":v<60?v.toFixed(1)+" s":Math.floor(v/60)+":"+String(Math.round(v%60)).padStart(2,"0");const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));const strOpts=()=>!strs?'<option value="evaluacion-simple">Evaluación</option>':strs.map(x=>`<option value="${esc(x.id)}"${x.id===stratId?" selected":""}>${x.propia?"✦ ":""}${esc(x.name)}</option>`).join(""),strDesc=()=>esc(((strs||[]).find(x=>x.id===stratId)||{short:""}).short);
 const QS=[[5,"#3ddc84"],[8,"#ffd86b"],[11,"#ffad61"],[15,"#e565aa"],[20,"#ff2a3d"]],qHx=h=>[1,3,5].map(i=>parseInt(h.substr(i,2),16)),qCol=e=>{if(e<=QS[0][0])return qHx(QS[0][1]);for(let i=1;i<QS.length;i++){if(e<=QS[i][0]){const a=QS[i-1],b=QS[i],t=(e-a[0])/(b[0]-a[0]),A=qHx(a[1]),B=qHx(b[1]);return A.map((v,j)=>Math.round(v+(B[j]-v)*t))}}return qHx(QS[QS.length-1][1])},qRgb=c=>"rgb("+c.join(",")+")";
 /* Tinte ambiental de riesgo: --risk (0..1) sube con los contratos (>5 hasta 20). Solo mientras el selector esta visible. */
 const rkSt=document.createElement("style");rkSt.textContent=":root{--risk:0}#riskTint{position:fixed;top:0;right:0;bottom:0;left:0;pointer-events:none;z-index:-1;overflow:hidden}#riskTint i{position:absolute;top:0;right:0;bottom:0;left:0;display:block;opacity:0;transition:opacity .8s ease;will-change:opacity}#riskTint i:nth-child(1){background:linear-gradient(180deg,rgba(150,10,30,.74),rgba(212,26,42,.84) 58%,rgba(118,8,26,.82));opacity:calc(var(--risk)*var(--risk)*.92)}#riskTint i:nth-child(2){background:radial-gradient(ellipse 135% 68% at 50% 66%,rgba(255,92,60,.9) 0%,rgba(255,52,58,.52) 40%,rgba(255,30,60,0) 74%);opacity:var(--risk)}#riskTint i:nth-child(3){background:radial-gradient(ellipse at 50% 46%,rgba(0,0,0,0) 34%,rgba(96,0,16,.78) 100%);opacity:calc(var(--risk)*.95)}@media (prefers-reduced-motion:reduce){#riskTint i{transition:none}}";document.head.appendChild(rkSt);
@@ -5197,7 +5198,7 @@ const e=q*k,tier=e<=5?"Tamaño tranquilo":e<=10?"Tamaño moderado":e<=15?"Tamañ
 
 const accOpts=()=>!accs?'<option value="">Cargando cuentas…</option>':!accs.ok?'<option value="">Sin cuentas ('+(accs.err||"?")+')</option>':(window.__tlAccSort?window.__tlAccSort(accs.accounts):accs.accounts).map(a=>`<option value="${a.id}"${a.allowed?"":" disabled"}${a.id===accId?" selected":""}${window.__tlAccSty?window.__tlAccSty(a):""}>${window.__tlAccTag?window.__tlAccTag(a):""}${a.name}${window.__tlAccBal?window.__tlAccBal(a):""}${a.real?" · REAL "+(a.realLabel||""):""}${a.current?" · activa":""}${a.allowed?"":" · bloqueada"}</option>`).join("");
 setInterval(()=>{if(phase==="choose")loadAccs()},30000);
-async function loadAccs(){J("/api/colchon/strategies").then(r=>{if(r&&r.ok){strs=r.strategies;if(!strs.some(x=>x.id===stratId))stratId=r.default;if(phase==="choose")setPhase("choose")}});accs=await J("/api/colchon/accounts");if(accs.ok){const cur=accs.accounts.find(a=>a.current);if(!accId||!accs.accounts.some(a=>a.id===accId&&a.allowed))accId=cur&&cur.allowed?cur.id:((accs.accounts.find(a=>a.allowed)||{}).id||null)}if(phase==="choose"){const e=card.querySelector("[data-acc]");if(e)e.innerHTML=accOpts();const t=card.querySelector("[data-acct-title]");t&&(t.textContent=__acT())}}
+async function loadAccs(){const gen=++stratGen;const rs=J("/api/colchon/strategies").then(r=>{if(gen!==stratGen||!r||!r.ok)return;strs=r.strategies;if(!strs.some(x=>x.id===stratId))stratId=r.default;if(phase==="choose")setPhase("choose")});accs=await J("/api/colchon/accounts");if(accs.ok){const cur=accs.accounts.find(a=>a.current);if(!accId||!accs.accounts.some(a=>a.id===accId&&a.allowed))accId=cur&&cur.allowed?cur.id:((accs.accounts.find(a=>a.allowed)||{}).id||null)}if(phase==="choose"){const e=card.querySelector("[data-acc]");if(e)e.innerHTML=accOpts();const t=card.querySelector("[data-acct-title]");t&&(t.textContent=__acT())}await rs}
 function __acT(){const a=accs&&accs.ok&&(accs.accounts||[]).find(x=>x.id===accId);const k=JSON.stringify(a||{})+" "+(accId||"")+" "+(chk&&chk.realLabel||"");return /LFF|funded|fondead/i.test(k)?"Fondeada":"Evaluación"}
 const usd=v=>v==null?"—":(v<0?"−":"+")+"$"+Math.abs(v).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 const ms=v=>v==null?"—":(v<1000?(v/1000).toFixed(2):(v/1000).toFixed(1))+" s";
@@ -5210,8 +5211,8 @@ function pin(){const pl=pill(),r=pl?pl.getBoundingClientRect():{left:innerWidth/
 function setPhase(p,extra){phase=p;if(p!=="choose")qRisk(0);setTimeout(pillLabel,0);if(p==="choose"||p==="blocked")pin();bub.style.display="none";card.style.display="none";bub.className="";
 if(p==="sleep"){setAwake(false);bub.textContent="Activado · durmiendo — toca «Agente» arriba";bub.className="zz";bub.style.display="block"}
 else if(p==="choose"){setAwake(true);if(sym!=="MNQ"){sym="MNQ";qty=defQ(sym)}card.innerHTML=`<div class=h><span data-acct-title>${__acT()}</span> <small>${chk.real?"Cuenta real":chk.paper?"Paper OK":"Revisando…"}</small></div>
-<div class=sz style="margin:0 0 8px">Cuenta <select data-acc style="max-width:170px">${accOpts()}</select></div><div class=sz style="margin:0 0 6px">Estrategia <select data-str style="max-width:170px">${strOpts()}</select></div><div class=msg data-sd style="margin:0 0 8px">${strDesc()}</div><div class=sz style="margin-top:12px"><span>MNQ (micro) · máx. ${MAX[sym]} contratos</span></div><div class=qs data-qs><div class=qro><b data-qn>${qty}</b><span>contratos</span></div><input class=qr data-q type=range min=1 max=${MAX[sym]} step=1 value=${qty} aria-label="Número de contratos"><div class=qtk data-qtk></div><div class=qh data-qh></div><div class=qh data-qd></div></div><div class=msg data-m></div><div data-be></div><div class=bs><button class=buy data-s=long>BUY</button><button class=sell data-s=short>SELL</button></div>`;card.style.display="block";
- const sx=card.querySelector("[data-str]");sx.onclick=e=>e.stopPropagation();sx.onchange=e=>{stratId=e.target.value;qty=defQ(sym);setPhase("choose")};const ac=card.querySelector("[data-acc]");ac.onclick=e=>e.stopPropagation();ac.onchange=e=>{accId=e.target.value;const t=card.querySelector("[data-acct-title]");t&&(t.textContent=__acT())};const qi=card.querySelector("[data-q]"),m=card.querySelector("[data-m]"),bb=card.querySelectorAll("[data-s]");
+<div class=sz style="margin:0 0 8px">Cuenta <select data-acc style="max-width:170px">${accOpts()}</select></div><div class=sz style="margin:0 0 6px">Estrategia <select data-str style="max-width:170px">${strOpts()}</select><button type=button data-propia class=ep>Estrategia propia</button></div><div class=msg data-sd style="margin:0 0 8px">${strDesc()}</div><div class=sz style="margin-top:12px"><span>MNQ (micro) · máx. ${MAX[sym]} contratos</span></div><div class=qs data-qs><div class=qro><b data-qn>${qty}</b><span>contratos</span></div><input class=qr data-q type=range min=1 max=${MAX[sym]} step=1 value=${qty} aria-label="Número de contratos"><div class=qtk data-qtk></div><div class=qh data-qh></div><div class=qh data-qd></div></div><div class=msg data-m></div><div data-be></div><div class=bs><button class=buy data-s=long>BUY</button><button class=sell data-s=short>SELL</button></div>`;card.style.display="block";
+ const sx=card.querySelector("[data-str]");sx.onclick=e=>e.stopPropagation();sx.onchange=e=>{stratId=e.target.value;qty=defQ(sym);setPhase("choose")};const ep=card.querySelector("[data-propia]");if(ep){ep.onclick=e=>{e.stopPropagation();e.preventDefault();window.__tlPropia&&window.__tlPropia.open()};["pointerdown","mousedown"].forEach(t=>ep.addEventListener(t,e=>e.stopPropagation()))}const ac=card.querySelector("[data-acc]");ac.onclick=e=>e.stopPropagation();ac.onchange=e=>{accId=e.target.value;const t=card.querySelector("[data-acct-title]");t&&(t.textContent=__acT())};const qi=card.querySelector("[data-q]"),m=card.querySelector("[data-m]"),bb=card.querySelectorAll("[data-s]");
  const upd=()=>{const q=+qi.value,okq=Number.isInteger(q)&&q>=1&&q<=MAX[sym];bb.forEach(b=>b.disabled=!okq);if(okq)qty=q;qUI(card,sym,okq?q:+qi.min);const pv=PV[sym]*(okq?q:1),r=u=>Math.round(u/pv/.25)*.25,qq=okq?q:1,lu=lockU(sym,qq),tu=trigU(sym,qq),tr=r(tu),lk=r(lu);
   card.querySelector("[data-be]").innerHTML=okq?beHTML(beU(sym,qq)):"";m.className=okq?"msg":"msg no";m.style.display=okq?"none":"";m.textContent=okq?"":false?`Abre a mercado ya · SL −${fm(SPf().SL_USD)} (${r(SPf().SL_USD)} pts) / TP +${fm(SPf().TP_USD)} (${r(SPf().TP_USD)} pts) · ${SPf().STEPS?(!SPf().STEPS.length?"Stop fijo: sin movimientos de SL":"Escalones: "+stepsU(sym,qq).map(x=>`+${fm(x.triggerUsd)} → protege +${fm(x.lockUsd)} (${x.lockPts} pts)`).join(" · ")):`a +${fm(tu)} (${tr} pts) el SL protege +${fm(lu)} (${lk} pts, ≈${fm(SPf().NET_USD)} netos)`}.`:`Cantidad inválida: ${sym} entre 1 y ${MAX[sym]}.`};
  qi.oninput=upd;[qi].forEach(x=>x.onclick=e=>e.stopPropagation());["pointerdown","mousedown","touchstart"].forEach(ev=>qi.addEventListener(ev,e=>e.stopPropagation()));upd();
@@ -5224,7 +5225,7 @@ async function go(side){card.querySelectorAll("button").forEach(b=>b.disabled=tr
  if(!chk.paper&&!chk.real){setPhase("blocked",chk.msg);return}
  if(!accId){setPhase("blocked","Elige una cuenta");return}const sa=accs&&accs.ok&&accs.accounts.find(a=>String(a.id)===String(accId));let cr=false;
  if((sa&&sa.real)||chk.real){if(!(window.__tlRealGate&&await window.__tlRealGate.confirm())){setPhase("choose");card.querySelectorAll("button").forEach(b=>b.disabled=false);return}cr=true}
- const r=await J("/api/colchon/start",{side,symbol:sym,qty,accountId:accId,strategyId:stratId,confirmReal:cr});if(!r.ok){setPhase("blocked",r.err||"No se pudo iniciar");return}setPhase("running");poll()}
+ const r=await J("/api/colchon/start",{side,symbol:sym,qty,accountId:accId,strategyId:stratId,confirmReal:cr});if(!r.ok){if(r.waitingLectura){setPhase("choose");const m=card.querySelector("[data-m]");if(m){m.className="msg";m.style.display="";m.textContent=r.err||"esperando lectura…"}return}setPhase("blocked",r.err||"No se pudo iniciar");return}setPhase("running");poll()}
 function latHTML(l){if(!l)return'<div class=lat>Latencia: aún no se movió el SL.</div>';return`<div class=lat>Método <b>${l.metodo==="api"?"API":"UI (clics)"}</b>${l.via&&l.via!=="ui"?" · "+l.via:""}<br>Leer <b>${ms(l.leerMs)}</b> · Modificar <b>${ms(l.modificarMs)}</b> · Confirmar <b>${ms(l.confirmarMs)}</b>${l.metodo==="ui"?`<br>Intento API <b>${ms(l.apiIntentoMs)}</b> · UI <b>${ms(l.uiMs)}</b>`:""}<br>Total <b>${ms(l.totalDesdeLecturaMs)}</b> <span style="opacity:.55">(+ hasta ${ms(l.maxRetrasoPorPollMs)} entre lecturas)</span></div>`}
 function liveRun(s){const st=s.steps||[],k=s.step||0,nm=(s.strategy&&s.strategy.name)||"Prueba",lt=lp=>Math.round(lp/.25),
  acct=s.mode==="real"?(window.__tlAcctT?window.__tlAcctT(s.realLabel||(s.account&&s.account.name)||""):"Cuenta real"):(s.mode?`<span class=tlAT>${s.mode==="paper"?"Paper":s.mode}</span>`:"");
@@ -5253,11 +5254,11 @@ addEventListener("click",e=>{const pl=pill();if(!pl||!pl.contains(e.target))retu
   pl.setAttribute("aria-pressed","true");accs=null;setPhase("choose");prevBot=null;pillLabel();loadAccs();J("/api/colchon/check").then(c=>{chk=c;if(phase==="choose"){const s=card.querySelector(".h small");s&&(s.textContent=c.real?"Cuenta real":c.paper?"Paper OK":"Bloqueado")}})})()},true);
 function pillLabel(){const pl=pill(),b=pl&&pl.querySelector("b");if(!b)return;const s=S(),en=!!(s&&s.botEnabled());const want=phase==="sleep"?"Durmiendo":(phase==="choose"||phase==="running"||en)?"Activo":"Pausado";pl.setAttribute("aria-pressed",String(want==="Activo"));if(want&&b.textContent!==want)b.textContent=want}
 new MutationObserver(pillLabel).observe(document.body,{subtree:true,childList:true,characterData:true});
-addEventListener("pointerdown",e=>{if(phase==="choose"&&!card.contains(e.target)&&!(pill()&&pill().contains(e.target)))setPhase("off")});
+addEventListener("pointerdown",e=>{const propia=document.getElementById("tlPropia");if(phase==="choose"&&!card.contains(e.target)&&!(pill()&&pill().contains(e.target))&&!(propia&&propia.contains(e.target)))setPhase("off")});
 setInterval(()=>{if(phase!=="choose"||card.style.display==="none")qRisk(0)},800);addEventListener("pagehide",()=>qRisk(0));
 // Sin botón «Prueba»: el panel está siempre disponible desde el pill del agente.
 (async()=>{const s=await J("/api/colchon/status");if(s&&s.state==="running"){setPhase("running");poll()}})();
-window.__prueba=()=>({on,phase,chk,agent:agentXY()});})();</script><style>/* Mejoras visuales: P&L grande, barra SL/entrada/TP, cuenta real, luces, historial de trades */
+window.__tlReloadStrats=()=>loadAccs();window.__tlPickStrat=id=>{if(typeof id==="string"&&id)stratId=id;if(phase==="choose")setPhase("choose")};window.__prueba=()=>({on,phase,chk,agent:agentXY()});})();</script><style>/* Mejoras visuales: P&L grande, barra SL/entrada/TP, cuenta real, luces, historial de trades */
 #tlRealModal{position:fixed;inset:0;z-index:10000;display:none;align-items:center;justify-content:center;background:rgba(6,3,14,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}#tlRealModal.open{display:flex}#tlRealModal .box{width:380px;max-width:90vw;padding:24px 24px 18px;border-radius:16px;background:rgba(18,12,32,.96);border:1px solid rgba(255,255,255,.1);box-shadow:0 30px 80px rgba(0,0,0,.6);color:#ececf3;font:14px/1.5 Inter,system-ui;text-align:center}#tlRealModal .ic{width:44px;height:44px;margin:0 auto 10px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(211,47,47,.15);color:#ff6b6b;font-size:22px}#tlRealModal h3{margin:0 0 6px;font-size:17px}#tlRealModal p{margin:0 0 18px;color:rgba(255,255,255,.78)}#tlRealModal .bt{display:flex;gap:10px}#tlRealModal button{flex:1;padding:10px;border-radius:10px;font:600 14px Inter,system-ui;cursor:pointer;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#fff}#tlRealModal button[data-ok]{background:#cdea1d;border-color:#cdea1d;color:#0d1a12}#tlRealModal button:hover{filter:brightness(1.08)}
 #tlLuces{display:inline-flex;gap:7px;align-items:center;font-size:12px}#tlLuces .tlEstT{font-weight:600;margin-right:2px}#tlLuces span{position:relative;display:inline-flex;padding:6px;margin:-3px;cursor:help;border-radius:50%;pointer-events:auto}#tlLuces span i{pointer-events:auto;cursor:help}#tlLuces span[data-tip]:hover::after{content:attr(data-tip);position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);white-space:nowrap;background:rgba(20,12,40,.95);color:#fff;font-size:12px;font-weight:600;padding:4px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.2);box-shadow:0 4px 12px rgba(0,0,0,.4);z-index:99999;pointer-events:none}#tlLuces span:hover{background:rgba(255,255,255,.12)}#tlLuces i{margin-right:0!important}
 #tlLuces i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;background:#888;box-shadow:0 0 0 2px rgba(0,0,0,.15)}
@@ -5797,7 +5798,7 @@ function hook(){const G=window.__granja&&window.__granja.pet;if(!G||!G.renderer|
  if(cfg.kind!=="perro"||cfg.body!==A.perro.b||cfg.accent!==A.perro.a){try{applyPet(G,cfg)}catch(err){console.warn("mascota",err)}}
  (function lab(){const p=window.__pet.screen();if(p&&cfg.name){tag.textContent=cfg.name;tag.style.left=p.x+"px";tag.style.top=(p.y-8)+"px";tag.style.display="block"}else tag.style.display="none";requestAnimationFrame(lab)})()}
 setTimeout(hook,600);})();</script>
-<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.7.2</div>
+<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.7.3</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/VERSION",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
 <script>/* 0.7.0: Profito duerme al abrir (granja en pausa), riega con laptop durante un trade, y etiquetas de cuentas con saldo y etapa. Solo visual: no toca el motor de trading. */
 (function(){
@@ -5889,5 +5890,223 @@ const B=document.getElementById("tlMute");function set(v){muted=!!v;try{localSto
 B.addEventListener("click",e=>{e.stopPropagation();unlock();set(!muted);if(!muted)play(false)});["pointerdown","mousedown"].forEach(t=>B.addEventListener(t,e=>e.stopPropagation()));
 window.__tlMuted=()=>muted;set(muted)})();
 </script>
+<script>/* 0.7.3: Estrategia propia. Se guarda solo en esta computadora. No cambia las estrategias de serie. */
+(function(){
+const API="/api/estrategias-propias";
+const st=document.createElement("style");
+st.textContent=`
+#prCard .ep{display:block;width:100%;margin-top:8px;border:1px solid rgba(255,216,107,.42);background:linear-gradient(180deg,rgba(255,216,107,.18),rgba(255,216,107,.05));color:#ffe7a3;border-radius:999px;padding:7px 12px;font:650 12px Inter,system-ui;letter-spacing:.2px;cursor:pointer}
+#prCard .ep:hover{color:#fff;border-color:rgba(255,216,107,.75)}
+#tlPropia{position:fixed;inset:0;z-index:2147483002;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(6,3,16,.62);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+#tlPropia.open{display:flex}
+#tlPropia .box{position:relative;width:min(440px,100%);max-height:min(86vh,780px);overflow:auto;padding:22px 22px 16px;border-radius:22px;color:#f4f1ea;font:13px/1.45 Inter,system-ui;background:linear-gradient(165deg,rgba(255,255,255,.16),rgba(48,22,86,.55));border:1px solid rgba(255,255,255,.28);box-shadow:0 30px 80px rgba(0,0,0,.55),inset 0 1px rgba(255,255,255,.4);backdrop-filter:blur(18px) saturate(150%)}
+#tlPropia h2{margin:0;font-size:18px;font-weight:680;letter-spacing:-.3px}
+#tlPropia .sub{margin:4px 0 14px;font-size:12px;color:rgba(255,255,255,.62)}
+#tlPropia .x{position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;cursor:pointer;font:600 16px/1 Inter,system-ui}
+#tlPropia label{display:block;margin:10px 0 4px;font-size:11px;letter-spacing:.4px;text-transform:uppercase;color:rgba(255,255,255,.55)}
+#tlPropia input[type=text],#tlPropia input[type=number]{width:100%;box-sizing:border-box;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(8,4,18,.45);color:#fff;padding:9px 11px;font:600 14px Inter,system-ui}
+#tlPropia input[type=number]{width:108px}
+#tlPropia .pair{display:flex;align-items:center;justify-content:space-between;gap:10px}
+#tlPropia .pair b{font:700 22px/1 Inter,system-ui;font-variant-numeric:tabular-nums;color:#ffe7a3}
+#tlPropia input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:22px;margin:2px 0 8px;background:transparent;cursor:pointer}
+#tlPropia input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:999px;background:linear-gradient(90deg,#ffd86b,rgba(255,255,255,.16))}
+#tlPropia input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;margin-top:-6px;border-radius:50%;background:#ffe7a3;border:2px solid #fff;box-shadow:0 0 12px rgba(255,216,107,.45)}
+#tlPropia input[type=range]::-moz-range-track{height:6px;border-radius:999px;background:rgba(255,255,255,.16)}
+#tlPropia input[type=range]::-moz-range-progress{height:6px;border-radius:999px;background:#ffd86b}
+#tlPropia input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#ffe7a3;border:2px solid #fff}
+#tlPropia .paso{margin-top:8px;padding:10px 12px 6px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)}
+#tlPropia .paso .top{display:flex;justify-content:space-between;align-items:center;font-weight:650}
+#tlPropia .ghost,#tlPropia .del{border:0;background:transparent;color:rgba(255,255,255,.62);cursor:pointer;font:600 12px Inter,system-ui}
+#tlPropia .del:hover,#tlPropia .ghost:hover{color:#fff}
+#tlPropia .add{margin-top:8px;width:100%;border-radius:12px;border:1px dashed rgba(255,255,255,.28);background:transparent;color:#fff;padding:8px;cursor:pointer;font:600 13px Inter,system-ui}
+#tlPropia .prev{margin:12px 0;padding:10px 12px;border-radius:12px;background:rgba(0,0,0,.22);white-space:pre-line;font-size:12px;color:rgba(255,255,255,.78)}
+#tlPropia .acts{display:flex;gap:8px}
+#tlPropia .save{flex:1;border:0;border-radius:12px;padding:11px;cursor:pointer;font:750 14px Inter,system-ui;background:linear-gradient(135deg,#ffd86b,#ffb300);color:#1a0f00}
+#tlPropia .nueva{border-radius:12px;padding:11px 14px;cursor:pointer;font:650 13px Inter,system-ui;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff}
+#tlPropia .msg{min-height:1.2em;margin:8px 0 0;font-size:12px;color:#b7f7c8}
+#tlPropia .msg.bad{color:#ffb3c0}
+#tlPropia h3{margin:16px 0 8px;font-size:12px;letter-spacing:.5px;text-transform:uppercase;color:rgba(255,255,255,.5);font-weight:650}
+#tlPropia .row{display:flex;gap:8px;align-items:stretch;margin-bottom:6px}
+#tlPropia .use{flex:1;text-align:left;border-radius:12px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#fff;padding:8px 10px;cursor:pointer;font:600 12px/1.35 Inter,system-ui}
+#tlPropia .use:hover{border-color:rgba(255,216,107,.45)}
+#tlPropia .row .del{border-radius:12px;border:1px solid rgba(255,143,163,.35);padding:0 10px;color:#ffb3c0}
+#tlPropia .empty{margin:0;color:rgba(255,255,255,.5);font-size:12px}
+`;
+document.head.appendChild(st);
+const root=document.createElement("div");
+root.id="tlPropia";root.setAttribute("aria-hidden","true");
+root.innerHTML='<div class="box" role="dialog" aria-modal="true" aria-labelledby="tlPropiaTitle"></div>';
+document.body.appendChild(root);
+const box=root.querySelector(".box");
+["pointerdown","mousedown","click"].forEach(t=>box.addEventListener(t,e=>e.stopPropagation()));
+function pull(){const n=box.querySelector("[data-name]");if(n)model.name=n.value}
+let model={id:null,name:"",sl:630,tp:630,steps:[]},saved=[];
+const money=n=>"$"+Number(n).toLocaleString("en-US",{maximumFractionDigits:0});
+function previewText(){
+  const lines=["SL −"+money(model.sl)+" / TP +"+money(model.tp)];
+  if(!model.steps.length)lines.push("Sin pasos: el stop no se mueve");
+  else model.steps.forEach((s,i)=>{lines.push("Paso "+(i+1)+": +"+money(s.trigger)+" → protege "+money(s.lock))});
+  return lines.join("\n");
+}
+function setMsg(t,bad){const m=box.querySelector("[data-msg]");if(!m)return;m.textContent=t||"";m.className=bad?"msg bad":"msg"}
+function syncSteps(){
+  let prevT=0,prevL=0;
+  box.querySelectorAll("[data-step]").forEach((row,i)=>{
+    const tr=row.querySelector("[data-k=trigger]"),lk=row.querySelector("[data-k=lock]");
+    const maxT=Math.max(5,model.tp-5);
+    tr.max=String(maxT);
+    let trigger=Math.round(+tr.value/5)*5;
+    if(trigger<=prevT)trigger=prevT+5;
+    if(trigger>maxT)trigger=maxT;
+    tr.value=String(trigger);
+    const maxL=Math.max(0,trigger-5);
+    lk.max=String(maxL);
+    let lock=Math.round(+lk.value/5)*5;
+    if(lock<prevL)lock=prevL;
+    if(lock>maxL)lock=maxL;
+    lk.value=String(lock);
+    model.steps[i]={trigger,lock};
+    row.querySelector("[data-tr]").textContent="+"+money(trigger);
+    row.querySelector("[data-lk]").textContent=money(lock);
+    prevT=trigger;prevL=lock;
+  });
+}
+function preview(){const p=box.querySelector("[data-prev]");if(p)p.textContent=previewText()}
+function drawList(){
+  const ul=box.querySelector("[data-list]");if(!ul)return;
+  ul.replaceChildren();
+  if(!saved.length){const p=document.createElement("p");p.className="empty";p.textContent="Todavía no hay estrategias propias en esta computadora.";ul.appendChild(p);return}
+  saved.forEach(s=>{
+    const p=s.params||{},st=Array.isArray(p.STEPS)?p.STEPS:[];
+    const row=document.createElement("div");row.className="row";
+    const use=document.createElement("button");use.type="button";use.className="use";
+    use.textContent=s.name+" · SL "+money(p.SL_USD)+" / TP "+money(p.TP_USD)+(st.length?" · "+st.map(x=>"+"+money(x.trigger)+" → "+money(x.lock)).join(" · "):" · stop fijo");
+    use.addEventListener("click",e=>{e.stopPropagation();loadSaved(s)});
+    const del=document.createElement("button");del.type="button";del.className="del";del.textContent="Borrar";
+    del.addEventListener("click",e=>{e.stopPropagation();removeSaved(s)});
+    row.append(use,del);ul.appendChild(row);
+  });
+}
+function render(){
+  const steps=model.steps.map((s,i)=>`<div class=paso data-step=${i}><div class=top><span>Paso ${i+1}</span><button type=button class=ghost data-rm=${i}>Quitar</button></div>
+<label>Cuando llegue a <b data-tr>+${money(s.trigger)}</b></label><input data-k=trigger type=range min=5 max=${Math.max(5,model.tp-5)} step=5 value=${s.trigger} aria-label="Disparo del paso ${i+1}">
+<label>protege <b data-lk>${money(s.lock)}</b></label><input data-k=lock type=range min=0 max=${Math.max(0,s.trigger-5)} step=5 value=${s.lock} aria-label="Protege en el paso ${i+1}"></div>`).join("");
+  box.innerHTML=`<button type=button class=x aria-label="Cerrar">×</button><h2 id=tlPropiaTitle>Estrategia propia</h2><p class=sub>Se guarda solo en esta computadora. Hasta 3 pasos: cuando llega, protege.</p>
+<label for=epName>Nombre</label><input id=epName data-name type=text maxlength=40 autocomplete=off value="">
+<div class=pair><label>Stop loss</label><b data-v=sl>−${money(model.sl)}</b></div><input data-n=sl type=number min=10 max=5000 step=5 value=${model.sl} aria-label="Stop loss en dólares"><input data-k=sl type=range min=10 max=5000 step=5 value=${model.sl} aria-label="Stop loss">
+<div class=pair><label>Take profit</label><b data-v=tp>+${money(model.tp)}</b></div><input data-n=tp type=number min=10 max=5000 step=5 value=${model.tp} aria-label="Take profit en dólares"><input data-k=tp type=range min=10 max=5000 step=5 value=${model.tp} aria-label="Take profit">
+${steps}${model.steps.length<3?'<button type=button class=add data-add>Añadir paso</button>':""}
+<div class=prev data-prev></div><div class=acts><button type=button class=save data-save>Guardar</button><button type=button class=nueva data-new>Nueva</button></div>
+<p class=msg data-msg></p><h3>En esta computadora</h3><div data-list></div>`;
+  const nameInp=box.querySelector("[data-name]");nameInp.value=model.name;nameInp.addEventListener("input",()=>{model.name=nameInp.value});
+  box.querySelector(".x").onclick=close;
+  const bindMoney=(key,sign)=>{
+    const n=box.querySelector("[data-n="+key+"]"),r=box.querySelector("[data-k="+key+"]"),lab=box.querySelector("[data-v="+key+"]");
+    const show=()=>{lab.textContent=sign+money(model[key]);syncSteps();preview()};
+    const commit=v=>{v=Math.round(Number(v)/5)*5;if(!Number.isFinite(v))v=model[key];v=Math.max(10,Math.min(5000,v));model[key]=v;n.value=String(v);r.value=String(v);show()};
+    n.addEventListener("input",()=>{const v=Number(n.value);if(!Number.isFinite(v)||v<10||v>5000)return;model[key]=Math.round(v);r.value=String(Math.max(10,Math.min(5000,Math.round(v/5)*5)));show()});
+    n.addEventListener("change",()=>commit(n.value));
+    r.addEventListener("input",()=>commit(r.value));
+  };
+  bindMoney("sl","−");bindMoney("tp","+");
+  box.querySelectorAll("[data-step]").forEach(row=>{
+    row.querySelectorAll("input").forEach(inp=>inp.addEventListener("input",()=>{syncSteps();preview()}));
+  });
+  box.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{pull();model.steps.splice(+b.dataset.rm,1);render()});
+  const add=box.querySelector("[data-add]");if(add)add.onclick=addStep;
+  box.querySelector("[data-save]").onclick=save;
+  box.querySelector("[data-new]").onclick=()=>{model={id:null,name:"",sl:630,tp:630,steps:[]};render();setMsg("",false)};
+  preview();drawList();
+}
+function addStep(){
+  pull();
+  if(model.steps.length>=3)return;
+  const prev=model.steps.length?model.steps[model.steps.length-1].trigger:0;
+  const prevL=model.steps.length?model.steps[model.steps.length-1].lock:0;
+  let trigger=model.steps.length?prev+100:200;
+  if(trigger>=model.tp)trigger=model.tp-5;
+  if(!(trigger>prev&&trigger<model.tp)){setMsg("Sube el take profit para agregar otro paso",true);return}
+  let lock=model.steps.length?Math.min(trigger-5,prevL+50):0;
+  if(lock<prevL)lock=prevL;
+  if(lock>=trigger)lock=Math.max(0,trigger-5);
+  model.steps.push({trigger,lock});
+  render();
+}
+function clientErr(){
+  const name=model.name.trim();
+  if(!name)return "escribe un nombre";
+  if(name.length>40)return "el nombre puede tener hasta 40 caracteres";
+  if(!(model.sl>=10&&model.sl<=5000))return "el stop loss tiene que estar entre $10 y $5,000";
+  if(!(model.tp>=10&&model.tp<=5000))return "el take profit tiene que estar entre $10 y $5,000";
+  if(model.steps.length>3)return "máximo 3 pasos";
+  let prevT=0,prevL=0;
+  for(let i=0;i<model.steps.length;i++){
+    const s=model.steps[i];
+    if(!(s.trigger>0))return "el paso "+(i+1)+": el disparo tiene que ser mayor que $0";
+    if(!(s.lock>=0)||s.lock>=s.trigger)return "el paso "+(i+1)+": protege menos de lo que dispara";
+    if(s.trigger>=model.tp)return "el paso "+(i+1)+": el disparo tiene que ser menor que el take profit";
+    if(i&&s.trigger<=prevT)return "el paso "+(i+1)+": el disparo tiene que ser mayor que el del paso anterior";
+    if(i&&s.lock<prevL)return "el paso "+(i+1)+": tiene que proteger al menos lo del paso anterior";
+    prevT=s.trigger;prevL=s.lock;
+  }
+  return "";
+}
+async function api(method,body,id){
+  const u=API+(id?"?id="+encodeURIComponent(id):"");
+  try{
+    const r=await fetch(u,body!=null?{method,headers:{"content-type":"application/json"},body:JSON.stringify(body)}:{method,cache:"no-store"});
+    let j={};try{j=await r.json()}catch(e){j={ok:false,err:"Respuesta inválida"}}
+    if(!j||typeof j!=="object")j={ok:false,err:"Respuesta inválida"};
+    if(!r.ok&&j.ok!==false)j.ok=false;
+    if(!r.ok&&!j.err)j.err="Error "+r.status;
+    return j;
+  }catch(e){return {ok:false,err:String(e&&e.message||e)}}
+}
+async function refresh(){
+  const j=await api("GET");
+  if(j&&j.ok&&Array.isArray(j.strategies))saved=j.strategies;
+  else if(j&&j.err)setMsg(j.err,true);
+  drawList();
+  return j;
+}
+function loadSaved(s){
+  const p=s.params||{};
+  model={id:s.id,name:s.name||"",sl:+p.SL_USD||630,tp:+p.TP_USD||630,steps:(Array.isArray(p.STEPS)?p.STEPS:[]).slice(0,3).map(x=>({trigger:+x.trigger,lock:+x.lock}))};
+  render();
+  if(window.__tlPickStrat)window.__tlPickStrat(s.id);
+  setMsg("Quedó elegida en el panel.",false);
+}
+async function removeSaved(s){
+  if(!confirm("¿Borrar la estrategia propia «"+(s.name||"")+"»?"))return;
+  const j=await api("DELETE",null,s.id);
+  if(!j.ok){setMsg(j.err||"No se pudo borrar",true);return}
+  if(model.id===s.id)model={id:null,name:"",sl:630,tp:630,steps:[]};
+  await refresh();
+  if(window.__tlReloadStrats)await window.__tlReloadStrats();
+  render();
+  setMsg("Borrada.",false);
+}
+async function save(){
+  model.name=(box.querySelector("[data-name]")||{}).value||model.name;
+  syncSteps();
+  const err=clientErr();if(err){setMsg(err,true);return}
+  const body={name:model.name.trim(),sl:model.sl,tp:model.tp,steps:model.steps.map(s=>({trigger:s.trigger,lock:s.lock}))};
+  if(model.id)body.id=model.id;
+  const j=await api("POST",body);
+  if(!j.ok){setMsg(j.err||"No se pudo guardar",true);return}
+  model.id=j.strategy&&j.strategy.id||model.id;
+  await refresh();
+  if(window.__tlReloadStrats)await window.__tlReloadStrats();
+  if(model.id&&window.__tlPickStrat)window.__tlPickStrat(model.id);
+  setMsg("Guardada. Ya está en el selector.",false);
+}
+function open(){root.classList.add("open");root.setAttribute("aria-hidden","false");refresh()}
+function close(){root.classList.remove("open");root.setAttribute("aria-hidden","true")}
+root.addEventListener("pointerdown",e=>{if(e.target===root)close()});
+addEventListener("keydown",e=>{if(e.key==="Escape"&&root.classList.contains("open"))close()});
+render();
+window.__tlPropia={open,close};
+})();</script>
+
 </body>
 </html>

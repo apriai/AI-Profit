@@ -430,11 +430,18 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
     strategies: () => ({ ok: true, default: DEFAULT_STRATEGY, strategies: listStrategies() }),
     async accounts() { try { const r = await (await D()).accounts(); return { ok: true, ...r, accounts: r.accounts.map(a => { const p = accountAllowed(a, `${r.broker} ${r.brokerId}`), re = !p && realAllowed(a.name, allow()); return { ...a, allowed: p || re, real: re, realLabel: re ? realLabel(a.name) : null }; }) }; } catch (e) { driver = null; return { ok: false, err: 'Sin conexión con TradingView: ' + e.message, accounts: [] }; } },
     async start(args = {}) {
-      if (S.state === 'running' || acctGuard.testActive) return { ok: false, err: 'Ya hay una prueba corriendo' };
+      if (S.state === 'running') return { ok: false, err: 'Ya hay una prueba corriendo' };
+      if (acctGuard.testActive) return { ok: false, err: 'esperando lectura…', waitingLectura: true };
       acctGuard.testActive = true;
-      if (acctGuard.fullRead) { log('Esperando a que termine la lectura de cuentas de la granja antes de operar…'); await acctGuard.fullRead; }
-      let r; try { r = await this._start(args); } catch (e) { r = { ok: false, err: String(e.message || e) }; }
-      if (!r.ok) acctGuard.testActive = false; return r;
+      try {
+        if (acctGuard.fullRead) {
+          log('Lectura de cuentas en curso: se espera como máximo 2.5 s antes de operar.');
+          await Promise.race([Promise.resolve(acctGuard.fullRead).catch(() => {}), sleep(2500)]);
+        }
+        let r; try { r = await this._start(args); } catch (e) { r = { ok: false, err: String(e.message || e) }; }
+        if (!r || !r.ok) { acctGuard.testActive = false; if (S.state === 'running') { S.state = 'error'; S.error = S.error || (r && r.err) || 'No se pudo iniciar'; } }
+        return r || { ok: false, err: 'No se pudo iniciar' };
+      } catch (e) { acctGuard.testActive = false; if (S.state === 'running') S.state = 'error'; return { ok: false, err: String(e.message || e) }; }
     },
     async _start({ side = 'long', symbol = DEFAULT.symbol, qty, accountId, strategyId, confirmReal } = {}) {
       const strat = getStrategy(strategyId == null || strategyId === '' ? DEFAULT_STRATEGY : strategyId); if (!strat) return { ok: false, err: `Estrategia desconocida: ${strategyId}` };
@@ -509,7 +516,7 @@ export const js_readAccounts = (all, only = null) => `(async function(){${PAGE}v
   return {broker:tvBrokerId(ab),current:orig,busy:busy,visible:visible,visibility:vis0,focus:(function(){try{return document.hasFocus()}catch(e){return null}})(),aborted:aborted,live:(l||[]).map(function(a){return {id:String(a.id),name:a.name}}),accounts:out,final:String(tvWv(ab.currentAccount()))}})()`;
 // Exclusión mutua entre la lectura de todas las cuentas (cambia de cuenta) y una prueba (fija su cuenta):
 // - con una prueba activa (o arrancando) solo se lee la cuenta activa, sin cambiar nada;
-// - una prueba que arranca espera a que termine una lectura completa en curso antes de tocar la cuenta.
+// - una prueba que arranca espera como máximo ~2.5 s a una lectura completa en curso y luego sigue.
 export const acctGuard = { testActive: false, fullRead: null };
 export async function readAccounts({ all = false, only = null, evaluate = null } = {}) {
   if (all && acctGuard.testActive) all = false;

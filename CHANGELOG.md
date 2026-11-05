@@ -10,6 +10,15 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.7.3] - 2026-11-05
+### Agregado
+- **Estrategia propia:** en el panel de la cuenta (junto al selector de estrategia) el botón «Estrategia propia» abre un cuadro centrado. Ahí se pone el nombre, el stop loss, el take profit y hasta 3 pasos (cuando el trade llega a +$X, protege $Y), con controles deslizantes. Se guarda solo en `estrategias-propias.json`, en la raíz de esta computadora. No se sube a GitHub. La estrategia aparece en el mismo selector que las de siempre y el motor la usa igual (`propia: true`). Rutas: `GET` / `POST` / `DELETE /api/estrategias-propias`.
+### Arreglado
+- **El botón de operar ya no se queda esperando la lectura de todas las cuentas.** Si hay una lectura completa en curso, se espera como máximo unos 2.5 segundos y se sigue. Un segundo clic mientras arranca dice «esperando lectura…». Mientras arranca un trade no se inicia un recorrido nuevo de cuentas (ni el de todas ni el de solo fondeadas) y esa espera cuenta como actividad reciente.
+### Notas
+- Las estrategias de serie quedan como en 0.7.2. El PR #19 (Rascacielo, Rascacielo + colchón y Fast Breakeven) sigue aparte: conviene mezclarlo por su lado; este cambio no las renombra.
+- Hay que reiniciar el servidor (solo sin posición abierta ni órdenes pendientes) para la ruta nueva y para el arreglo de la espera. La página se actualiza al recargar (F5).
+
 ## [0.7.2] - 2026-11-04
 ### Arreglado
 - **Selector de cuenta legible:** en el panel de trading en vivo, las cuentas con ⭐ / 💎 / ✖ tenían el texto en color (amarillo `#ffd86b`, celeste `#7fd8ff`, gris `#888`) y no se leían bien sobre la lista blanca de Windows. Ahora usan el color normal (negro sobre blanco en la lista, blanco en el selector cerrado); ⭐ y 💎 van en negrita. La diferencia la da el emoji. Solo página.

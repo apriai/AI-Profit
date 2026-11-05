@@ -3,7 +3,8 @@
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
 import * as orders from './orders.mjs';
 import { negocio } from './negocio.mjs';
-import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, diaFarm, cdpEvaluator, PAGE } from './colchon.mjs';
+import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, diaFarm, cdpEvaluator, PAGE, acctGuard } from './colchon.mjs';
+import { estrategiasPropias } from './estrategias-propias.mjs';
 import { execFile } from 'node:child_process';
 import { dataDir, ROOT, HTML, TV_CLI } from './rutas.mjs';
 const DIR = dataDir();
@@ -75,16 +76,19 @@ async function cycle() {
     // Saldos por la API interna de TradingView (sin clics): la cuenta activa cada 30 s; todas las cuentas cada 5 min
     // (nunca si hay posiciones/órdenes abiertas ni durante una prueba colchón, para no cambiar de cuenta en mitad de un trade).
     const pausa = fs.existsSync(path.join(DIR, 'pausa-lectura.flag'));
-    // lectura completa (cambia de cuenta) SOLO si: sin pausa, sin prueba colchon, y sin posiciones/ordenes en la cuenta activa (si las hay, se salta y se reintenta en 5 min)
-    const full = !pausa && Date.now() - lastFull >= FULL_MS && colchon.status().state !== 'running';
+    // Un trade en marcha o un arranque en curso (acctGuard.testActive) cuenta como ocupado: no se inicia
+    // un recorrido nuevo de todas las cuentas ni de solo fondeadas. La lectura de la cuenta activa sigue.
+    const operando = colchon.status().state === 'running' || acctGuard.testActive;
+    // lectura completa (cambia de cuenta) SOLO si: sin pausa, sin prueba colchon ni arranque, y sin posiciones/ordenes en la cuenta activa (si las hay, se salta y se reintenta en 5 min)
+    const full = !pausa && Date.now() - lastFull >= FULL_MS && !operando;
     // Con pausa-lectura.flag NO se recorren las evaluaciones, pero las FONDEADAS (LFF) se siguen leyendo cada 5 min
-    // (mismas protecciones: sin posición/orden abierta, TradingView en segundo plano, sin prueba colchón) para evaluar la quema de $1,000.
-    const fundedOnly = !full && pausa && Date.now() - lastFunded >= FULL_MS && colchon.status().state !== 'running';
+    // (mismas protecciones: sin posición/orden abierta, TradingView en segundo plano, sin prueba colchón ni arranque) para evaluar la quema de $1,000.
+    const fundedOnly = !full && pausa && Date.now() - lastFunded >= FULL_MS && !operando;
     const r = await readAccounts({ all: full || fundedOnly, only: fundedOnly ? '^LFF' : null }); if (r.error) throw new Error(r.error);
     if (fundedOnly && r.full && !r.busy && !r.visible && !r.aborted) lastFunded = Date.now();
     if (full) lastFull = Date.now();
     if (full && (r.busy || r.visible || r.aborted)) console.log(new Date().toLocaleTimeString(), 'lectura completa ' + (r.aborted ? 'cortada (TradingView pasó a primer plano)' : 'saltada: ' + (r.busy ? 'posición/orden abierta' : 'TradingView en primer plano')) + ' · reintento en 5 min'); // con posicion/orden (r.busy) no cambia de cuenta y se reintenta en 5 min
-    if (r.busy || colchon.status().state === 'running') lastBusy = Date.now();
+    if (r.busy || colchon.status().state === 'running' || acctGuard.testActive) lastBusy = Date.now();
     for (const a of r.accounts) if (/^LF[EF]/.test(a.name) && a.balance != null)
       save({ id: a.name, f: [['Account Balance', String(a.balance)], ['Equity', String(a.equity ?? a.balance)], ['Profit', String(a.profit ?? 0)]] });
     // la granja refleja SOLO las cuentas que TradingView tiene ahora (accountsMetainfo); se borran las que ya no existen
@@ -252,7 +256,9 @@ async function conexion() { if (conn.v && Date.now() - conn.at < 10000) return c
   if (!cdp) tdv = false; if (st.state === 'running' && st.mode === 'real') real = true;
   conn = { at: Date.now(), v: { servidor: true, tradingview: cdp, tradovate: tdv, broker, real, cuenta, lecturaOk: !state.error, actualizado: state.updated } }; return conn.v; }
 const negocioH = negocio({ dir: DIR, port: PORT, day: () => diaFarm() }); // /api/negocio: copia del historial del Negocio (negocio.json)
+const propiasH = estrategiasPropias({ port: PORT }); // /api/estrategias-propias: estrategias de esta computadora (raíz, no se sube)
 http.createServer((q, r) => {
+  if (propiasH(q, r)) return;
   if (negocioH(q, r)) return;
   if (/^\/(logros|metas)\.json/.test(q.url)) { let t='{}'; try { t = fs.readFileSync(path.join(DIR, q.url.startsWith('/logros') ? 'logros.json' : 'metas.json'), 'utf8'); } catch {} r.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); return r.end(t); }
   if (q.url.startsWith('/accounts.json')) { r.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); return r.end(JSON.stringify(state)); }
