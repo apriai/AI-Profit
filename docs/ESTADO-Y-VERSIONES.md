@@ -3,13 +3,14 @@
 Documento de relevo para cualquier agente (Grok) que trabaje en este repositorio. Sin datos personales: no hay cuentas, saldos ni claves aquí.
 
 ## Versión actual
-- **Última versión: 0.8.5** (2026-11-06). Está en el archivo `VERSION` y se ve en la esquina inferior izquierda de la granja.
+- **Última versión: 0.9.0** (2026-11-06). Está en el archivo `VERSION` y se ve en la esquina inferior izquierda de la granja.
 - Historial completo y detallado: `CHANGELOG.md`. Cada versión tiene su release en GitHub (`v0.5.1`, etc.).
 - **Al terminar un cambio, actualiza este documento** (versión, fecha y la lista de abajo).
 
 ## Lo que cambió (31 oct 2026)
 | Versión | Qué cambió |
 |---|---|
+| 0.9.0 | Reporte de trades en TradingView (`motor/tv-reporte.mjs`, doc `docs/reporte-trades-tradingview.md`). Dibuja el cierre una vez en el gráfico y no lo repone. No toca órdenes. |
 | 0.8.5 | Botón Negocio (abajo a la derecha): solo dice «Negocio», sin el total. El neto sigue dentro del panel al abrirlo. Solo página. |
 | 0.8.4 | Etiqueta arriba de la planta: nombre propio si existe; si no, solo los últimos 3 caracteres de la cuenta (letrero y línea `pfMeta`). Saldo y privacidad igual. Solo página. |
 | 0.8.3 | «Evaluación con trailing»: quita el falso «Probabilidad del trade 100%»; con trailing describe breakeven/protege ganancias, sin %. Solo página. |

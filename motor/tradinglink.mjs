@@ -4,6 +4,7 @@ import http from 'node:http'; import fs from 'node:fs'; import path from 'node:p
 import * as orders from './orders.mjs';
 import { negocio } from './negocio.mjs';
 import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, diaFarm, cdpEvaluator, PAGE, acctGuard } from './colchon.mjs';
+import { attachReporte } from './tv-reporte.mjs';
 import { estrategiasPropias } from './estrategias-propias.mjs';
 import { execFile } from 'node:child_process';
 import { dataDir, ROOT, HTML, TV_CLI } from './rutas.mjs';
@@ -243,6 +244,13 @@ async function brokerExecs() { if (execCache.v && (Date.now() - execCache.at < 2
 // Al terminar una prueba, si el bucle no tiene P&L final, el motor pide aqui el P&L bruto real de las ejecuciones del broker (solo lectura).
 colchonHooks.pnlFinalBroker = async ({ openAt, side, cuenta }) => { try { execCache.at = 0; const b = await brokerExecs(); if (!b || !b.ex) return null; if (cuenta && b.cuenta && String(b.cuenta) !== String(cuenta)) return null; const dir = side === 'long' ? 'COMPRA' : 'VENTA';
   const rt = roundTrips(b.ex).filter(t => t.direccion === dir && Date.parse(t.at) >= openAt - 2000 && Date.parse(t.abierta) >= openAt - 30000).sort((x, y) => Date.parse(x.at) - Date.parse(y.at)); const t = rt[rt.length - 1]; return t && typeof t.pnlBruto === 'number' ? t.pnlBruto : null; } catch { return null; } };
+// Reporte de trades en TradingView: solo el cierre que acaba de confirmarse. No barre el historial ni repone dibujos.
+let reporte = null;
+try {
+  reporte = attachReporte({ dir: DIR, raizOcupada: () => colchon.status().state === 'running' ? colchon.status().symbol : null });
+  colchonHooks.onCierre = (s) => { try { reporte.alCerrar(s); } catch (e) { console.log('reporte:', e && e.message); } };
+  console.log('reporte: Reporte de trades en TradingView listo');
+} catch (e) { console.log('reporte: no arrancó; el motor sigue.', e && e.message); }
 function roundTrips(ex) { const by = {}; for (const x of [...ex].sort((a, b) => a.time - b.time)) (by[x.symbol] ||= []).push(x);
   const out = []; for (const [sym, l] of Object.entries(by)) { const pv = PV(sym); let pos = 0, cash = 0, t0 = null, q = 0, first = null, comm = 0, commOk = true, entry = 0;
     for (const x of l) { if (!pos) { t0 = x.time; first = x.side; q = 0; cash = 0; comm = 0; commOk = true; entry = x.price; } pos += x.side * x.qty; cash -= x.side * x.qty * x.price; if (x.side === first) q += x.qty; if (x.comm == null) commOk = false; else comm += x.comm;
