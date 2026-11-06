@@ -21,6 +21,9 @@ negocio.json
 negocio.json.tmp-*
 # Estrategias propias de esta computadora (nunca se suben)
 estrategias-propias.json
+# Cierres ya atendidos por el reporte en TradingView (personal; no es una cola)
+tv-reporte.json
+tv-reporte.json.tmp-*
 estrategias-propias.json.tmp-*
 backups-negocio/
 reportes/

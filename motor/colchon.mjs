@@ -299,7 +299,7 @@ export function buildReport(dir = DIR, day = diaFarm()) {
 }
 
 // ---- Controlador (usado por el servidor) ----
-export const colchonHooks = {}; // el servidor registra aqui pnlFinalBroker (P&L final real desde las ejecuciones del broker)
+export const colchonHooks = {}; // el servidor registra pnlFinalBroker y onCierre (reporte). onCierre no se espera: no bloquea el cierre ni las órdenes.
 export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
   let driver = typeof driverOrFactory === 'function' ? null : driverOrFactory;
   const D = async () => driver || (driver = await driverOrFactory());
@@ -367,7 +367,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
           if (nl === 'broker-evento' || nl === 'broker-lectura') price = S.entry + pnl / (sd * pv); else if (nl === 'grafica' && S.chartPx != null) price = S.chartPx;
           pos = { ...pos, pnl, price, pnlSrc: nl || 'sin-fuente-fresca' }; S.fuenteLider = pos.pnlSrc;
           S.fuentes = Object.fromEntries(Object.entries(SRC).map(([k, x]) => [k, { v: x.v, edadMs: now - x.readAt }]));
-          Object.assign(S, { entry: pos.entry, price: pos.price, pnl: pos.pnl, sl, brokerPl: pos.brokerPl ?? null, chartPl: pos.chart ? pos.chart.pnl : null }); if (S.tpPrice == null && pos.entry != null) S.tpPrice = roundTick(pos.entry + (c.side === 'long' ? 1 : -1) * S.tp);
+          Object.assign(S, { entry: pos.entry, price: pos.price, pnl: pos.pnl, sl, brokerPl: pos.brokerPl ?? null, chartPl: pos.chart ? pos.chart.pnl : null }); if (typeof sl === 'number' && Number.isFinite(sl)) S.slVisto = sl; if (pos.raw && typeof pos.raw.takeProfit === 'number' && Number.isFinite(pos.raw.takeProfit)) S.tpVisto = pos.raw.takeProfit; if (S.tpPrice == null && pos.entry != null) S.tpPrice = roundTick(pos.entry + (c.side === 'long' ? 1 : -1) * S.tp);
         }
         if (S.lockPending && sl === S.lockTarget) { S.lockPending = false; S.locked = true; S.lockPrice = sl; S.lockAt = S.lockAt || Date.now(); log(`colchón confirmado en ${sl}`); }
         const d = decide(pos, sl, st, c);
@@ -424,6 +424,14 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
     log(`DURACIÓN ${last.duracionSeg == null ? '?' : sg(last.duracionSeg * 1000)} (${last.abiertaET ?? '?'} → ${last.cerradaET ?? '?'}, ±${sg(poll)})${last.colchonTrasSeg != null ? ` · colchón a los ${sg(last.colchonTrasSeg * 1000)}` : ''}`);
     if (last.pasos.length) log('PASOS ' + last.pasos.map(p => `#${p.paso} +$${p.protegeUSD} a los ${p.enSeg ?? '?'} s`).join(' · '));
     log('RESUMEN', JSON.stringify(last));
+    // Reporte en el gráfico: aviso asíncrono, fuera del camino de la orden. Si falla, el cierre ya quedó registrado.
+    try {
+      const h = opts.onCierre || colchonHooks.onCierre;
+      if (typeof h === 'function') {
+        const aviso = { ...last, symbol: S.symbol, side: S.side, qty: S.qty, accountId: S.accountId || null, slVisto: S.slVisto ?? null, tpVisto: S.tpVisto ?? null, cerrado: S.openAt != null && S.entry != null && S.reason !== 'error' };
+        setImmediate(() => { Promise.resolve(h(aviso)).catch(() => {}); });
+      }
+    } catch {}
   }
   return {
     check,
@@ -464,7 +472,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
       const exec = chk.paper || (chk.real && confirmReal === true);
       if (accountId != null && accountId !== '' && !exec) return { ok: false, blocked: true, err: chk.msg };
       const P = strat.params, c = { side, symbol, qty, P, strategy: { id: strat.id, name: strat.name }, steps: stepsFor(symbol, qty, P) }, slPts = ptsFor(P.SL_USD, symbol, qty), tpPts = ptsFor(P.TP_USD, symbol, qty);
-      S = { ...S, pnlBroker: null, summary: null, reason: null, lockTarget: null, lockPending: false, openAt: null, closeAt: null, lockAt: null, tpPrice: null, latency: null, state: 'running', strategy: { id: strat.id, name: strat.name }, steps: stepsFor(symbol, qty, P), step: 0, pasos: [], mode: chk.paper ? 'paper' : chk.real ? 'real' : 'simulacion', realLabel: chk.realLabel || null, alerta: null, emptyN: 0, emptySince: null, kidsWarned: false, fuentesStats: null, account: chk.account, side, symbol, qty, entry: null, price: null, pnl: null, sl: null, tp: tpPts, locked: false, lockPrice: null, error: null, startedAt: new Date().toISOString(), log: [] };
+      S = { ...S, pnlBroker: null, summary: null, reason: null, lockTarget: null, lockPending: false, openAt: null, closeAt: null, lockAt: null, tpPrice: null, latency: null, state: 'running', strategy: { id: strat.id, name: strat.name }, steps: stepsFor(symbol, qty, P), step: 0, pasos: [], mode: chk.paper ? 'paper' : chk.real ? 'real' : 'simulacion', realLabel: chk.realLabel || null, alerta: null, emptyN: 0, emptySince: null, kidsWarned: false, fuentesStats: null, account: chk.account, side, symbol, qty, entry: null, price: null, pnl: null, sl: null, slVisto: null, tpVisto: null, tp: tpPts, locked: false, lockPrice: null, error: null, startedAt: new Date().toISOString(), log: [] };
       stopReq = false;
       log(`Inicio [${strat.name}] ${side === 'long' ? 'COMPRA' : 'VENTA'} ${qty} ${symbol} · SL -$${P.SL_USD} (${slPts} pts) · TP +$${P.TP_USD} (${tpPts} pts) · ${P.STEPS ? (!c.steps.length ? 'stop fijo (sin movimientos)' : 'escalones ' + c.steps.map(x => `+$${x.triggerUsd}→+$${x.lockUsd} (${x.lockPts} pts)`).join(' · ')) : `colchón +$${lockUsdFor(symbol, qty, P)} (${lockPtsFor(symbol, qty, P)} pts, ≈ +$${P.NET_USD} netos), disparo +$${triggerUsdFor(symbol, qty, P)} (${triggerPtsFor(symbol, qty, P)} pts)`} · cuenta ${chk.account.name || '?'} -> ${chk.msg}`);
       if (switched) log(`Cuenta cambiada a ${switched.name} por API (${(switched.ms / 1000).toFixed(2)} s, verificada)`);

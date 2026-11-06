@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.9.0] — 2026-11-06
+### Agregado
+- **Reporte de trades en TradingView** (`motor/tv-reporte.mjs`). Cuando un trade se cierra de verdad (la granja lo confirma, o el bróker avisa en vivo un cierre manual con fills), dibuja el resultado en el gráfico de ese instrumento: flecha de entrada, línea hasta la salida, caja de SL/TP solo si esos precios se vieron en el bróker, y un recuadro azul con la duración y el P&L. En el gráfico el grupo se llama «reporte» cuando la API lo permite.
+- El dibujo se hace una vez, en ese cierre, y el motor no lo vuelve a tocar. Si TradingView no está, o el gráfico está en otro símbolo, se anota como omitido y no se repone al reconectar, al reiniciar ni al recargar.
+- El aviso sale después del cierre y no espera a que el dibujo termine: no coloca, no modifica y no cancela órdenes.
+
 ## [0.8.5] — 2026-11-06
 ### Cambiado
 - **Botón Negocio:** el botón flotante de abajo a la derecha solo dice «Negocio». El total ya no sale en el botón cerrado; al abrirlo, el neto, lo cobrado y lo gastado siguen igual dentro del panel. Un refresco del libro no vuelve a poner el importe en el botón. Solo página.
