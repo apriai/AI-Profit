@@ -27,6 +27,8 @@ reportes/
 backups/
 # Registros
 *.log
+# Marcador de la guía INSTALAR-CON-GROKBOT (solo en la PC de quien instala)
+profito-guia.json
 # Herramientas portatiles (cada PC tiene las suyas)
 node-win/
 /node/
