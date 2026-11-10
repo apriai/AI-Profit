@@ -56,4 +56,4 @@ export const listStrategies = () => {
   const have = new Set(built.map(s => s.id));
   return built.concat(listPropias().filter(s => s && s.id && !have.has(s.id)));
 };
-export { accountPlanSize, paramsForAccount, rulesFor, PLANS, attachPlan } from './account-size.mjs';
+export { accountPlanSize, paramsForAccount, rulesFor, PLANS, attachPlan, maxQtyFor } from './account-size.mjs';

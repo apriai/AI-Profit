@@ -15,6 +15,11 @@ export const PLANS = {
     dailyLoss: 600,
     profitTarget: 1250,
     atRisk: 300,
+    // Oficial LucidFlex evaluación y fondeada 25K: 2 minis o 20 micros.
+    // https://support.lucidtrading.com/en/articles/12945790-lucidflex-evaluation-account
+    // https://support.lucidtrading.com/en/articles/12945795-lucidflex-funded-account
+    maxMinis: 2,
+    maxMicros: 20,
   },
   '50K': {
     size: '50K',
@@ -34,6 +39,12 @@ export const PLANS = {
     // https://support.lucidtrading.com/en/articles/12945790-lucidflex-evaluation-account
     profitTarget: 3000,
     atRisk: 600,
+    // Oficial LucidFlex evaluación y fondeada 50K: 4 minis o 40 micros. Techo del plan.
+    // La fondeada baja de ese techo según el beneficio sobre el saldo inicial (maxQtyFor).
+    // https://support.lucidtrading.com/en/articles/12945790-lucidflex-evaluation-account
+    // https://support.lucidtrading.com/en/articles/12945808-lucidflex-scaling-plan
+    maxMinis: 4,
+    maxMicros: 40,
   },
 };
 
@@ -76,6 +87,8 @@ export function attachPlan(account = {}) {
     lockTriggerOver: r.lockTriggerOver,
     lockFloorOver: r.lockFloorOver,
     atRisk: r.atRisk,
+    maxMinis: maxQtyFor('NQ', account),
+    maxMicros: maxQtyFor('MNQ', account),
   });
 }
 
@@ -103,4 +116,36 @@ export function paramsForAccount(params, account) {
     });
   }
   return out;
+}
+
+function isFundedAccount(account = {}) {
+  if (account == null) account = {};
+  if (typeof account === 'string') account = { id: account, name: account };
+  if (account.type === 'funded') return true;
+  if (account.type === 'eval') return false;
+  const labels = [account.id, account.name, account.accountId, account.cuenta]
+    .filter(v => v != null && String(v).trim() !== '')
+    .map(v => String(v).trim());
+  return labels.some(s => /^LFF/i.test(s));
+}
+
+// Tope vigente. Evaluación: el techo del plan, sin escalar por beneficio.
+// Fondeada: según el beneficio sobre el saldo inicial (totalPnl, o saldo − inicio).
+// Sin saldo conocido, el techo del plan.
+// 25K: < $1,000 → 10 micros, ≥ $1,000 → 20.
+// 50K: < $1,000 → 20, $1,000–$1,999 → 30, ≥ $2,000 → 40.
+// https://support.lucidtrading.com/en/articles/12945808-lucidflex-scaling-plan
+export function maxQtyFor(symbol, account) {
+  const r = rulesFor(account);
+  const s = String(symbol || 'MNQ').toUpperCase();
+  let micros = r.maxMicros;
+  if (isFundedAccount(account)) {
+    const bal = numOrNull(account.balance ?? account.equity);
+    const profit = numOrNull(account.totalPnl) ?? (bal != null ? bal - r.start : null);
+    if (profit != null) {
+      if (r.size === '50K') micros = profit < 1000 ? 20 : profit < 2000 ? 30 : 40;
+      else micros = profit < 1000 ? 10 : 20;
+    }
+  }
+  return s === 'NQ' ? Math.round(micros / 10) : micros;
 }

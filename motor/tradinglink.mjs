@@ -9,7 +9,7 @@ import { createVistaPrevia } from './tv-vista-previa.mjs';
 import { estrategiasPropias } from './estrategias-propias.mjs';
 import { execFile } from 'node:child_process';
 import { dataDir, ROOT, HTML, TV_CLI } from './rutas.mjs';
-import { rulesFor } from './account-size.mjs';
+import { rulesFor, maxQtyFor } from './account-size.mjs';
 const DIR = dataDir();
 const TV = TV_CLI;
 const PORT = 8787, EVERY_MS = 5 * 60 * 1000;
@@ -26,6 +26,7 @@ function applyPlan(a) {
   a.dd = r.dd; a.dailyLoss = r.dailyLoss; a.profitTarget = r.profitTarget;
   a.lockTriggerOver = r.lockTriggerOver; a.lockFloorOver = r.lockFloorOver; a.atRisk = r.atRisk;
   if (typeof a.balance === 'number') a.totalPnl = Math.round((a.balance - r.start) * 100) / 100;
+  a.maxMinis = maxQtyFor('NQ', a); a.maxMicros = maxQtyFor('MNQ', a);
   return a;
 }
 

@@ -1,9 +1,9 @@
 // TradingLink Fase 2 - Ordenes con confirmacion + switch on/off, alineado a la estrategia de Baned.
 // SEGURIDAD: MODO SIMULACION fijo. Este archivo NUNCA hace clic en Buy/Sell/Place.
 // Activar envio real requiere un cambio de codigo explicito autorizado por Baned.
-import { rulesFor } from './account-size.mjs';
+import { rulesFor, maxQtyFor } from './account-size.mjs';
 export const DRY_RUN = true;
-export const SYMBOLS = { NQ: 2, MNQ: 20 };           // tamano maximo por simbolo (2 minis o 20 micros)
+export const SYMBOLS = { NQ: 2, MNQ: 20 };           // tope 25K (2 minis o 20 micros); 50K y la fondeada usan maxQtyFor
 export const MAX_QTY = 20;
 export const BRACKET = {                             // USD por trade (TP / SL)
   eval:   { tp: 630,  sl: 600 },                      // evaluacion: exactamente 2 trades ganadores de +630 = +1260 (> objetivo 1250)
@@ -32,7 +32,7 @@ export function check(o, accounts) {
   if (!['buy', 'sell'].includes(o.side)) err.push('Lado invalido');
   const sym = o.symbol || 'MNQ';
   if (!(sym in SYMBOLS)) err.push('Simbolo debe ser NQ o MNQ');
-  else if (!Number.isInteger(o.qty) || o.qty < 1 || o.qty > SYMBOLS[sym]) err.push(`Cantidad ${sym} debe ser 1-${SYMBOLS[sym]}`);
+  else if (!Number.isInteger(o.qty) || o.qty < 1 || o.qty > maxQtyFor(sym, a || {})) err.push(`Cantidad ${sym} debe ser 1-${maxQtyFor(sym, a || {})}`);
   // Toda orden se convierte en bracket (TP/SL fijos) en plan(), aunque la UI mande 'market'.
   const t = etNow();
   if (['Sat', 'Sun'].includes(t.wd)) err.push('Fin de semana');

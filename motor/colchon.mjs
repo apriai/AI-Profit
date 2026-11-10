@@ -1,4 +1,4 @@
-import { getStrategy, listStrategies, DEFAULT_STRATEGY, paramsForAccount, accountPlanSize, rulesFor } from './strategies.mjs';
+import { getStrategy, listStrategies, DEFAULT_STRATEGY, paramsForAccount, accountPlanSize, rulesFor, maxQtyFor } from './strategies.mjs';
 // TradingLink - "Colchón" (stop-to-profit). Paper/Demo, y cuentas reales Lucid (LFE/LFF) SOLO si están en real-allowlist.json, con confirmReal (el motor puede activarla con setCurrentAccount si no hay trades/órdenes abiertas).
 // La IA nunca coloca/modifica/cierra órdenes: solo el usuario arranca una prueba desde la Granja.
 // Servidor: import { colchon } from './colchon.mjs'  -> colchon.start({side,symbol,qty}), colchon.stop(), colchon.status()
@@ -9,7 +9,7 @@ const DIR = dataDir();
 export const CFG = { SL_USD: 600, TP_USD: 1600, NET_USD: 100, SLIP_TICKS: 1, TRIGGER_EXTRA_USD: 15, POLL_MS: 500, FLAT_BY_MIN: 16 * 60 + 45 };
 export const SIZES = { NQ: 2, MNQ: 20 }; const PT_USD = { NQ: 20, MNQ: 2 }; export const TICK = 0.25;
 export const ptsFor = (usd, symbol, qty) => Math.round(usd / (PT_USD[symbol] * qty) / TICK) * TICK;
-export const DEFAULT = { symbol: 'MNQ', qty: 20 }; // SIZES = tope máximo por símbolo; $/tick: MNQ 0.50, NQ 5
+export const DEFAULT = { symbol: 'MNQ', qty: 20 }; // SIZES = tope 25K; 50K y la fondeada usan maxQtyFor (hasta 40 MNQ / 4 NQ). $/tick: MNQ 0.50, NQ 5
 // colchón en puntos: nunca a menos de 1 tick del punto de disparo (+$160)
 // colchón automático por tamaño: neto ≈ +$150 tras comisiones Lucid (ida y vuelta: $1 por MNQ, $3.50 por NQ) y 1 tick de deslizamiento
 export const COMM_RT = { MNQ: 1, NQ: 3.5 };
@@ -466,7 +466,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
   return {
     check,
     strategies: () => ({ ok: true, default: DEFAULT_STRATEGY, strategies: listStrategies() }),
-    async accounts() { try { const r = await (await D()).accounts(); return { ok: true, ...r, accounts: r.accounts.map(a => { const p = accountAllowed(a, `${r.broker} ${r.brokerId}`), re = !p && realAllowed(a.name, allow()); const rules = rulesFor({ id: a.name, name: a.name }); return { ...a, allowed: p || re, real: re, realLabel: re ? realLabel(a.name) : null, plan: rules.size, scale: rules.scale, start: rules.start, planStart: rules.start, dd: rules.dd, dailyLoss: rules.dailyLoss, profitTarget: rules.profitTarget, lockTriggerOver: rules.lockTriggerOver, lockFloorOver: rules.lockFloorOver, atRisk: rules.atRisk }; }) }; } catch (e) { driver = null; return { ok: false, err: 'Sin conexión con TradingView: ' + e.message, accounts: [] }; } },
+    async accounts() { try { const r = await (await D()).accounts(); return { ok: true, ...r, accounts: r.accounts.map(a => { const p = accountAllowed(a, `${r.broker} ${r.brokerId}`), re = !p && realAllowed(a.name, allow()); const hint = accountHintFor(a.name); const named = /^LFF/i.test(a.name || '') ? 'funded' : /^LFE/i.test(a.name || '') ? 'eval' : undefined; const acc = { id: a.name, name: a.name, ...(a.balance != null ? { balance: a.balance } : {}), ...hint, ...(named ? { type: named } : {}) }; const rules = rulesFor({ id: a.name, name: a.name, ...acc }); const pnl = acc.balance != null ? Math.round((acc.balance - rules.start) * 100) / 100 : null; return { ...a, ...(named ? { type: named } : {}), ...(acc.balance != null ? { balance: acc.balance, totalPnl: pnl } : { totalPnl: null }), allowed: p || re, real: re, realLabel: re ? realLabel(a.name) : null, plan: rules.size, scale: rules.scale, start: rules.start, planStart: rules.start, dd: rules.dd, dailyLoss: rules.dailyLoss, profitTarget: rules.profitTarget, lockTriggerOver: rules.lockTriggerOver, lockFloorOver: rules.lockFloorOver, atRisk: rules.atRisk, maxMinis: maxQtyFor('NQ', acc), maxMicros: maxQtyFor('MNQ', acc) }; }) }; } catch (e) { driver = null; return { ok: false, err: 'Sin conexión con TradingView: ' + e.message, accounts: [] }; } },
     async start(args = {}) {
       if (S.state === 'running') return { ok: false, err: 'Ya hay una prueba corriendo' };
       if (acctGuard.testActive) return { ok: false, err: 'esperando lectura…', waitingLectura: true };
@@ -485,11 +485,12 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
       const strat = getStrategy(strategyId == null || strategyId === '' ? DEFAULT_STRATEGY : strategyId); if (!strat) return { ok: false, err: `Estrategia desconocida: ${strategyId}` };
       if (!['long', 'short'].includes(side) || !(symbol in SIZES)) return { ok: false, err: 'Parámetros inválidos' };
       qty = qty == null || qty === '' ? ((strat.params.DEFAULT_QTY || {})[symbol] ?? (symbol === DEFAULT.symbol ? DEFAULT.qty : 1)) : Number(qty);
-      if (!Number.isInteger(qty) || qty < 1 || qty > SIZES[symbol]) return { ok: false, err: `Cantidad inválida: ${symbol} entre 1 y ${SIZES[symbol]}` };
+      if (!Number.isInteger(qty) || qty < 1) return { ok: false, err: `Cantidad inválida: ${symbol} entre 1 y ${maxQtyFor(symbol, {})}` };
       let switched = null, chosen = null;
       if (accountId != null && accountId !== '') {
         const l = await this.accounts(); if (!l.ok) return { ok: false, err: l.err };
         const a = l.accounts.find(x => x.id === String(accountId)); if (!a) return { ok: false, err: 'Cuenta no encontrada' }; chosen = a;
+        { const maxChosen = maxQtyFor(symbol, a); if (qty > maxChosen) return { ok: false, err: `Cantidad inválida: ${symbol} entre 1 y ${maxChosen}` }; }
         if (!a.allowed) return { ok: false, blocked: true, err: `Bloqueado: ${a.name} no es Paper/Demo ni está en real-allowlist.json` };
         if (a.real && confirmReal !== true) return { ok: false, blocked: true, needConfirm: true, err: `CUENTA REAL · ${a.realLabel}: falta confirmación` };
         if (!a.current && S.state === 'running') return { ok: false, err: 'Hay una prueba en marcha: no se cambia de cuenta' };
@@ -502,6 +503,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
       const exec = chk.paper || (chk.real && confirmReal === true);
       if (accountId != null && accountId !== '' && !exec) return { ok: false, blocked: true, err: chk.msg };
       const hint = accountHintFor((chk.account && chk.account.name) || (chosen && chosen.name) || '');
+      { const maxQ = maxQtyFor(symbol, hint); if (qty > maxQ) return { ok: false, err: `Cantidad inválida: ${symbol} entre 1 y ${maxQ}` }; }
       const P = paramsForAccount(strat.params, hint), c = { side, symbol, qty, P, strategy: { id: strat.id, name: strat.name }, steps: stepsFor(symbol, qty, P) }, slPts = ptsFor(P.SL_USD, symbol, qty), tpPts = ptsFor(P.TP_USD, symbol, qty);
       S = { ...S, pnlBroker: null, summary: null, reason: null, lockTarget: null, lockPending: false, openAt: null, closeAt: null, lockAt: null, tpPrice: null, latency: null, state: 'running', strategy: { id: strat.id, name: strat.name }, P, steps: stepsFor(symbol, qty, P), step: 0, pasos: [], mode: chk.paper ? 'paper' : chk.real ? 'real' : 'simulacion', realLabel: chk.realLabel || null, alerta: null, emptyN: 0, emptySince: null, kidsWarned: false, fuentesStats: null, account: chk.account, side, symbol, qty, entry: null, price: null, pnl: null, sl: null, slVisto: null, tpVisto: null, tp: tpPts, locked: false, lockPrice: null, error: null, startedAt: new Date().toISOString(), log: [] };
       stopReq = false;
