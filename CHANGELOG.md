@@ -10,6 +10,20 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.1] — 2026-11-10
+### Cambiado
+- **PROFITO riega solo con el panel abierto.** Riega una flor únicamente mientras el panel de esa cuenta sigue abierto. Cerrar el panel por cualquier vía (la X, un clic afuera o el botón TRADE) corta el riego y esconde la regadera.
+- **Abrir el panel lo despierta y lo lleva a la flor.** Siempre se levanta y camina hasta esa flor. No riega desde el banco, tampoco la flor que está justo al lado. El punto donde se para a regar queda al menos a unos 1,25 del asiento.
+- **Bajar del banco ya no lo deja pegado.** Ya no recalcula en cada cuadro un camino en línea recta. Si se queda quieto cerca de 1 segundo, busca otro camino, se desliza o rodea. También puede salir del rincón sin salida que hay al sur de la casa.
+- **El punto de riego se elige entre varios.** Prueba sitios alrededor de la flor y se queda con uno al que se puede llegar y que tiene espacio libre.
+- **La mascota se aparta.** Cuando PROFITO va hacia una flor, la mascota sale del pasillo de su camino hasta que él llega. Si se cruzan, se mueve la mascota, no PROFITO.
+- **El agua espera a que esté listo.** La regadera y las gotas salen solo cuando ya llegó al punto final, está quieto y mira la flor. Si lo empujan, el riego se pausa.
+- **Se quitó el letrero de dormir.** Ya no aparece «Activado · durmiendo — toca «Agente» arriba». La animación zZ del modelo sigue.
+- **Color nuevo «Verde Profit».** Es el verde lima del logo (`#C8E810`) y aparece el primero en el selector de color del agente. El color con el que arranca sigue siendo el blanco.
+- **Los colores del agente se ven más vivos.** El cuerpo tiene menos barniz, un brillo suave y más saturación. Las muestras del selector también están más brillantes.
+### Notas
+- Solo la página (`motor/Granja-de-Cuentas-v2.html`). No abre, no mueve y no cierra órdenes.
+
 ## [0.10.0] — 2026-11-10
 ### Agregado
 - **Estrategia «Dos disparos · 1:2»** (`dos-disparos`). Entra a mercado y el stop no se mueve. En una cuenta de 25K: SL −$300 / TP +$630. En una de 50K el motor dobla esos dólares: SL −$600 / TP +$1,260. Hasta 2 intentos al día: el segundo lo abre la persona; el motor no reentra solo. Sigue al final del selector, después de Fast Breakeven. Por defecto siguen 8 MNQ (1 NQ). La estrategia por defecto sigue siendo «Evaluación».
