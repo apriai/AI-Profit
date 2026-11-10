@@ -1,8 +1,9 @@
 // TradingLink Fase 2 - Ordenes con confirmacion + switch on/off, alineado a la estrategia de Baned.
 // SEGURIDAD: MODO SIMULACION fijo. Este archivo NUNCA hace clic en Buy/Sell/Place.
 // Activar envio real requiere un cambio de codigo explicito autorizado por Baned.
+import { rulesFor, maxQtyFor } from './account-size.mjs';
 export const DRY_RUN = true;
-export const SYMBOLS = { NQ: 2, MNQ: 20 };           // tamano maximo por simbolo (2 minis o 20 micros)
+export const SYMBOLS = { NQ: 2, MNQ: 20 };           // tope 25K (2 minis o 20 micros); 50K y la fondeada usan maxQtyFor
 export const MAX_QTY = 20;
 export const BRACKET = {                             // USD por trade (TP / SL)
   eval:   { tp: 630,  sl: 600 },                      // evaluacion: exactamente 2 trades ganadores de +630 = +1260 (> objetivo 1250)
@@ -27,11 +28,11 @@ export function check(o, accounts) {
   if (!botEnabled) err.push('El bot esta apagado');
   const a = accounts[o.account];
   if (!a) err.push('Cuenta desconocida'); else if (typeOf(a.id) === 'unknown') err.push('Cuenta no es LFE/LFF');
-  if (a && typeOf(a.id) === 'eval' && a.balance != null && a.balance <= 24000) err.push('Cuenta en drawdown maximo (quemada)');
+  if (a && typeOf(a.id) === 'eval' && a.balance != null) { const R = rulesFor(a); if (a.balance <= R.start - R.dd) err.push('Cuenta en drawdown maximo (quemada)'); }
   if (!['buy', 'sell'].includes(o.side)) err.push('Lado invalido');
   const sym = o.symbol || 'MNQ';
   if (!(sym in SYMBOLS)) err.push('Simbolo debe ser NQ o MNQ');
-  else if (!Number.isInteger(o.qty) || o.qty < 1 || o.qty > SYMBOLS[sym]) err.push(`Cantidad ${sym} debe ser 1-${SYMBOLS[sym]}`);
+  else if (!Number.isInteger(o.qty) || o.qty < 1 || o.qty > maxQtyFor(sym, a || {})) err.push(`Cantidad ${sym} debe ser 1-${maxQtyFor(sym, a || {})}`);
   // Toda orden se convierte en bracket (TP/SL fijos) en plan(), aunque la UI mande 'market'.
   const t = etNow();
   if (['Sat', 'Sun'].includes(t.wd)) err.push('Fin de semana');
@@ -41,8 +42,9 @@ export function check(o, accounts) {
   return err;
 }
 function plan(o, accounts) {
-  const sym = o.symbol || 'MNQ'; const kind = typeOf(accounts[o.account].id);
-  return { ...o, symbol: sym, type: 'bracket', tp: BRACKET[kind].tp, sl: BRACKET[kind].sl };
+  const acc = accounts[o.account]; const sym = o.symbol || 'MNQ'; const kind = typeOf(acc.id);
+  const sc = rulesFor(acc).scale;
+  return { ...o, symbol: sym, type: 'bracket', tp: BRACKET[kind].tp * sc, sl: BRACKET[kind].sl * sc };
 }
 export function request(o, accounts) {
   const err = check(o, accounts); if (err.length) return { ok: false, err };

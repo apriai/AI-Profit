@@ -15,7 +15,9 @@ Solo hay un disparo: el cierre confirmado, con el servidor y TradingView en marc
 
 No hay barrido al arrancar, ni al pulsar F5, ni al reconectar, ni un temporizador que recorra el historial. La primera vez que se instala no se dibujan los trades viejos: no se leen para dibujarlos.
 
-Si en el momento del cierre TradingView no responde, el gráfico todavía no tiene símbolo, o el gráfico está en otro instrumento, el cierre queda **anotado como omitido**. No se dibuja más tarde. La única repetición es dentro de ese mismo cierre, unos instantes, por si el fill o el símbolo del gráfico llegan con un poco de retraso (0 ms, luego 350 ms, luego 800 ms). Eso no es una cola. El envío del dibujo al gráfico se hace **una sola vez**. Si esa llamada se corta, no se reenvía: preferimos no duplicar flechas.
+Si en el momento del cierre TradingView no responde (también cuando la API del bróker no está: `no-api`), faltan los fills o el gráfico todavía no está listo, el cierre **no se archiva para siempre**. Queda pendiente y se vuelve a intentar en un aviso posterior o al reconectar la escucha. Dentro del mismo intento las esperas son 0 ms, 350 ms, 800 ms, 2 s y 5 s. El lector de fills, si `allExecutions` viene vacío, pide también el contrato real `CME_MINI:MNQZ2026` y `CME_MINI:NQZ2026`, igual que las ejecuciones del bróker, y anota cuántos fills vio y por qué se omitió.
+
+Un motivo que no es pasajero (otro símbolo, sin valor por punto, dibujo incompleto) sí se anota como omitido y no se reintenta. El envío de un dibujo que ya salió bien se hace **una sola vez**: no se duplican flechas al reconectar ni al reiniciar.
 
 ## Qué se dibuja
 
@@ -44,7 +46,7 @@ Reiniciar el servidor o recargar el gráfico no recorre esa lista para volver a 
 
 ## Cuánto tarda
 
-En las pruebas el reloj es simulado: con el gráfico y los fills listos, el dibujo sale en la primera pasada de ese cierre, sin espera. Si faltan fills o el gráfico aún no tiene símbolo, hay como máximo dos esperas (350 ms y 800 ms) y se deja pasar. Eso mide el código, no promete un instante en la computadora real. En la práctica se suma el aviso del cierre, una lectura de fills y una llamada al gráfico. No se ha medido en la granja en vivo.
+En las pruebas el reloj es simulado: con el gráfico y los fills listos, el dibujo sale en la primera pasada de ese cierre, sin espera. Si faltan fills o TradingView no responde, hay cuatro esperas (350 ms, 800 ms, 2 s y 5 s) y el cierre queda pendiente para otro intento. Eso mide el código, no promete un instante en la computadora real. En la práctica se suma el aviso del cierre, una lectura de fills y una llamada al gráfico. No se ha medido en la granja en vivo.
 
 ## Si el dibujo sigue ahí al día siguiente
 
@@ -67,4 +69,4 @@ El enganche está en `motor/tradinglink.mjs` (`attachReporte`) y el aviso de la 
 
 Para que un cambio de código entre, hay que reiniciar el servidor, y solo sin posición abierta ni órdenes pendientes. La página se recarga con F5; el F5 no dibuja reportes.
 
-No borres `tv-reporte.json` para «volver a dibujar» los cierres pasados: el módulo no los recorre. Borrar ese archivo solo olvida la marca anti-duplicado; tampoco redibuja el pasado, y tampoco borra lo que ya esté en el gráfico.
+No borres `tv-reporte.json` para «volver a dibujar» los cierres pasados: el módulo no recorre el historial. Lo que ya está marcado como dibujado no se repite. Lo que quedó pendiente por un fallo pasajero (sin fills, sin API, chart no listo) sí se reintenta al reconectar. Borrar el archivo solo olvida la marca anti-duplicado; no redibuja el pasado y no borra lo que ya esté en el gráfico.

@@ -3,14 +3,15 @@
 Documento de relevo para cualquier agente (Grok) que trabaje en este repositorio. Sin datos personales: no hay cuentas, saldos ni claves aquí.
 
 ## Versión actual
-- **Última versión: 0.9.0** (2026-11-06). Está en el archivo `VERSION` y se ve en la esquina inferior izquierda de la granja.
+- **Última versión: 0.10.0** (2026-11-10). Está en el archivo `VERSION` y se ve en la esquina inferior izquierda de la granja.
 - Historial completo y detallado: `CHANGELOG.md`. Cada versión tiene su release en GitHub (`v0.5.1`, etc.).
 - **Al terminar un cambio, actualiza este documento** (versión, fecha y la lista de abajo).
 
-## Lo que cambió (31 oct 2026)
+## Lo que cambió
 | Versión | Qué cambió |
 |---|---|
-| 0.9.0 | Reporte de trades en TradingView (`motor/tv-reporte.mjs`, doc `docs/reporte-trades-tradingview.md`). Dibuja el cierre una vez en el gráfico y no lo repone. No toca órdenes. |
+| 0.10.0 | Dos disparos · 1:2 (25K −300/+630, 50K −600/+1,260). Cuentas 50K detectadas solas y reglas coherentes (meta, DD, trail, Listo por hoy, barra, marchitez). Tope de contratos LucidFlex: eval 20/40 MNQ; fondeada 25K 10 o 20 y 50K 20, 30 o 40 según el beneficio; defecto 8 MNQ. Panel de operar con scroll y BUY/SELL fijos. P&L ganado en verde. Sonido único de fanfarria + moneda. Celebración ~5,3 s (7 saltos, voltereta, casa y confeti). PROFITO y la mascota rodean los árboles, también el cerezo. Clic en la flor: camina y riega con regadera. Botón TRADE sin la pregunta de dinero real (BUY/SELL sigue confirmando). Vista previa de SL/TP en el gráfico, sin órdenes. El reporte de TradingView reintenta un cierre si faltaron fills o no había API; un dibujo ya hecho no se repite. |
+| 0.9.0 | Reporte de trades en TradingView (`motor/tv-reporte.mjs`, doc `docs/reporte-trades-tradingview.md`). Dibuja el cierre en el gráfico. No toca órdenes. Desde 0.10.0 un fallo pasajero (sin fills o sin API) se reintenta; un dibujo ya hecho no se repite. |
 | 0.8.5 | Botón Negocio (abajo a la derecha): solo dice «Negocio», sin el total. El neto sigue dentro del panel al abrirlo. Solo página. |
 | 0.8.4 | Etiqueta arriba de la planta: nombre propio si existe; si no, solo los últimos 3 caracteres de la cuenta (letrero y línea `pfMeta`). Saldo y privacidad igual. Solo página. |
 | 0.8.3 | «Evaluación con trailing»: quita el falso «Probabilidad del trade 100%»; con trailing describe breakeven/protege ganancias, sin %. Solo página. |
@@ -36,7 +37,10 @@ Documento de relevo para cualquier agente (Grok) que trabaje en este repositorio
 
 ## Datos clave que debes saber
 - **Fin del día de la granja (`diaFarm()`, en `motor/colchon.mjs`, `motor/tradinglink.mjs` y la página):** se toma la fecha de Nueva York (`America/New_York`) y, **desde las 16:00 ET, cuenta como el día siguiente**. Sábado y domingo cuentan como lunes (viernes 16:00 pasa a lunes). Esa única regla vale para el P&L del día, la barra superior (conteo de trades), el historial, el reporte diario y el Negocio. Las carpetas `historial/` viejas siguen con la regla anterior.
-- **Max loss de Lucid (LucidFlex 25K): trailing de fin de día (EOD).** El pico es el **mayor saldo de cierre de sesión**, no el mayor saldo del día, y el piso es pico − $1,000. El servidor solo sube el pico con lecturas de 17:00 a 17:59 ET (o con el último saldo del día anterior si estaba apagado en el cierre). `breachedAt` solo se marca contra ese piso. La página no sube el pico con saldos intradía. Cuenta de evaluación = `LFE…`, fondeada = `LFF…`.
+- **Max loss de Lucid (LucidFlex): trailing de fin de día (EOD).** El pico es el **mayor saldo de cierre de sesión**, no el mayor saldo del día. En 25K el piso es pico − $1,000 (inicial 24,000). En 50K el piso es pico − $2,000 (inicial 48,000). El servidor solo sube el pico con lecturas de 17:00 a 17:59 ET (o con el último saldo del día anterior si estaba apagado en el cierre). `breachedAt` solo se marca contra ese piso. La página no sube el pico con saldos intradía. Cuenta de evaluación = `LFE…`, fondeada = `LFF…`.
+- **Tamaño 25K / 50K** (`motor/account-size.mjs`): `LFE050`/`LFF050` o token `50K` → 50K; `LFE025`/`LFF025` o token `25K` → 25K (gana sobre un saldo de inicio crecido); si no, un saldo de plan ≥ 45,000 → 50K; si no, 25K. Estrategias ×2 en dólares. La cantidad por defecto sigue en 8 MNQ. Meta 1,250 / 3,000. Trail al pasar +1,100 / +2,100; el piso bloqueado es inicio + $100 en los dos tamaños. «Listo por hoy» a −$600 / −$1,200. El $1,200 diario de 50K es una suposición alineada con LucidPro 50K: LucidFlex no publica esa tabla. La meta de 3,000 y el trail de 2,100 sí son las cifras publicadas de LucidFlex 50K.
+- **Tope de contratos** (`maxQtyFor`): evaluación 25K = 20 MNQ (2 NQ) y 50K = 40 MNQ (4 NQ), sin escalar. Fondeada, por beneficio sobre el saldo inicial: 25K < $1,000 → 10 MNQ, ≥ $1,000 → 20; 50K < $1,000 → 20, $1,000–$1,999 → 30, ≥ $2,000 → 40. Sin saldo, el techo del plan. El panel usa el tope que manda el motor.
+- **Dos disparos · 1:2** (`dos-disparos`): SL −$300 / TP +$630 en 25K y el doble en 50K. El stop no se mueve. El segundo intento del día lo abre la persona.
 - **Los archivos del repositorio están saneados** (sin datos personales). Nunca copies archivos del PC en vivo encima de los del repositorio. Aplica los cambios como diffs sobre la versión del repositorio, y revisa que no se cuele ninguna cuenta, saldo ni nombre.
 - **Flujo de trabajo:** según `AGENTS.md`, trabaja en tu rama `caroline` y abre un pull request; no subas a `main`. Bänéd aprueba el merge. Cada PR sube `VERSION`, agrega una entrada arriba en `CHANGELOG.md` (en español, con fecha) y actualiza el texto `vX.Y.Z` del bloque `tl-version` de `motor/Granja-de-Cuentas-v2.html`. Un PR solo de documentación puede no subir la versión.
 - **Antes de reiniciar el servidor:** solo sin operaciones abiertas ni órdenes pendientes. La página se actualiza con recargar (F5). No se toca `orders.mjs`, `strategies.mjs` ni los stops sin que Bänéd lo pida.
