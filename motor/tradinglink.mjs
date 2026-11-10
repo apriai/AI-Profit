@@ -3,11 +3,13 @@
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
 import * as orders from './orders.mjs';
 import { negocio } from './negocio.mjs';
-import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, diaFarm, cdpEvaluator, PAGE, acctGuard } from './colchon.mjs';
+import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, diaFarm, cdpEvaluator, PAGE, acctGuard, js } from './colchon.mjs';
 import { attachReporte } from './tv-reporte.mjs';
+import { createVistaPrevia } from './tv-vista-previa.mjs';
 import { estrategiasPropias } from './estrategias-propias.mjs';
 import { execFile } from 'node:child_process';
 import { dataDir, ROOT, HTML, TV_CLI } from './rutas.mjs';
+import { rulesFor } from './account-size.mjs';
 const DIR = dataDir();
 const TV = TV_CLI;
 const PORT = 8787, EVERY_MS = 5 * 60 * 1000;
@@ -15,13 +17,25 @@ const tv = (...a) => new Promise(r => execFile(process.execPath, [TV, ...a], (e,
 const ev = async js => (await tv('ui', 'eval', js)).result;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const typeOf = id => id.startsWith('LFF') ? 'funded' : id.startsWith('LFE') ? 'eval' : 'unknown';
+function rulesOf(id, extra = {}) { return rulesFor({ id, name: id, ...extra }); }
+function applyPlan(a) {
+  if (!a || !a.id) return a;
+  const s = (sod.accounts || {})[a.id] || {};
+  const r = rulesOf(a.id, { inicio: s.inicio, startOfDay: a.startOfDay ?? s.bal, start: a.start, planStart: a.planStart, plan: a.plan });
+  a.plan = r.size; a.scale = r.scale; a.planStart = r.start; a.start = r.start;
+  a.dd = r.dd; a.dailyLoss = r.dailyLoss; a.profitTarget = r.profitTarget;
+  a.lockTriggerOver = r.lockTriggerOver; a.lockFloorOver = r.lockFloorOver; a.atRisk = r.atRisk;
+  if (typeof a.balance === 'number') a.totalPnl = Math.round((a.balance - r.start) * 100) / 100;
+  return a;
+}
+
 const num = s => +String(s).replace(/[^0-9.-]/g, '');
 let state = { updated: null, accounts: {}, error: null, daily: {} };
 // Dia de trading (ET): el dia termina a las 16:00 ET (fin de las sesiones de Nueva York) -> desde las 16:00 cuenta como el dia siguiente; sabado/domingo -> lunes. Una sola regla para todo: diaFarm() en colchon.mjs.
 const SOD_FILE = path.join(DIR, 'sod.json');
 let sod = { accounts: {}, daily: {} }; try { sod = { accounts: {}, daily: {}, ...JSON.parse(fs.readFileSync(SOD_FILE, 'utf8')) }; } catch {}
 // Semilla: al reiniciar, las cuentas no activas no se releen (p.ej. con pausa-lectura.flag); se publica su ÚLTIMO saldo real conocido (sod.lastBal) marcado stale para que la granja pueda marcar quemada una fondeada.
-for (const [id, s] of Object.entries(sod.accounts || {})) if (/^LF[EF]/.test(id) && s && s.lastBal != null && !s.gone) state.accounts[id] = { id, type: typeOf(id), balance: s.lastBal, equity: s.lastBal, profit: null, readAt: s.readAt || null, startOfDay: s.bal, dayPnl: Math.round((s.lastBal - s.bal) * 100) / 100, totalPnl: Math.round((s.lastBal - 25000) * 100) / 100, tradingDay: s.day, stale: true };
+for (const [id, s] of Object.entries(sod.accounts || {})) if (/^LF[EF]/.test(id) && s && s.lastBal != null && !s.gone) state.accounts[id] = applyPlan({ id, type: typeOf(id), balance: s.lastBal, equity: s.lastBal, profit: null, readAt: s.readAt || null, startOfDay: s.bal, dayPnl: Math.round((s.lastBal - s.bal) * 100) / 100, totalPnl: Math.round((s.lastBal - 25000) * 100) / 100, tradingDay: s.day, stale: true });
 function tradingDay() { return diaFarm(); }
 
 const readCurrent = () => ev(`(()=>{const n=document.querySelector('[class*=accountName]');const f=[...document.querySelectorAll('[class*=accountSummaryField]')].map(e=>e.innerText.split('\\n'));const p=(document.querySelector('[class*=accountManager]')||{}).innerText||'';return JSON.stringify({id:n&&n.innerText.trim(),f,busy:/Positions\\s*\\(?[1-9]|Orders\\s*\\(?[1-9]/.test(p)})})()`).then(s => JSON.parse(s || '{}'));
@@ -42,11 +56,11 @@ function save(c) {
     // cambio de día: se conservan peak y breachedAt (quema pegajosa; −$600 + −$600 en 2 días = −$1,200 → quemada)
     // cuenta de EVALUACION vista por primera vez en una granja que ya tenia cuentas: empieza el dia en el saldo inicial (25,000), no en la primera lectura (que puede traer una posicion abierta con P&L flotante). Instalacion nueva (sod vacio): se mantiene la primera lectura.
     const nuevaEval = !s && /^LFE/.test(c.id) && Object.keys(sod.accounts).length > 0;
-    if (!s || s.day !== day) sod.accounts[c.id] = nuevaEval ? { day, bal: RULES.start, inicio: RULES.start, lastBal: a.balance } : { ...(s || {}), ...(s && s.lastBal != null && ![16, 17].includes(horaET()) ? { peak: Math.max(RULES.start, s.peak ?? 0, s.lastBal) } : {}), day, bal: s && s.lastBal != null ? s.lastBal : a.balance, lastBal: a.balance, ...(s && s.day && s.lastBal != null && s.bal != null ? { prev: { day: s.day, pnl: Math.round((s.lastBal - s.bal) * 100) / 100 } } : {}) };
+    if (!s || s.day !== day) sod.accounts[c.id] = nuevaEval ? { day, bal: rulesOf(c.id).start, inicio: rulesOf(c.id).start, lastBal: a.balance } : { ...(s || {}), ...(s && s.lastBal != null && ![16, 17].includes(horaET()) ? { peak: Math.max(rulesOf(c.id).start, s.peak ?? 0, s.lastBal) } : {}), day, bal: s && s.lastBal != null ? s.lastBal : a.balance, lastBal: a.balance, ...(s && s.day && s.lastBal != null && s.bal != null ? { prev: { day: s.day, pnl: Math.round((s.lastBal - s.bal) * 100) / 100 } } : {}) };
     else s.lastBal = a.balance;
     sod.accounts[c.id].readAt = a.readAt;
     sod.accounts[c.id].lastAt = a.readAt;
-    a.startOfDay = sod.accounts[c.id].bal; a.dayPnl = Math.round((a.balance - a.startOfDay) * 100) / 100; a.totalPnl = Math.round((a.balance - 25000) * 100) / 100; a.tradingDay = day;
+    a.startOfDay = sod.accounts[c.id].bal; a.dayPnl = Math.round((a.balance - a.startOfDay) * 100) / 100; a.tradingDay = day; applyPlan(a);
     sod.daily[day] = Object.values(state.accounts).filter(x => x.tradingDay === day && x.dayPnl != null).reduce((t, x) => t + x.dayPnl, 0);
     try { fs.writeFileSync(SOD_FILE, JSON.stringify(sod, null, 2)); } catch {}
     state.daily = sod.daily;
@@ -55,21 +69,21 @@ function save(c) {
 }
 // FIX quema fondeada: piso de max loss calculado en el servidor (mismas reglas que Ln() de la granja) para que
 // una fondeada que rompe el max loss SIEMPRE se marque, aunque la lectura completa esté en pausa.
-const RULES = { start: 25000, dd: 1000, lockTriggerOver: 1100, lockFloorOver: 100 };
+const RULES = { start: 25000, dd: 1000, lockTriggerOver: 1100, lockFloorOver: 100 }; // fallback 25K; preferir rulesOf(id)
 // PICO = mayor SALDO DE CIERRE de sesion (regla Lucid EOD trailing). Un saldo intradia NUNCA sube el pico: solo cuenta si la lectura es de la ventana de cierre (17:00-17:59 ET, mercado en pausa y todo plano) o via el cambio de dia.
 const horaET = () => +new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: '2-digit', hourCycle: 'h23' }).format(new Date());
 const enCierre = () => horaET() === 17;
-function peakDe(id, bal, cierre) { const s = sod.accounts[id] || {}; let p = Math.max(RULES.start, s.peak ?? 0, cierre ? (bal ?? 0) : 0);
+function peakDe(id, bal, cierre) { const s = sod.accounts[id] || {}; const R = rulesOf(id); let p = Math.max(R.start, s.peak ?? 0, cierre ? (bal ?? 0) : 0);
   try { const d = JSON.parse(fs.readFileSync(path.join(DIR, 'days.json'), 'utf8'))[id] || []; for (const x of d) p = Math.max(p, x.close ?? 0); } catch {}
   if (sod.accounts[id]) sod.accounts[id].peak = p; return p; }
-function riesgo(a) { if (!a || a.balance == null) return; const peak = peakDe(a.id, a.balance, enCierre()), locked = a.type === 'funded' && peak > RULES.start + RULES.lockTriggerOver;
-  a.peak = peak; a.floor = locked ? RULES.start + RULES.lockFloorOver : peak - RULES.dd; a.locked = locked; const sa = sod.accounts[a.id]; // REGLA FONDEADA 25K: perder $1,000 (desde el pico, o en total desde 25,000 aunque sea en varios días) = QUEMADA para siempre
-  a.breached = a.balance <= a.floor || a.balance <= RULES.start - RULES.dd || !!(sa && sa.breachedAt); if (a.breached && sa && !sa.breachedAt) { sa.breachedAt = new Date().toISOString(); try { fs.writeFileSync(SOD_FILE, JSON.stringify(sod, null, 2)); } catch {} } if (a.breached && a.type === "funded") { a.burned = true; a.breachedAt = sa && sa.breachedAt; }
+function riesgo(a) { if (!a || a.balance == null) return; applyPlan(a); const R = rulesOf(a.id); const peak = peakDe(a.id, a.balance, enCierre()), locked = a.type === 'funded' && peak > R.start + R.lockTriggerOver;
+  a.peak = peak; a.floor = locked ? R.start + R.lockFloorOver : peak - R.dd; a.locked = locked; const sa = sod.accounts[a.id]; // MAX LOSS: 25K pierde $1,000 desde 25,000; 50K pierde $2,000 desde 50,000 (desde el pico o acumulado) = QUEMADA
+  a.breached = a.balance <= a.floor || a.balance <= R.start - R.dd || !!(sa && sa.breachedAt); if (a.breached && sa && !sa.breachedAt) { sa.breachedAt = new Date().toISOString(); try { fs.writeFileSync(SOD_FILE, JSON.stringify(sod, null, 2)); } catch {} } if (a.breached && a.type === "funded") { a.burned = true; a.breachedAt = sa && sa.breachedAt; }
   if (a.breached) console.log('MAX LOSS roto:', a.id, a.type, 'saldo', a.balance, '<= piso', a.floor); }
 // Cuentas vivas que no se leyeron en este ciclo (p. ej. pausa-lectura.flag activo o servidor reiniciado): usar el último saldo leído (sod.json)
 function rellenar(live) { for (const a of Object.values(state.accounts)) if (a.floor == null) riesgo(a); for (const id of live || []) { if (state.accounts[id] || !/^LF[EF]/.test(id)) continue; const s = sod.accounts[id]; if (!s || s.lastBal == null) continue;
   const a = state.accounts[id] = { id, type: typeOf(id), balance: s.lastBal, equity: s.lastBal, profit: 0, readAt: s.lastAt || null, stale: true, tradingDay: s.day };
-  if (s.day === tradingDay()) { a.startOfDay = s.bal; a.dayPnl = Math.round((s.lastBal - s.bal) * 100) / 100; } a.totalPnl = Math.round((s.lastBal - 25000) * 100) / 100; riesgo(a); } }
+  if (s.day === tradingDay()) { a.startOfDay = s.bal; a.dayPnl = Math.round((s.lastBal - s.bal) * 100) / 100; } applyPlan(a); riesgo(a); } }
 let cycling = false;
 async function cycle() {
   if (cycling) return; cycling = true;
@@ -251,6 +265,11 @@ try {
   colchonHooks.onCierre = (s) => { try { reporte.alCerrar(s); } catch (e) { console.log('reporte:', e && e.message); } };
   console.log('reporte: Reporte de trades en TradingView listo');
 } catch (e) { console.log('reporte: no arrancó; el motor sigue.', e && e.message); }
+// Vista previa del panel: solo dibuja. No abre, no modifica y no cierra órdenes, y no repone reportes.
+const vistaPrevia = createVistaPrevia({
+  cotizar: async () => { const E = await cdpEvaluator(9222); try { return await E.evaluate(js.lastPrice); } finally { try { E.close(); } catch {} } },
+  dibujar: async (expr) => { const E = await cdpEvaluator(9222); try { return await E.evaluate(expr); } finally { try { E.close(); } catch {} } },
+});
 function roundTrips(ex) { const by = {}; for (const x of [...ex].sort((a, b) => a.time - b.time)) (by[x.symbol] ||= []).push(x);
   const out = []; for (const [sym, l] of Object.entries(by)) { const pv = PV(sym); let pos = 0, cash = 0, t0 = null, q = 0, first = null, comm = 0, commOk = true, entry = 0;
     for (const x of l) { if (!pos) { t0 = x.time; first = x.side; q = 0; cash = 0; comm = 0; commOk = true; entry = x.price; } pos += x.side * x.qty; cash -= x.side * x.qty * x.price; if (x.side === first) q += x.qty; if (x.comm == null) commOk = false; else comm += x.comm;
@@ -268,6 +287,7 @@ const propiasH = estrategiasPropias({ port: PORT }); // /api/estrategias-propias
 http.createServer((q, r) => {
   if (propiasH(q, r)) return;
   if (negocioH(q, r)) return;
+  if (q.url.startsWith('/api/vista-previa')) { let b = ''; q.on('data', c => b += c); q.on('end', async () => { let out; try { let j = {}; try { j = JSON.parse(b || '{}'); } catch { j = {}; } if (colchon.status().state === 'running') j = { activo: false, seq: j.seq || 0 }; out = await vistaPrevia.aplicar(j); } catch (e) { out = { ok: false, estado: 'no-disponible', texto: 'Vista previa no disponible' }; } r.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); r.end(JSON.stringify(out)); }); return; }
   if (/^\/(logros|metas)\.json/.test(q.url)) { let t='{}'; try { t = fs.readFileSync(path.join(DIR, q.url.startsWith('/logros') ? 'logros.json' : 'metas.json'), 'utf8'); } catch {} r.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); return r.end(t); }
   if (q.url.startsWith('/accounts.json')) { r.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); return r.end(JSON.stringify(state)); }
   if (q.url.startsWith('/api/colchon/')) { let b=''; q.on('data',c=>b+=c); q.on('end', async()=>{ let j={}; try{j=JSON.parse(b||'{}')}catch{} let out;

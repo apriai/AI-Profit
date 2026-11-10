@@ -1,7 +1,8 @@
 // tv-reporte.mjs — Reporte de trades en TradingView.
 // Dibuja UNA vez el cierre que acaba de confirmarse (granja o, si el bróker avisa en vivo, manual).
-// No barre el historial, no encola, no repone al reconectar ni al reiniciar, no vigila dibujos ya hechos.
-// No coloca, modifica ni cancela órdenes. Si este módulo falla, el motor sigue.
+// No barre el historial ni vigila dibujos ya hechos. Si faltan fills o TradingView no responde,
+// el cierre queda pendiente y se reintenta al volver a avisar o al reconectar la escucha.
+// No repone un dibujo ya hecho. No coloca, modifica ni cancela órdenes. Si este módulo falla, el motor sigue.
 //
 // Frase de mantenimiento: «reporte trades en TradingView» = este archivo.
 import fs from 'node:fs';
@@ -12,9 +13,12 @@ export const TITULO = 'Reporte de trades en TradingView';
 export const GRUPO = 'reporte';
 export const ESTILO = 'unified-box-v2-outside';
 export const ARCHIVO = 'tv-reporte.json';
-// Reintentos SOLO dentro del mismo cierre, antes de crear dibujos (fills o chart aún vacíos).
-// No se usa al reconectar. El dibujo en sí se envía una sola vez.
-export const ESPERAS_MS = [0, 350, 800];
+// Reintentos dentro del mismo cierre, antes de crear dibujos (fills o chart aún vacíos).
+// Si faltan fills o TradingView no responde, no se memoriza como omitido: se reintenta
+// en un aviso posterior o al reconectar la escucha. El dibujo en sí se envía una sola vez.
+export const ESPERAS_MS = [0, 350, 800, 2000, 5000];
+export const RAZONES_TRANSITORIAS = ['sin fills del cierre', 'TradingView no disponible', 'chart no listo', 'sin chart'];
+export const esTransitorio = razon => RAZONES_TRANSITORIAS.includes(String(razon || ''));
 const CAJA_DESPUES_S = 300;
 const ETIQUETA_DESPUES_S = 360;
 const VENTANA_CIERRE_MS = 15000;
@@ -449,13 +453,25 @@ function clavePos(p) {
   return `${p.accountId || p.cuenta || ''}|${root}`;
 }
 
+function evPendiente(ev) {
+  if (!ev) return null;
+  return {
+    origen: ev.origen || 'granja',
+    accountId: ev.accountId || null,
+    symbol: ev.symbol, side: ev.side, qty: ev.qty ?? null, entry: ev.entry,
+    openAt: ev.openAt ?? null, closeAt: ev.closeAt ?? null,
+    slVisto: ev.slVisto ?? null, tpVisto: ev.tpVisto ?? null,
+    ajuste: ev.ajuste || null,
+  };
+}
+
 function cargar(file) {
   try {
     const j = JSON.parse(fs.readFileSync(file, 'utf8'));
     if (!j || typeof j !== 'object') throw new Error('vacio');
-    return { v: 1, modulo: MODULO, handled: j.handled && typeof j.handled === 'object' ? j.handled : {}, nextN: Number.isInteger(j.nextN) ? j.nextN : 1, bitacora: Array.isArray(j.bitacora) ? j.bitacora.slice(-40) : [] };
+    return { v: 1, modulo: MODULO, handled: j.handled && typeof j.handled === 'object' ? j.handled : {}, nextN: Number.isInteger(j.nextN) ? j.nextN : 1, bitacora: Array.isArray(j.bitacora) ? j.bitacora.slice(-40) : [], pending: j.pending && typeof j.pending === 'object' ? j.pending : {} };
   } catch {
-    return { v: 1, modulo: MODULO, handled: {}, nextN: 1, bitacora: [] };
+    return { v: 1, modulo: MODULO, handled: {}, nextN: 1, bitacora: [], pending: {} };
   }
 }
 function guardar(file, st) {
@@ -477,7 +493,7 @@ export function createReporte(opts = {}) {
   let parado = false;
   const api = {
     archivo: file,
-    estado: () => ({ handled: st.handled, nextN: st.nextN, bitacora: st.bitacora }),
+    estado: () => ({ handled: st.handled, nextN: st.nextN, bitacora: st.bitacora, pending: st.pending }),
     memoria: () => mem,
     alCerrar(raw) {
       const run = tail.then(() => uno(raw), () => uno(raw));
@@ -499,7 +515,24 @@ export function createReporte(opts = {}) {
     resetMemoria() { mem = { open: {} }; },
     detener() { parado = true; },
     get parado() { return parado; },
+    async reintentarPendientes() {
+      const items = Object.values(st.pending || {});
+      if (!items.length) return { n: 0, resultados: [] };
+      log('reintento de', items.length, 'cierre(s) pendiente(s)');
+      const out = [];
+      for (const p of items) {
+        if (!p || !p.ev) continue;
+        out.push(await api.alCerrar(p.ev));
+      }
+      return { n: out.length, resultados: out };
+    },
   };
+  function quitarPendiente(ev, extraKey) {
+    if (!st.pending) return;
+    const prov = ev && claveProvisional(ev);
+    if (prov && st.pending[prov]) delete st.pending[prov];
+    if (extraKey && st.pending[extraKey]) delete st.pending[extraKey];
+  }
   function anotar(rec) {
     st.bitacora.push({ at: new Date(now()).toISOString(), ...rec });
     st.bitacora = st.bitacora.slice(-40);
@@ -517,20 +550,22 @@ export function createReporte(opts = {}) {
       if (!st.handled[key]) { st.handled[key] = { status: 'omitido', razon: 'sin valor por punto', at: new Date(now()).toISOString() }; anotar({ status: 'omitido', razon: 'sin valor por punto', cuenta: maskCuenta(ev.cuenta) }); }
       return { status: 'omitido', key, razon: 'sin valor por punto', ms: now() - t0 };
     }
-    let trip = null, lastRazon = 'sin fills del cierre', bloqueo = null;
+    let trip = null, lastRazon = 'sin fills del cierre', lastFills = 0, bloqueo = null;
     for (let i = 0; i < ESPERAS_MS.length; i++) {
       if (i) await sleep(ESPERAS_MS[i]);
       if (!opts.readExec) { lastRazon = 'sin lector de fills'; break; }
       let pack = null;
-      try { pack = await opts.readExec(); } catch (e) { lastRazon = 'TradingView no disponible'; continue; }
-      if (!pack || !Array.isArray(pack.ex)) { lastRazon = 'sin fills del cierre'; continue; }
+      try { pack = await opts.readExec(); } catch (e) { lastRazon = 'TradingView no disponible'; lastFills = 0; continue; }
+      if (pack && pack.error === 'no-api') { lastRazon = 'TradingView no disponible'; lastFills = 0; continue; }
+      if (!pack || !Array.isArray(pack.ex)) { lastRazon = 'sin fills del cierre'; lastFills = 0; continue; }
+      lastFills = pack.ex.length;
       const trips = cierresDeFills(pack.ex, { cuenta: pack.cuenta || ev.cuenta, accountId: pack.accountId || ev.accountId });
       const cuentaEv = { ...ev, cuenta: ev.cuenta || pack.cuenta || null, accountId: ev.accountId || pack.accountId || null };
       trip = elegirCierre(trips, cuentaEv, now());
       if (!trip) { lastRazon = 'sin fills del cierre'; continue; }
       Object.assign(ev, { cuenta: cuentaEv.cuenta, accountId: cuentaEv.accountId });
       const key = claveTrade(trip);
-      if (st.handled[key]) return { status: 'ya', key, ms: now() - t0 };
+      if (st.handled[key]) { quitarPendiente(ev, prov); try { guardar(file, st); } catch {} return { status: 'ya', key, ms: now() - t0 }; }
       if (!opts.readCharts) { lastRazon = 'sin lector de chart'; break; }
       let charts = null;
       try { charts = await opts.readCharts(); } catch (e) { lastRazon = 'TradingView no disponible'; continue; }
@@ -554,32 +589,49 @@ export function createReporte(opts = {}) {
       if (res && res.ok && Array.isArray(res.ids) && res.ids.length) {
         st.nextN += 1;
         st.handled[key] = { status: 'dibujado', ids: res.ids, save: res.save || null, at: new Date(now()).toISOString(), n: trade.n, root: trip.root, cuenta: maskCuenta(ev.cuenta) };
-        anotar({ status: 'dibujado', n: trade.n, root: trip.root, cuenta: maskCuenta(ev.cuenta), save: res.save && res.save.method || null });
-        return { status: 'dibujado', key, ids: res.ids, ms: now() - t0, save: res.save || null };
+        quitarPendiente(ev, prov);
+        anotar({ status: 'dibujado', n: trade.n, root: trip.root, cuenta: maskCuenta(ev.cuenta), fills: lastFills, save: res.save && res.save.method || null });
+        log('dibujado', 'n', trade.n, 'fills', lastFills, 'cuenta', maskCuenta(ev.cuenta), 'root', trip.root);
+        return { status: 'dibujado', key, ids: res.ids, ms: now() - t0, save: res.save || null, fills: lastFills };
       }
       st.handled[key] = { status: res && res.partial ? 'parcial' : 'omitido', razon: (res && res.reason) || (res && res.error) || 'dibujo incompleto', ids: res && res.ids || [], at: new Date(now()).toISOString(), n: trade.n };
       anotar({ status: st.handled[key].status, razon: st.handled[key].razon, cuenta: maskCuenta(ev.cuenta), root: trip.root });
       return { status: st.handled[key].status, key, razon: st.handled[key].razon, ms: now() - t0 };
     }
     const key = prov || `omitido:${ev.accountId || ev.cuenta || ''}|${root}|${ev.side}|${ev.entry ?? ''}|${ev.closeAt ?? ''}`;
+    if (esTransitorio(lastRazon)) {
+      st.pending = st.pending || {};
+      if (prov) st.pending[prov] = { ev: evPendiente(ev), razon: lastRazon, fills: lastFills, at: new Date(now()).toISOString() };
+      anotar({ status: 'omitido', razon: lastRazon, transitorio: true, fills: lastFills, cuenta: maskCuenta(ev.cuenta), root });
+      log('omitido transitorio', lastRazon, 'fills', lastFills, 'cuenta', maskCuenta(ev.cuenta), 'root', root, '(se reintenta)');
+      return { status: 'omitido', key, razon: lastRazon, transitorio: true, fills: lastFills, ms: now() - t0 };
+    }
     if (!st.handled[key]) {
       st.handled[key] = { status: 'omitido', razon: lastRazon, at: new Date(now()).toISOString() };
-      anotar({ status: 'omitido', razon: lastRazon, cuenta: maskCuenta(ev.cuenta), root });
+      quitarPendiente(ev, prov);
+      anotar({ status: 'omitido', razon: lastRazon, fills: lastFills, cuenta: maskCuenta(ev.cuenta), root });
     }
-    return { status: 'omitido', key, razon: lastRazon, ms: now() - t0 };
+    log('omitido', lastRazon, 'fills', lastFills, 'cuenta', maskCuenta(ev.cuenta), 'root', root);
+    return { status: 'omitido', key, razon: lastRazon, ms: now() - t0, fills: lastFills };
   }
   return api;
 }
 
 export const READ_EXEC_JS = (PAGE) => `(async function(){${PAGE}
   var ab=tvBroker(tvTrading()); if(!ab) return {error:'no-api'};
+  if(typeof ab.allExecutions!=='function'&&typeof ab.executions!=='function') return {error:'no-api'};
   var cuenta=null, accountId=null;
   try{ accountId=String(tvWv(ab.currentAccount())); }catch(e){}
   try{ var ms=await ab.accountsMetainfo(); var ci=accountId; (ms||[]).forEach(function(m){ if(String(m.id)===String(ci)) cuenta=m.name; }); }catch(e){}
   if(!cuenta){ try{ var n=document.querySelector('[class*=accountName]'); cuenta=n?n.innerText.trim():null; }catch(e){} }
   var l=null; try{ l=await ab.allExecutions(); }catch(e){}
-  if(!l||!l.length){ l=[]; var sy=[]; try{ var cs=window.TradingViewApi.activeChart().symbol(); if(cs) sy.push(cs); }catch(e){}
-    for(var i=0;i<sy.length;i++){ try{ (await ab.executions(sy[i])||[]).forEach(function(x){ if(!l.some(function(y){ return String(y.id)===String(x.id); })) l.push(x); }); }catch(e){} } }
+  if(!l||!l.length){
+    l=[];
+    var sy=['CME_MINI:MNQZ2026','CME_MINI:NQZ2026'];
+    try{ var w=window.TradingViewApi&&window.TradingViewApi._activeChartWidgetWV; var cs=w&&w.value&&w.value().symbol(); if(cs&&sy.indexOf(cs)<0) sy.push(cs); }catch(e){}
+    try{ var c=window.TradingViewApi&&window.TradingViewApi.activeChart&&window.TradingViewApi.activeChart(); var s=c&&c.symbol&&c.symbol(); if(s&&sy.indexOf(s)<0) sy.push(s); }catch(e2){}
+    for(var i=0;i<sy.length;i++){ try{ (await ab.executions(sy[i])||[]).forEach(function(x){ if(!l.some(function(y){ return String(y.id)===String(x.id); })) l.push(x); }); }catch(e){} }
+  }
   return {cuenta:cuenta, accountId:accountId, ex:(l||[]).map(function(x){ return {id:String(x.id), symbol:x.symbol, price:+x.price, qty:Math.abs(+x.qty), side:+x.side, time:+x.time}; })};
 })()`;
 
@@ -673,6 +725,7 @@ async function escuchar(rep, port, page) {
       await client.Runtime.evaluate({ expression: expr, awaitPromise: true, returnByValue: true });
       espera = 2000;
       avisado = false;
+      try { await rep.reintentarPendientes(); } catch (e) { console.log('[reporte] reintento pendientes', e && e.message); }
       await new Promise(r => client.on('disconnect', r));
     } catch (e) {
       if (!avisado) { avisado = true; console.log('[reporte] escucha en espera (no repone dibujos):', e && e.message || e); }

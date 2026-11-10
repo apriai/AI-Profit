@@ -1,9 +1,9 @@
-// Registro de estrategias. Orden: Evaluación → Evaluación con trailing → Rascacielo (Dia Minimo+Colchon) → Rascacielo → Fast Breakeven.
+// Registro de estrategias. Orden: Evaluación → Evaluación con trailing → Rascacielo (Dia Minimo+Colchon) → Rascacielo → Fast Breakeven → Dos disparos · 1:2.
 // Explicaciones al estilo flecha: +$300 → protege $100. Todas usan el mismo motor colchon (modifyOrder / Tradovate·Bit).
 // Rascacielo / Fast Breakeven: idea de Karol (PR #19), integradas en 0.8.0.
 // Las propias (estrategias-propias.json, solo esta computadora) se agregan al final con propia:true y no pisan un id de serie.
 import { getPropia, listPropias } from './estrategias-propias.mjs';
-export const STRATEGY_ORDER = ['evaluacion-simple', 'evaluacion', 'dia-minimo-colchon', 'rascacielo', 'prueba-be'];
+export const STRATEGY_ORDER = ['evaluacion-simple', 'evaluacion', 'dia-minimo-colchon', 'rascacielo', 'prueba-be', 'dos-disparos'];
 export const STRATEGIES = {
   'evaluacion-simple': {
     id: 'evaluacion-simple', name: 'Evaluación',
@@ -35,6 +35,12 @@ export const STRATEGIES = {
     description: "Fast Breakeven. Operación: entra a mercado con SL −$630 y TP +$630. AI: +$15 → el stop sube a la entrada +3 ticks de ganancia (0.75 pts), para cubrir al menos la comisión. Se mueve una sola vez.",
     params: { SL_USD: 630, TP_USD: 630, STEPS: [{ trigger: 15, lockTicks: 3 }], PROB: 'tp', DEFAULT_QTY: { MNQ: 8, NQ: 1 } },
   },
+  'dos-disparos': {
+    id: 'dos-disparos', name: 'Dos disparos · 1:2',
+    short: "Operación: SL −$300 / TP +$630 (25K) · 50K: −$600 / +$1,260\nAI: el stop no se mueve; hasta 2 intentos al día",
+    description: "Dos disparos · 1:2. Operación: entra a mercado con SL −$300 y TP +$630 en una cuenta de 25K (en 50K, el doble: SL −$600 y TP +$1,260). AI: el stop no se mueve; termina en TP, en SL o si la cierras tú. Hasta 2 intentos al día (el segundo lo abres tú; el motor no reentra solo).",
+    params: { SL_USD: 300, TP_USD: 630, STEPS: [], SCALE_BY_SIZE: { '25K': 1, '50K': 2 }, DEFAULT_QTY: { MNQ: 8, NQ: 1 } },
+  },
 };
 export const DEFAULT_STRATEGY = 'evaluacion-simple';
 const pubBuilt = s => { const { id, name, short, description, params } = s; return { id, name, short, description, params, default: id === DEFAULT_STRATEGY, propia: false }; };
@@ -50,3 +56,4 @@ export const listStrategies = () => {
   const have = new Set(built.map(s => s.id));
   return built.concat(listPropias().filter(s => s && s.id && !have.has(s.id)));
 };
+export { accountPlanSize, paramsForAccount, rulesFor, PLANS, attachPlan } from './account-size.mjs';

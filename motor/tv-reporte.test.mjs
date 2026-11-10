@@ -8,7 +8,7 @@ import {
   MODULO, TITULO, GRUPO, ESTILO, ESPERAS_MS, ARCHIVO,
   rootOf, cierresDeFills, planDibujo, pasosDibujo, expresionDibujo, expresionDibujo as expr,
   reducirPosiciones, eventoDesdeGranja, createReporte, textoDuracion, textoPnl, colorPnl, horaET,
-  READ_EXEC_JS, READ_CHARTS_JS, JS_ESCUCHA, chartBloquea,
+  READ_EXEC_JS, READ_CHARTS_JS, JS_ESCUCHA, chartBloquea, esTransitorio,
 } from './tv-reporte.mjs';
 
 const PROHIBIDO = /placeOrder|modifyOrder|editPositionBrackets|closePosition|cancelOrder|createEditOrderContext|setCurrentAccount|removeAllShapes|setSymbol/;
@@ -55,6 +55,7 @@ function banco(dir, opt = {}) {
     readExec: async () => {
       reads.push(1);
       if (state.failRead) { state.failRead--; throw new Error('ECONNREFUSED'); }
+      if (state.noApi) return { error: 'no-api' };
       const ex = typeof state.ex === 'function' ? state.ex(reads.length) : state.ex;
       return { cuenta: CUENTA, accountId: '99', ex };
     },
@@ -174,7 +175,7 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'tv-reporte-'));
   ok(!b2.reads.length || b2.draws.length === 0);
 }
 
-// --- sin TradingView: se omite y no se repone ---
+// --- sin TradingView: transitorio, se reintenta y luego dibuja una vez ---
 {
   const dir = tmp();
   const s = muestra();
@@ -183,18 +184,60 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'tv-reporte-'));
   const r = await b.rep.alCerrar(s.aviso);
   eq(r.status, 'omitido');
   eq(r.razon, 'TradingView no disponible');
+  eq(r.transitorio, true);
   eq(b.draws.length, 0);
-  eq(b.sleeps, [350, 800]);
-  eq(ESPERAS_MS, [0, 350, 800]);
+  eq(b.sleeps, [350, 800, 2000, 5000]);
+  eq(ESPERAS_MS, [0, 350, 800, 2000, 5000]);
+  ok(esTransitorio('TradingView no disponible') && esTransitorio('sin fills del cierre'));
+  ok(!esTransitorio('simbolo distinto') && !esTransitorio('dibujo no confirmado'));
+  const guardado1 = JSON.parse(fs.readFileSync(path.join(dir, ARCHIVO), 'utf8'));
+  ok(!Object.keys(guardado1.handled || {}).length, 'un fallo transitorio no queda en handled');
+  ok(Object.keys(guardado1.pending || {}).length === 1, 'queda pendiente para reintentar');
+  ok(!JSON.stringify(guardado1).includes(CUENTA), 'el pendiente no guarda la cuenta completa');
   const antes = b.reads.length;
+  eq(antes, 5);
   const r2 = await b.rep.alCerrar(s.aviso);
-  eq(r2.status, 'ya');
-  eq(b.reads.length, antes, 'un segundo aviso no vuelve a intentar');
+  eq(r2.status, 'omitido');
+  eq(r2.transitorio, true);
+  ok(b.reads.length > antes, 'un segundo aviso vuelve a intentar si fue transitorio');
+  eq(b.draws.length, 0);
   b.state.failRead = 0;
+  const rOk = await b.rep.alCerrar(s.aviso);
+  eq(rOk.status, 'dibujado');
+  eq(b.draws.length, 1);
   const b2 = banco(dir, { ex: s.ex });
   const r3 = await b2.rep.alCerrar(s.aviso);
   eq(r3.status, 'ya');
-  eq(b2.draws.length, 0, 'reconectar o reiniciar no pone al día lo omitido');
+  eq(b2.draws.length, 0, 'una vez dibujado, reiniciar no recrea');
+}
+
+// --- no-api y fills que llegan tarde: transitorio, luego dibuja; reconnect reintenta pendientes ---
+{
+  const dir = tmp();
+  const s = muestra();
+  const b = banco(dir, { ex: [] });
+  b.state.noApi = true;
+  const r = await b.rep.alCerrar(s.aviso);
+  eq(r.status, 'omitido');
+  eq(r.razon, 'TradingView no disponible');
+  eq(r.transitorio, true);
+  eq(r.fills, 0);
+  b.state.noApi = false;
+  const rFills = await b.rep.alCerrar(s.aviso);
+  eq(rFills.status, 'omitido');
+  eq(rFills.razon, 'sin fills del cierre');
+  eq(rFills.transitorio, true);
+  eq(rFills.fills, 0);
+  eq(b.draws.length, 0);
+  const b2 = banco(dir, { ex: s.ex });
+  const flush = await b2.rep.reintentarPendientes();
+  eq(flush.n, 1);
+  eq(flush.resultados[0].status, 'dibujado');
+  eq(b2.draws.length, 1);
+  const flush2 = await b2.rep.reintentarPendientes();
+  eq(flush2.n, 0);
+  eq(flush2.resultados.length, 0);
+  eq(b2.draws.length, 1, 'el reintento posterior no duplica el dibujo');
 }
 
 // --- símbolo distinto: no dibuja y no espera a que el usuario cambie el chart ---
@@ -360,6 +403,11 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'tv-reporte-'));
   ok(!PROHIBIDO.test(page), 'las lecturas no envían órdenes');
   eq(expr && MODULO, 'tv-reporte');
   ok(rootOf('CME_MINI:MNQ1!') === 'MNQ' && rootOf('CME_MINI:NQ1!') === 'NQ' && rootOf('CME_MINI:MESZ2026') === 'MES');
+  const execJs = READ_EXEC_JS('');
+  ok(execJs.includes('CME_MINI:MNQZ2026') && execJs.includes('CME_MINI:NQZ2026'), 'el lector pide los contratos fechados, como brokerExecs');
+  ok(execJs.includes('_activeChartWidgetWV'), 'el fallback de símbolo coincide con brokerExecs');
+  ok(execJs.includes("return {error:'no-api'}"));
+
 }
 
 console.log(`tv-reporte: ${pass} comprobaciones`);

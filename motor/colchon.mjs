@@ -1,4 +1,4 @@
-import { getStrategy, listStrategies, DEFAULT_STRATEGY } from './strategies.mjs';
+import { getStrategy, listStrategies, DEFAULT_STRATEGY, paramsForAccount, accountPlanSize, rulesFor } from './strategies.mjs';
 // TradingLink - "Colchón" (stop-to-profit). Paper/Demo, y cuentas reales Lucid (LFE/LFF) SOLO si están en real-allowlist.json, con confirmReal (el motor puede activarla con setCurrentAccount si no hay trades/órdenes abiertas).
 // La IA nunca coloca/modifica/cierra órdenes: solo el usuario arranca una prueba desde la Granja.
 // Servidor: import { colchon } from './colchon.mjs'  -> colchon.start({side,symbol,qty}), colchon.stop(), colchon.status()
@@ -48,6 +48,36 @@ export function isPaper(name = '', broker = '') {
   if (/\bLF[EF]\d*/i.test(s) || /lucid/i.test(s)) return false;   // nunca Lucid
   return /paper|demo|\bsim(ulat\w*)?\b/i.test(s);
 }
+
+// Datos de la cuenta al abrir (nombre Lucid + inicio/startOfDay de la granja, si existen).
+function accountHintFor(name) {
+  const id = String(name || '').trim();
+  const hint = { name: id, id };
+  if (!id) return hint;
+  try {
+    const j = JSON.parse(fs.readFileSync(path.join(DIR, 'accounts.json'), 'utf8'));
+    const a = j && j.accounts && j.accounts[id];
+    if (a) {
+      if (a.startOfDay != null) hint.startOfDay = a.startOfDay;
+      if (a.balance != null) hint.balance = a.balance;
+      if (a.inicio != null) hint.inicio = a.inicio;
+      if (a.start != null) hint.start = a.start;
+      if (a.planStart != null) hint.planStart = a.planStart;
+      if (a.plan) hint.plan = a.plan;
+      if (a.size) hint.size = a.size;
+    }
+  } catch {}
+  try {
+    const j = JSON.parse(fs.readFileSync(path.join(DIR, 'sod.json'), 'utf8'));
+    const s = j && j.accounts && j.accounts[id];
+    if (s) {
+      if (s.inicio != null) hint.inicio = s.inicio;
+      if (hint.startOfDay == null && s.bal != null) hint.startOfDay = s.bal;
+    }
+  } catch {}
+  return hint;
+}
+
 
 // ---- Lógica pura del colchón ----
 export function decide(pos, stop, st, c) {
@@ -416,7 +446,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
     if (S.reason === 'sl' && S.lockTarget != null && !S.locked) { S.locked = true; S.lockPrice = S.lockTarget; S.sl = S.lockTarget; S.lockPending = false; } // salió por stop en el precio del colchón
     if (S.reason === 'sl' && S.lockTarget != null) S.sl = S.lockTarget;
     const pnlSL = S.sl != null && S.entry != null ? Math.round((S.sl - S.entry) * (S.side === 'long' ? 1 : -1) * PT_USD[S.symbol] * S.qty * 100) / 100 : null;
-    const SP = (S.strategy && getStrategy(S.strategy.id) || getStrategy()).params; const pnlFinal0 = S.reason === 'tp' ? SP.TP_USD : S.reason === 'sl' ? pnlSL : S.pnl; const usaBroker = pnlFinal0 == null && typeof S.pnlBroker === 'number'; const pnlFinal = usaBroker ? S.pnlBroker : pnlFinal0;
+    const SP = S.P || (S.strategy && getStrategy(S.strategy.id) || getStrategy()).params; const pnlFinal0 = S.reason === 'tp' ? SP.TP_USD : S.reason === 'sl' ? pnlSL : S.pnl; const usaBroker = pnlFinal0 == null && typeof S.pnlBroker === 'number'; const pnlFinal = usaBroker ? S.pnlBroker : pnlFinal0;
     last = { fin: new Date().toISOString(), cuenta: S.account && S.account.name, modo: S.mode, direccion: S.side === 'long' ? 'COMPRA' : 'VENTA', tamano: `${S.qty} ${S.symbol}`, motivo: { tp: 'Take profit', sl: 'Stop loss', stop: 'Detenido manualmente', flat: 'Posición cerrada', '4:45pm': 'Cierre 4:45 PM ET', error: 'Error' }[S.reason] || S.reason || '—',
       ajusteFill: S.ajuste || null, estrategia: S.strategy ? S.strategy.name : null, estrategiaId: S.strategy ? S.strategy.id : null, ...tiempos(), entrada: S.entry, pnlFinalUSD: pnlFinal, pnlFinalAprox: usaBroker ? false : !(S.reason === 'tp' || S.reason === 'sl'), colchonMovido: S.locked, slColchon: S.lockPrice, pasos: (S.pasos || []).map(p => ({ paso: p.paso, disparoUSD: p.disparoUSD, protegeUSD: p.protegeUSD, precio: p.precio, enSeg: p.enSeg, confirmado: p.confirmado, saltados: p.saltados, latenciaSeg: p.latencia ? Math.round(p.latencia.totalDesdeLecturaMs / 10) / 100 : null })), probabilidadNecesaria: S.qty ? breakEvenFor(S.symbol, S.qty, SP) : null, pasosTotal: S.steps ? S.steps.length : null, colchonUSD: S.qty ? ((S.pasos && S.pasos.length) ? S.pasos[S.pasos.length - 1].protegeUSD : (SP.STEPS ? null : lockUsdFor(S.symbol, S.qty, SP))) : null, disparoUSD: S.qty && !SP.STEPS ? triggerUsdFor(S.symbol, S.qty, SP) : null, latencia: S.latency || null, fuenteModo: S.fuenteModo || null, fuenteLider: S.fuenteLider || null, fuentes: S.fuentesStats || null, alerta: S.alerta || null, inicio: S.startedAt, error: S.error };
     S.summary = last; try { fs.writeFileSync(path.join(path.dirname(logFile), 'colchon-resumen.json'), JSON.stringify(last, null, 2)); } catch {}
@@ -436,7 +466,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
   return {
     check,
     strategies: () => ({ ok: true, default: DEFAULT_STRATEGY, strategies: listStrategies() }),
-    async accounts() { try { const r = await (await D()).accounts(); return { ok: true, ...r, accounts: r.accounts.map(a => { const p = accountAllowed(a, `${r.broker} ${r.brokerId}`), re = !p && realAllowed(a.name, allow()); return { ...a, allowed: p || re, real: re, realLabel: re ? realLabel(a.name) : null }; }) }; } catch (e) { driver = null; return { ok: false, err: 'Sin conexión con TradingView: ' + e.message, accounts: [] }; } },
+    async accounts() { try { const r = await (await D()).accounts(); return { ok: true, ...r, accounts: r.accounts.map(a => { const p = accountAllowed(a, `${r.broker} ${r.brokerId}`), re = !p && realAllowed(a.name, allow()); const rules = rulesFor({ id: a.name, name: a.name }); return { ...a, allowed: p || re, real: re, realLabel: re ? realLabel(a.name) : null, plan: rules.size, scale: rules.scale, start: rules.start, planStart: rules.start, dd: rules.dd, dailyLoss: rules.dailyLoss, profitTarget: rules.profitTarget, lockTriggerOver: rules.lockTriggerOver, lockFloorOver: rules.lockFloorOver, atRisk: rules.atRisk }; }) }; } catch (e) { driver = null; return { ok: false, err: 'Sin conexión con TradingView: ' + e.message, accounts: [] }; } },
     async start(args = {}) {
       if (S.state === 'running') return { ok: false, err: 'Ya hay una prueba corriendo' };
       if (acctGuard.testActive) return { ok: false, err: 'esperando lectura…', waitingLectura: true };
@@ -456,10 +486,10 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
       if (!['long', 'short'].includes(side) || !(symbol in SIZES)) return { ok: false, err: 'Parámetros inválidos' };
       qty = qty == null || qty === '' ? ((strat.params.DEFAULT_QTY || {})[symbol] ?? (symbol === DEFAULT.symbol ? DEFAULT.qty : 1)) : Number(qty);
       if (!Number.isInteger(qty) || qty < 1 || qty > SIZES[symbol]) return { ok: false, err: `Cantidad inválida: ${symbol} entre 1 y ${SIZES[symbol]}` };
-      let switched = null;
+      let switched = null, chosen = null;
       if (accountId != null && accountId !== '') {
         const l = await this.accounts(); if (!l.ok) return { ok: false, err: l.err };
-        const a = l.accounts.find(x => x.id === String(accountId)); if (!a) return { ok: false, err: 'Cuenta no encontrada' };
+        const a = l.accounts.find(x => x.id === String(accountId)); if (!a) return { ok: false, err: 'Cuenta no encontrada' }; chosen = a;
         if (!a.allowed) return { ok: false, blocked: true, err: `Bloqueado: ${a.name} no es Paper/Demo ni está en real-allowlist.json` };
         if (a.real && confirmReal !== true) return { ok: false, blocked: true, needConfirm: true, err: `CUENTA REAL · ${a.realLabel}: falta confirmación` };
         if (!a.current && S.state === 'running') return { ok: false, err: 'Hay una prueba en marcha: no se cambia de cuenta' };
@@ -471,10 +501,11 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
       if (chk.real && confirmReal !== true) return { ok: false, blocked: true, needConfirm: true, err: `CUENTA REAL · ${chk.realLabel}: falta confirmación (confirmReal)` };
       const exec = chk.paper || (chk.real && confirmReal === true);
       if (accountId != null && accountId !== '' && !exec) return { ok: false, blocked: true, err: chk.msg };
-      const P = strat.params, c = { side, symbol, qty, P, strategy: { id: strat.id, name: strat.name }, steps: stepsFor(symbol, qty, P) }, slPts = ptsFor(P.SL_USD, symbol, qty), tpPts = ptsFor(P.TP_USD, symbol, qty);
-      S = { ...S, pnlBroker: null, summary: null, reason: null, lockTarget: null, lockPending: false, openAt: null, closeAt: null, lockAt: null, tpPrice: null, latency: null, state: 'running', strategy: { id: strat.id, name: strat.name }, steps: stepsFor(symbol, qty, P), step: 0, pasos: [], mode: chk.paper ? 'paper' : chk.real ? 'real' : 'simulacion', realLabel: chk.realLabel || null, alerta: null, emptyN: 0, emptySince: null, kidsWarned: false, fuentesStats: null, account: chk.account, side, symbol, qty, entry: null, price: null, pnl: null, sl: null, slVisto: null, tpVisto: null, tp: tpPts, locked: false, lockPrice: null, error: null, startedAt: new Date().toISOString(), log: [] };
+      const hint = accountHintFor((chk.account && chk.account.name) || (chosen && chosen.name) || '');
+      const P = paramsForAccount(strat.params, hint), c = { side, symbol, qty, P, strategy: { id: strat.id, name: strat.name }, steps: stepsFor(symbol, qty, P) }, slPts = ptsFor(P.SL_USD, symbol, qty), tpPts = ptsFor(P.TP_USD, symbol, qty);
+      S = { ...S, pnlBroker: null, summary: null, reason: null, lockTarget: null, lockPending: false, openAt: null, closeAt: null, lockAt: null, tpPrice: null, latency: null, state: 'running', strategy: { id: strat.id, name: strat.name }, P, steps: stepsFor(symbol, qty, P), step: 0, pasos: [], mode: chk.paper ? 'paper' : chk.real ? 'real' : 'simulacion', realLabel: chk.realLabel || null, alerta: null, emptyN: 0, emptySince: null, kidsWarned: false, fuentesStats: null, account: chk.account, side, symbol, qty, entry: null, price: null, pnl: null, sl: null, slVisto: null, tpVisto: null, tp: tpPts, locked: false, lockPrice: null, error: null, startedAt: new Date().toISOString(), log: [] };
       stopReq = false;
-      log(`Inicio [${strat.name}] ${side === 'long' ? 'COMPRA' : 'VENTA'} ${qty} ${symbol} · SL -$${P.SL_USD} (${slPts} pts) · TP +$${P.TP_USD} (${tpPts} pts) · ${P.STEPS ? (!c.steps.length ? 'stop fijo (sin movimientos)' : 'escalones ' + c.steps.map(x => `+$${x.triggerUsd}→+$${x.lockUsd} (${x.lockPts} pts)`).join(' · ')) : `colchón +$${lockUsdFor(symbol, qty, P)} (${lockPtsFor(symbol, qty, P)} pts, ≈ +$${P.NET_USD} netos), disparo +$${triggerUsdFor(symbol, qty, P)} (${triggerPtsFor(symbol, qty, P)} pts)`} · cuenta ${chk.account.name || '?'} -> ${chk.msg}`);
+      log(`Inicio [${strat.name}] ${side === 'long' ? 'COMPRA' : 'VENTA'} ${qty} ${symbol} · SL -$${P.SL_USD} (${slPts} pts) · TP +$${P.TP_USD} (${tpPts} pts) · ${P.STEPS ? (!c.steps.length ? 'stop fijo (sin movimientos)' : 'escalones ' + c.steps.map(x => `+$${x.triggerUsd}→+$${x.lockUsd} (${x.lockPts} pts)`).join(' · ')) : `colchón +$${lockUsdFor(symbol, qty, P)} (${lockPtsFor(symbol, qty, P)} pts, ≈ +$${P.NET_USD} netos), disparo +$${triggerUsdFor(symbol, qty, P)} (${triggerPtsFor(symbol, qty, P)} pts)`} · cuenta ${chk.account.name || '?'}${strat.params.SCALE_BY_SIZE ? ' · plan ' + accountPlanSize(hint) : ''} -> ${chk.msg}`);
       if (switched) log(`Cuenta cambiada a ${switched.name} por API (${(switched.ms / 1000).toFixed(2)} s, verificada)`);
       if (chk.real) log(`CUENTA REAL · ${chk.realLabel} · confirmada por el usuario`);
       if (!exec) { log('BLOQUEADO: solo Paper/Demo o cuenta real permitida y confirmada. No se envía ninguna orden.'); S.state = 'blocked'; return { ok: false, blocked: true, err: chk.msg, status: S }; }
