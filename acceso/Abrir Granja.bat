@@ -19,16 +19,14 @@ if errorlevel 1 call :arrancar_servidor
 call :listening 9222
 if not errorlevel 1 goto server
 
-echo El puerto 9222 no responde.
-echo Se cierra TradingView si estaba abierto y se vuelve a abrir con depuracion.
-echo Esto no envia ordenes.
-echo Reiniciando TradingView con el puerto 9222 (cerrarlo no cierra posiciones ni stops en el broker).
+echo TradingView no esta conectado con la granja.
+echo Se cierra y se vuelve a abrir conectado. Esto no envia ordenes ni cierra posiciones ni stops en el broker.
 taskkill /F /IM TradingView.exe >nul 2>&1
 ping -n 4 127.0.0.1 >nul
 set "GRANJA_CALL=1"
 call "%~dp0abrir-tradingview.bat"
 if errorlevel 1 (
-  echo No se pudo abrir TradingView con el puerto 9222. La granja se abre igual.
+  echo TradingView no se conecta. La granja se abre igual.
   goto server
 )
 echo Esperando a TradingView...
@@ -38,7 +36,7 @@ call :listening 9222
 if not errorlevel 1 goto server
 set /a TRIES+=1
 if %TRIES% GEQ 20 (
-  echo TradingView aun no responde en el puerto 9222. La granja se abrira igual.
+  echo TradingView todavia no se conecta. La granja se abrira igual.
   goto server
 )
 ping -n 2 127.0.0.1 >nul
@@ -72,8 +70,7 @@ call :listening_http 8787
 if not errorlevel 1 goto browser
 set /a TRIES+=1
 if %TRIES% GEQ 15 (
-  echo El servidor no respondio en http://127.0.0.1:8787.
-  echo Revisa la ventana minimizada TradingLink.
+  echo No pude abrir la granja. Cierra y vuelve a abrir AI Profit.
   goto browser
 )
 ping -n 2 127.0.0.1 >nul
@@ -90,7 +87,7 @@ if defined CHROME (
   start "" "http://localhost:8787/Granja-de-Cuentas-v2.html"
 )
 echo.
-echo Listo. Granja: http://localhost:8787/Granja-de-Cuentas-v2.html
+echo Listo. La granja se abrio en el navegador.
 echo No cierres la ventana minimizada TradingLink: ahi sigue el servidor.
 echo Puedes cerrar esta ventana.
 ping -n 6 127.0.0.1 >nul

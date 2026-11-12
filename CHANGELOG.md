@@ -10,6 +10,15 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.2] — 2026-11-12
+### Cambiado
+- **La guía de Grok Bot instala siempre la última versión.** `INSTALAR-CON-GROKBOT.md` y `docs/instalacion/` ya no fijan ningún número de versión. El bot consulta la última release publicada (`releases/latest`), baja el zip de esa etiqueta y comprueba que `VERSION` sea esa etiqueta sin la `v`. `profito-guia.json` guarda la versión, la etiqueta y el commit que se instalaron. El Node portable sigue fijado en `v22.23.4` con su SHA-256.
+- **TradingView se reconecta sin preguntar.** Ni la guía ni los accesos piden confirmación para cerrar TradingView. Si no está conectado con la granja, el acceso AI Profit lo cierra y lo vuelve a abrir conectado, solo. El bot sigue sin abrir, reiniciar ni actualizar nada si la granja tiene una operación en curso, pero lo comprueba él, sin preguntar.
+- **Sin puertos en lo que ve la persona.** Los mensajes de `acceso/Abrir Granja.bat`, `acceso/abrir-tradingview.bat`, `acceso/AI Profit.command`, `instalar-ai-profit.ps1` e `instalar-ai-profit.command`, el README, `docs/AI-PROFIT-ACCESO.md` y la guía ya no mencionan números de conexión ni la palabra «puerto». Si la granja no arranca, el mensaje es «No pude abrir la granja. Cierra y vuelve a abrir AI Profit.» Los detalles técnicos para el bot están en `docs/instalacion/notas-internas.md`. Los valores reales de conexión del código no cambian.
+- **El comprobador ya no tiene una versión fija.** `acceso/comprobar-instalacion.mjs` compara el `VERSION` de la carpeta instalada con su marcador o, con `--ultima`, con la última release publicada. Una carpeta `v0.10.1` ya pasa.
+### Notas
+- No cambia el motor ni la página (solo el número de versión de la esquina). No abre, no mueve y no cierra órdenes.
+
 ## [0.10.1] — 2026-11-10
 ### Cambiado
 - **PROFITO riega solo con el panel abierto.** Riega una flor únicamente mientras el panel de esa cuenta sigue abierto. Cerrar el panel por cualquier vía (la X, un clic afuera o el botón TRADE) corta el riego y esconde la regadera.

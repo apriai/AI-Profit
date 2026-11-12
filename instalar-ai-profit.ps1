@@ -128,7 +128,7 @@ $lnk.Save()
 
 Write-Host ''
 Write-Host 'Listo. En el Escritorio quedo el acceso AI Profit.'
-Write-Host 'Un doble clic abre TradingView (puerto 9222), el servidor y la Granja.'
+Write-Host 'Un doble clic abre TradingView conectado, el servidor y la Granja.'
 Write-Host 'No envia ordenes.'
 Write-Host "Carpeta: $root"
 if ($iconNote) { Write-Host $iconNote }

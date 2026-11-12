@@ -64,12 +64,12 @@ listening() {
 }
 
 if ! listening 9222 /json/version; then
-  echo "El puerto 9222 no responde. Se cierra TradingView y se abre con depuración."
-  echo "Esto no envía órdenes."
+  echo "TradingView no está conectado con la granja. Se cierra y se vuelve a abrir conectado."
+  echo "Esto no envía órdenes ni cierra posiciones."
   osascript -e 'quit app "TradingView"' >/dev/null 2>&1 || true
   sleep 3
   if ! open -a TradingView --args --remote-debugging-port=9222; then
-    echo "No pude abrir TradingView. Si está instalado, ábrelo con el puerto 9222."
+    echo "No pude abrir TradingView. Si está instalado, ciérralo y vuelve a abrir AI Profit."
   fi
   echo "Abriendo TradingView..."
   i=0
@@ -104,7 +104,7 @@ if ! listening 8787 /; then
 fi
 
 if ! listening 8787 /; then
-  echo "El servidor no respondió en http://127.0.0.1:8787. Revisa $LOG."
+  echo "No pude abrir la granja. Cierra y vuelve a abrir AI Profit."
 fi
 
 GRANJA_URL="http://localhost:8787/Granja-de-Cuentas-v2.html"

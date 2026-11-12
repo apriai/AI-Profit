@@ -9,7 +9,7 @@ cd /d "%~dp0"
 
 call :listening 9222
 if not errorlevel 1 (
-  echo TradingView ya escucha en el puerto 9222. No se reinicia.
+  echo TradingView ya esta conectado. No se reinicia.
   exit /b 0
 )
 

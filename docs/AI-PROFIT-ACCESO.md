@@ -9,6 +9,6 @@ En Mac eso deja en el Escritorio **AI Profit**. Es un applet de AppleScript (`os
 
 En Windows deja el acceso **AI Profit** con `assets/abrir-granja-icon.ico`.
 
-Cada día, doble clic en **AI Profit**. Abre TradingView con el puerto 9222, enciende el servidor y abre la Granja en Chrome: `http://localhost:8787/Granja-de-Cuentas-v2.html`. No envía órdenes.
+Cada día, doble clic en **AI Profit**. Si TradingView no está conectado con la granja, lo cierra y lo vuelve a abrir conectado, solo y sin preguntar. Después enciende el servidor y abre la Granja en Chrome. No envía órdenes.
 
 Si mueves la carpeta, vuelve a ejecutar el instalador.

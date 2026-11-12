@@ -42,7 +42,7 @@ Doble clic en `acceso\actualizar.bat`.
 3. Abre el acceso **AI Profit** del Escritorio (o `Abrir Granja.bat` / `iniciar-tradinglink.bat`). Si todavía no existe el icono, una vez: `instalar-ai-profit.bat` en Windows o `instalar-ai-profit.command` en Mac.
 
 ## Paso 6: TradingView
-Solo funciona la versión abierta con el puerto 9222. El acceso **AI Profit** (o `Abrir Granja.bat` / `abrir-tradingview.bat`) lo abre así. Si la granja dice "no conectado a TradingView/Tradovate", ciérralo y ábrelo con ese acceso.
+Solo funciona TradingView abierto por el acceso **AI Profit** (o `Abrir Granja.bat` / `abrir-tradingview.bat`). Si no está conectado, el acceso lo cierra y lo vuelve a abrir conectado, sin preguntar. Si la granja dice "no conectado a TradingView/Tradovate", vuelve a abrir ese acceso. A la persona no le des detalles técnicos de conexión ni direcciones locales.
 
 ## Paso 7: verificación
 - `http://localhost:8787/api/colchon/conexion` debe mostrar `tradingview` y `tradovate` conectados y `broker` verdadero.
