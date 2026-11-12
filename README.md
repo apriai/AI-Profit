@@ -16,7 +16,7 @@
 
 Para uso diario: ver [LEEME.md](LEEME.md).
 
-**Instalar en un Windows nuevo, con un bot de Grok:** [INSTALAR-CON-GROKBOT.md](INSTALAR-CON-GROKBOT.md). Es la versión publicada `v0.8.5`, sin copiar las cuentas de otra PC.
+**Instalar en un Windows nuevo, con un bot de Grok:** [INSTALAR-CON-GROKBOT.md](INSTALAR-CON-GROKBOT.md). Instala siempre la última versión publicada ([releases/latest](https://github.com/apriai/AI-Profit/releases/latest)), sin copiar las cuentas de otra PC.
 
 **Prop Farm** es una aplicación web local que gestiona una *granja* de cuentas de evaluación de firmas de fondeo (Lucid, Tradovate) y trae un **motor de ejecución** que habla con TradingView Desktop y con Tradovate para abrir, ajustar y vigilar órdenes de **MNQ / NQ**.
 

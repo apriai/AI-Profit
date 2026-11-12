@@ -1,8 +1,8 @@
 # Si algo falla
 
-## 404 al bajar v0.8.5.zip
+## 404 al bajar el zip de la última versión
 
-El repositorio sigue privado o la etiqueta no está. No pidas un token. No clones. Espera a que el dueño lo haga público y vuelve a intentar esa misma URL. El release `v0.8.5` no incluye un archivo descargable propio.
+El repositorio no es público o la etiqueta no está. No pidas un token. No clones. Espera a que el dueño lo arregle y vuelve a intentarlo: averigua otra vez la última release y baja el zip de esa etiqueta. La release puede traer `Profito-Setup.exe`, pero esta guía usa el zip del código.
 
 ## El SHA-256 de Node no coincide
 
@@ -20,13 +20,13 @@ Sin `profito-guia.json` de esta guía, detente. Puede ser la granja de alguien q
 
 Instálalo desde el sitio oficial de TradingView (aplicación de escritorio o Microsoft Store). El zip de Profito no lo trae. `acceso/abrir-tradingview.bat` lo busca en `%LOCALAPPDATA%\TradingView`, en Archivos de programa y en el paquete de la Store.
 
-## El 9222 no responde
+## TradingView no se conecta
 
-No lances `taskkill` a mano. Pregunta, guarda el gráfico, confirma que no hay posición ni órdenes, y solo entonces usa el acceso **AI Profit**, que es quien cierra y reabre TradingView. Si TradingView se abrió desde el menú Inicio, normalmente no lleva el puerto 9222.
+No lances `taskkill` a mano y no le preguntes nada a la persona. Vuelve a abrir el acceso **AI Profit**: es quien cierra y reabre TradingView conectado. Si TradingView se abrió desde el menú Inicio, normalmente no queda conectado; el acceso lo arregla solo.
 
-## El 8787 no responde
+## La granja no abre
 
-Mira la ventana minimizada «TradingLink». Si la cerraste, el servidor se apagó: vuelve a abrir **AI Profit** con el mismo aviso. Otro programa en ese puerto también impide arrancar; no lo mates a ciegas.
+Mira la ventana minimizada «TradingLink». Si la cerraste, el servidor se apagó: vuelve a abrir **AI Profit**. Si otro programa ocupa la conexión de la granja, tampoco arranca; no lo cierres a ciegas. A la persona dile solo: «No pude abrir la granja. Cierra y vuelve a abrir AI Profit.»
 
 ## No se ven cuentas
 
