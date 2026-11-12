@@ -2,8 +2,9 @@
 
 Empieza por [INSTALAR-CON-GROKBOT.md](../../INSTALAR-CON-GROKBOT.md), en la raíz del repositorio. Ahí está el texto para copiar al bot.
 
-- [pasos.md](pasos.md) — descarga, Node, acceso y cuentas de quien instala
+- [pasos.md](pasos.md) — descarga de la última release, Node, acceso y cuentas de quien instala
 - [comprobaciones.md](comprobaciones.md) — qué tiene que cumplirse para decir «instalado»
-- [problemas.md](problemas.md) — 404, checksum, carpeta ya existente, puerto 9222
+- [problemas.md](problemas.md) — 404, checksum, carpeta ya existente, TradingView no conectado, la granja no abre
+- [notas-internas.md](notas-internas.md) — detalles técnicos de conexión, solo para el bot (no se leen a la persona)
 
-El comprobador `acceso/comprobar-instalacion.mjs` no va dentro del zip de la etiqueta `v0.8.5`. Los pasos de `pasos.md` alcanzan para esa etiqueta. El script sirve cuando esta guía ya está en la carpeta.
+La guía no fija ningún número de versión: instala siempre la última release (`https://github.com/apriai/AI-Profit/releases/latest`). El comprobador `acceso/comprobar-instalacion.mjs` compara `VERSION` con esa release si se le pasa `--ultima`.

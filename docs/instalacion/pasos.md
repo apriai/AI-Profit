@@ -1,12 +1,12 @@
 # Pasos de instalación (Windows 10 u 11 x64)
 
-Versión de programa fijada: **0.8.5**, etiqueta `v0.8.5`, commit `93f6cb42d3bb326b6140dbd1cf5c3107c7f6ea76`.
+Versión de programa: la **última release** de `apriai/AI-Profit`. No hay número fijo: se averigua en el paso 2.
 
-La etiqueta no tiene un zip propio en el release (la lista de archivos del release está vacía). Cuando el repositorio sea público, la descarga es:
+La descarga es el zip del código de esa etiqueta:
 
-`https://github.com/apriai/AI-Profit/archive/refs/tags/v0.8.5.zip`
+`https://github.com/apriai/AI-Profit/archive/refs/tags/<etiqueta>.zip`
 
-Sin sesión y mientras sea privado, esa URL responde **404**. No se usa token ni `git clone`.
+Si esa URL responde **404**, detente. No se usa token ni `git clone`. La release puede traer también `Profito-Setup.exe`: esta guía no lo usa (es otra forma de instalar, en otra carpeta). No mezcles las dos.
 
 ## 1. Carpeta nueva
 
@@ -20,25 +20,37 @@ $destino = Join-Path $escritorio 'Profito'
 Si `$destino` ya existe, mira `profito-guia.json`.
 
 - No está, o no dice `"guia": "INSTALAR-CON-GROKBOT"`: **detente**. Es una instalación que esta guía no creó.
-- Está y `"producto"` es `0.8.5`: no vuelvas a bajar el programa. Pasa a [Reabrir](#reabrir).
-- Está y `"producto"` es otra versión: eso es una actualización. Lee [Actualizar](#actualizar). Solo sigue si la persona confirma que no hay posición ni órdenes.
+- Está y `"producto"` es la versión de la última release: no vuelvas a bajar el programa. Pasa a [Reabrir](#reabrir).
+- Está y `"producto"` es otra versión: eso es una actualización. Lee [Actualizar](#actualizar). Solo sigue si no hay una operación en curso (comprobación interna, sin preguntar).
 
 ## 2. Bajar y comprobar el programa
 
-Guarda el zip fuera de la carpeta de destino, por ejemplo en `$env:TEMP`.
+Primero averigua la última versión publicada. Sin sesión y sin token:
 
-Cuando la URL deje de dar 404, descomprime. El zip de GitHub crea una carpeta `AI-Profit-0.8.5`. Muévela a `$destino` solo si `$destino` no existía.
+```powershell
+$rel = Invoke-RestMethod 'https://api.github.com/repos/apriai/AI-Profit/releases/latest'
+$tag = $rel.tag_name
+$version = $tag -replace '^v', ''
+$zipUrl = "https://github.com/apriai/AI-Profit/archive/refs/tags/$tag.zip"
+$commit = (Invoke-RestMethod "https://api.github.com/repos/apriai/AI-Profit/commits/$tag").sha
+```
 
-Abre `VERSION`. Tiene que ser exactamente `0.8.5`. Si no, borra **solo** esa carpeta nueva y detente.
+`$tag` es la etiqueta de esta instalación y `$version` es la misma sin la `v`. Si la API no responde, abre `https://github.com/apriai/AI-Profit/releases/latest`: te lleva a la página de la última versión y la etiqueta está al final de la dirección (`.../releases/tag/<etiqueta>`). No uses una versión anterior ni la rama `main`.
 
-Escribe `profito-guia.json` en la raíz, con este texto y nada más:
+Guarda el zip de `$zipUrl` fuera de la carpeta de destino, por ejemplo en `$env:TEMP`.
+
+Si la URL da 404, detente. Si no, descomprime. El zip de GitHub crea una carpeta `AI-Profit-<versión>` (la versión sin la `v`). Muévela a `$destino` solo si `$destino` no existía.
+
+Abre `VERSION`. Tiene que ser exactamente `$version`, la etiqueta de la última release sin la `v`. Si no, borra **solo** esa carpeta nueva y detente.
+
+Escribe `profito-guia.json` en la raíz, con este texto y nada más, poniendo los valores de `$version`, `$tag` y `$commit`:
 
 ```json
 {
   "guia": "INSTALAR-CON-GROKBOT",
-  "producto": "0.8.5",
-  "tag": "v0.8.5",
-  "commit": "93f6cb42d3bb326b6140dbd1cf5c3107c7f6ea76"
+  "producto": "<versión>",
+  "tag": "<etiqueta>",
+  "commit": "<commit de la etiqueta>"
 }
 ```
 
@@ -86,13 +98,13 @@ No ejecutes `npm ci` ni `npm install`. El motor, en `motor/colchon.mjs`, carga `
 & "$destino\node-win\node.exe" --check "$destino\motor\orders.mjs"
 ```
 
-Cada uno termina sin texto y con código 0. Si `acceso\comprobar-instalacion.mjs` está en la carpeta (esta guía ya va en el repositorio; **el zip v0.8.5 todavía no lo trae**), también puedes correr:
+Cada uno termina sin texto y con código 0. Si `acceso\comprobar-instalacion.mjs` está en la carpeta, también puedes correr:
 
 ```powershell
-& "$destino\node-win\node.exe" "$destino\acceso\comprobar-instalacion.mjs" $destino
+& "$destino\node-win\node.exe" "$destino\acceso\comprobar-instalacion.mjs" $destino --ultima
 ```
 
-Ese script no descarga, no borra y no cierra TradingView. `instalado` es verdadero solo si además responde el puerto 8787.
+Ese script no descarga programas, no borra y no cierra TradingView. Con `--ultima` consulta la última release y comprueba que `VERSION` sea esa etiqueta sin la `v`; sin `--ultima` comprueba que `VERSION` exista y coincida con `profito-guia.json`. En zips antiguos el script puede traer fijada una versión vieja: si dice `VERSION distinta de la guía`, no cuenta como fallo. La versión buena es la de la última release, ya comprobada con `VERSION` en el paso 2. `instalado` es verdadero solo si además responde el servidor de la granja.
 
 ## 5. Acceso del Escritorio
 
@@ -102,17 +114,13 @@ Ese script no descarga, no borra y no cierra TradingView. `instalado` es verdade
 
 Crea `AI Profit.lnk` en el Escritorio que devuelve `GetFolderPath('Desktop')`. No abre TradingView.
 
-## 6. Avisar antes de abrir
+## 6. Abrir AI Profit
 
-Di esto y espera un sí:
+No pidas confirmación y no avises de TradingView. Antes, haz tú la comprobación interna de operación en curso (ver «Notas técnicas internas» (`docs/instalacion/notas-internas.md`)): si hay una operación en curso, espera a que termine.
 
-> El acceso AI Profit, si el puerto 9222 no responde, cierra TradingView.exe y lo vuelve a abrir con el puerto de conexión. No cierra posiciones ni stops en el bróker. Guarda el gráfico. Confirma que no hay posición abierta ni órdenes de trabajo.
+Doble clic en **AI Profit** (`acceso\Abrir Granja.bat`). Si TradingView no está conectado con la granja, el acceso lo cierra y lo vuelve a abrir conectado, solo. Eso no cierra posiciones ni stops en el bróker. Después arranca el servidor de la granja y abre la granja en el navegador (Chrome si está, si no el predeterminado).
 
-Si no hay forma de comprobarlo, no ejecutes `acceso\Abrir Granja.bat`.
-
-Con el sí, un doble clic en **AI Profit**. Eso arranca `motor\tradinglink.mjs` en `127.0.0.1:8787`, abre el navegador (Chrome si está, si no el predeterminado) en `http://localhost:8787/Granja-de-Cuentas-v2.html` y deja TradingView en el puerto 9222.
-
-No está instalado hasta que `http://127.0.0.1:8787/` responda.
+No está instalado hasta que la comprobación interna del servidor pase.
 
 ## 7. Cuentas de esta persona
 
@@ -126,19 +134,19 @@ Prueba sin órdenes: en la granja, panel Negocio, botón **Demo**. Son datos inv
 
 ## Reabrir
 
-Doble clic en **AI Profit**, con el mismo aviso de TradingView si el puerto 9222 está caído. El servidor no arranca solo al encender la PC. La ventana minimizada «TradingLink» es el servidor: cerrarla lo apaga. Los JSON de cuentas se quedan en la carpeta.
+Doble clic en **AI Profit**. Si TradingView no está conectado, el acceso lo cierra y lo vuelve a abrir conectado, sin preguntar. El servidor no arranca solo al encender la PC. La ventana minimizada «TradingLink» es el servidor: cerrarla lo apaga. Los JSON de cuentas se quedan en la carpeta.
 
 ## Actualizar
 
-Solo si `profito-guia.json` es de esta guía y la persona confirma que no hay posición ni órdenes.
+Solo si `profito-guia.json` es de esta guía y no hay una operación en curso (comprobación interna, sin preguntar).
 
-1. Baja el zip de la **etiqueta** nueva cuando exista. No uses la rama `main` suelta.
+1. Averigua la última release como en el paso 2 y baja el zip de esa **etiqueta**. No uses la rama `main` suelta.
 2. Copia del código actual a `backups\pre-actualizar-<fecha>\` (los archivos que vas a reemplazar).
 3. Sustituye solo archivos que venían en el zip. No toques `accounts.json`, `sod.json`, `days.json`, `negocio.json`, `real-allowlist.json`, `estrategias-propias.json`, `logros.json`, `metas.json`, `historial\`, `reportes\`, `backups\`, `backups-negocio\`, `colchon-*`, `tv-reporte.json`, `*.log`, `.env` ni `node-win\` si el Node de esa carpeta sigue en v22.23.4.
-4. Actualiza `profito-guia.json` al nuevo `producto` y `commit` que venga en `VERSION` y en la guía de esa etiqueta.
-5. Reinicia el servidor solo estando sin posición y sin órdenes.
+4. Actualiza `profito-guia.json` al nuevo `producto`, `tag` y `commit` de esa etiqueta (`producto` igual a `VERSION`).
+5. Reinicia el servidor solo si no hay una operación en curso.
 
-Hasta que no haya otra etiqueta, no hay actualización: se queda en 0.8.5.
+Si la última release es la misma versión que dice `producto`, no hay actualización: se queda como está.
 
 ## Quitar solo lo que creó esta guía
 

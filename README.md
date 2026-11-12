@@ -16,11 +16,11 @@
 
 Para uso diario: ver [LEEME.md](LEEME.md).
 
-**Instalar en un Windows nuevo, con un bot de Grok:** [INSTALAR-CON-GROKBOT.md](INSTALAR-CON-GROKBOT.md). Es la versión publicada `v0.8.5`, sin copiar las cuentas de otra PC.
+**Instalar en un Windows nuevo, con un bot de Grok:** [INSTALAR-CON-GROKBOT.md](INSTALAR-CON-GROKBOT.md). Instala siempre la última versión publicada ([releases/latest](https://github.com/apriai/AI-Profit/releases/latest)), sin copiar las cuentas de otra PC.
 
 **Prop Farm** es una aplicación web local que gestiona una *granja* de cuentas de evaluación de firmas de fondeo (Lucid, Tradovate) y trae un **motor de ejecución** que habla con TradingView Desktop y con Tradovate para abrir, ajustar y vigilar órdenes de **MNQ / NQ**.
 
-Todo corre en tu propia PC con Windows. La página se sirve en `http://localhost:8787`, los datos de las cuentas se quedan en tu carpeta y este repositorio **no contiene** saldos, cuentas, historial ni claves.
+Todo corre en tu propia PC con Windows. La página se abre en tu navegador desde tu propia PC, los datos de las cuentas se quedan en tu carpeta y este repositorio **no contiene** saldos, cuentas, historial ni claves.
 
 > **Quién la usa:** el equipo de Ai Profit Camp (Bänéd y Caroline), cada uno en su PC, y los agentes (Grok) que los ayudan. Las reglas para los agentes están en [`AGENTS.md`](AGENTS.md).
 
@@ -51,7 +51,7 @@ Todo corre en tu propia PC con Windows. La página se sirve en `http://localhost
 | **P&L real del bróker** | En modo `broker` el P&L sale directamente de Tradovate (eventos de posición y lectura de posiciones), no del gráfico. |
 | **Slider de contratos 1 a 20** | Por defecto 5. Del verde al rojo según el tamaño, y el fondo de la página se tiñe de rojo al subir el riesgo. |
 | **Historial** | Trades del día con hora ET, dirección, contratos, resultado y cuenta enmascarada (4 primeros y 3 últimos caracteres). |
-| **Luces de conexión** | Servidor, TradingView (CDP 9222) y Tradovate, siempre visibles en la barra superior. |
+| **Luces de conexión** | Servidor, TradingView y Tradovate, siempre visibles en la barra superior. |
 | **Actualización segura** | `acceso/actualizar.bat` descarga Git portátil, respalda lo que va a reemplazar y nunca toca tus archivos personales. |
 
 > **Modo Demo:** en el panel Negocio hay un botón «Demo» que muestra la granja con datos de ejemplo inventados (+$600 hoy, 14 trades ganadores, 2 cuentas de evaluación y 1 fondeada).
@@ -96,10 +96,10 @@ Con la misma pérdida máxima en dólares, más contratos significan un stop má
 
 ```mermaid
 flowchart LR
-    U["Tú (granja en el navegador)<br/>localhost:8787"] -->|BUY / SELL + estrategia + contratos| S["tradinglink.mjs<br/>servidor local"]
+    U["Tú (granja en el navegador)"] -->|BUY / SELL + estrategia + contratos| S["tradinglink.mjs<br/>servidor local"]
     S --> C["colchon.mjs<br/>motor"]
     C --> E["strategies.mjs<br/>reglas de SL / TP / stop"]
-    C -->|CDP, puerto 9222| TV["TradingView Desktop"]
+    C -->|CDP| TV["TradingView Desktop"]
     TV -->|orden, modifyOrder, lecturas| TR[("Tradovate<br/>cuenta de evaluación")]
     TR -->|P&L real y estado de órdenes| TV
     TV --> C
@@ -137,13 +137,13 @@ Tope de tamaño: 20 MNQ o 2 NQ.
 ```text
 AI-Profit/
 ├── motor/Granja-de-Cuentas-v2.html   La página (granja, slider, historial)
-├── motor/tradinglink.mjs             Servidor local en 127.0.0.1:8787 y API
+├── motor/tradinglink.mjs             Servidor local de la granja y API
 ├── motor/colchon.mjs                 Motor de ejecución (CDP, stop, P&L)
 ├── motor/orders.mjs                  Órdenes manuales con confirmación
 ├── motor/strategies.mjs              Registro de estrategias
 ├── motor/negocio.mjs                 Copia del historial del Negocio (negocio.json)
 ├── motor/probe.mjs · motor/busy.mjs  Herramientas de lectura (¿está libre la cuenta?)
-├── acceso/abrir-tradingview.bat      Abre TradingView Desktop con el puerto 9222
+├── acceso/abrir-tradingview.bat      Abre TradingView Desktop conectado con la granja
 ├── acceso/iniciar-tradinglink.bat    Arranca el servidor y abre la granja
 ├── acceso/actualizar.bat / .ps1      Actualización segura desde este repositorio
 ├── motor/colchon-src/                Fuentes de la UI del motor y pruebas simuladas
@@ -170,10 +170,9 @@ Los archivos personales de cada PC (`accounts.json`, `sod.json`, `negocio.json`,
 
 ### Arranque diario
 
-1. Cierra TradingView por completo.
-2. Doble clic en `acceso/abrir-tradingview.bat` (abre TradingView con el puerto de depuración 9222). Solo funciona la versión abierta así.
-3. Doble clic en `acceso/iniciar-tradinglink.bat`. Se abre la granja en `http://localhost:8787`.
-4. Comprueba `http://localhost:8787/api/colchon/conexion`: `tradingview` y `tradovate` deben salir conectados y `broker` verdadero.
+1. Doble clic en el acceso **AI Profit** del Escritorio (o en `acceso/Abrir Granja.bat`). Si TradingView no está conectado con la granja, lo cierra y lo vuelve a abrir conectado, solo y sin preguntar. Después enciende el servidor y abre la granja en el navegador.
+2. En la granja, comprueba que las luces de TradingView y Tradovate estén encendidas.
+3. Si no se conecta: cierra y vuelve a abrir **AI Profit**. Si la granja no abre: «No pude abrir la granja. Cierra y vuelve a abrir AI Profit.»
 
 > El servidor **no arranca solo** al reiniciar la PC. Hay que lanzarlo a mano.
 
