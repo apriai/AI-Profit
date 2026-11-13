@@ -11,10 +11,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
 ## [0.10.6] — 2026-11-13
+### Cambiado
+- **Vista previa: solo dos líneas grises.** Al pasar el cursor por BUY o SELL se dibujan el stop y el take profit como dos líneas horizontales del mismo gris, de 1 píxel. Se crean una vez y, si cambia el lado o la cantidad, solo se les mueve el precio. Al salir el mouse o cerrar el panel se borran. Ya no hay caja de riesgo ni zona de color.
+- **Tope de la 25K fondeada.** 10 MNQ (1 NQ) hasta un saldo de $26,100 (ganancia de $1,100 sobre 25,000); desde ahí, 20 MNQ (2 NQ). La 50K no cambia: 20, 30 desde $1,000 y 40 desde $2,000.
 ### Corregido
-- **Vista previa con el tope de la cuenta.** Al pasar el cursor por BUY o SELL, el dibujo (líneas y caja de riesgo) solo sale si la cantidad cabe en el tope que ya usa el motor (`maxQtyFor`): evaluación 20 o 40 MNQ según 25K o 50K, y en fondeada las etapas por beneficio. Antes la vista se negaba por encima de 20 MNQ aunque la cuenta de 50K permitiera más, y no miraba la etapa fondeada.
+- **La vista previa usa el tope de la cuenta.** Ya no se corta siempre en 20 MNQ. Usa `maxQtyFor`, el mismo tope del motor, también en la etapa fondeada.
 ### Notas
-- No cambia los topes del motor ni abre, mueve o cierra órdenes. El bloque de color de la caja ya estaba en `motor/tv-vista-previa.mjs` (herramienta `long_position` / `short_position`).
+- No abre, no mueve y no cierra órdenes.
 
 ## [0.10.5] — 2026-11-13
 ### Agregado

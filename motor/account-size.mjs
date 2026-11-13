@@ -132,8 +132,8 @@ function isFundedAccount(account = {}) {
 // Tope vigente. Evaluación: el techo del plan, sin escalar por beneficio.
 // Fondeada: según el beneficio sobre el saldo inicial (totalPnl, o saldo − inicio).
 // Sin saldo conocido, el techo del plan.
-// 25K: < $1,000 → 10 micros, ≥ $1,000 → 20.
-// 50K: < $1,000 → 20, $1,000–$1,999 → 30, ≥ $2,000 → 40.
+// 25K fondeada: beneficio < $1,100 (saldo < $26,100) → 10 micros; desde $1,100 → 20.
+// 50K fondeada: < $1,000 → 20, $1,000–$1,999 → 30, ≥ $2,000 → 40.
 // https://support.lucidtrading.com/en/articles/12945808-lucidflex-scaling-plan
 export function maxQtyFor(symbol, account) {
   const r = rulesFor(account);
@@ -144,7 +144,7 @@ export function maxQtyFor(symbol, account) {
     const profit = numOrNull(account.totalPnl) ?? (bal != null ? bal - r.start : null);
     if (profit != null) {
       if (r.size === '50K') micros = profit < 1000 ? 20 : profit < 2000 ? 30 : 40;
-      else micros = profit < 1000 ? 10 : 20;
+      else micros = profit < 1100 ? 10 : 20;
     }
   }
   return s === 'NQ' ? Math.round(micros / 10) : micros;
