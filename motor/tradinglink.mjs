@@ -322,6 +322,13 @@ http.createServer((q, r) => {
     else if (q.url==='/cancel') out={ok: orders.cancel(j.id)};
     else out={ok:false,err:['ruta desconocida']};
     console.log(new Date().toLocaleTimeString(), q.url, JSON.stringify(out)); r.writeHead(200,{'content-type':'application/json'}); r.end(JSON.stringify(out)); }); return; }
+  if (q.method === 'GET' && q.url.startsWith('/sonidos/')) {
+    const nombre = path.basename(q.url.split('?')[0]);
+    if (nombre === 'clic-burbuja.wav' || nombre === 'despertar-wuhu.wav') {
+      const wav = path.join(ROOT, 'motor', 'sonidos', nombre);
+      if (fs.existsSync(wav)) { r.writeHead(200, { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=86400' }); return fs.createReadStream(wav).pipe(r); }
+    }
+  }
   if (q.method === 'GET' && (q.url === '/propfarm-logo.png' || q.url.startsWith('/propfarm-logo.png?'))) {
     const logo = path.join(ROOT, 'assets', 'propfarm-logo.png');
     if (fs.existsSync(logo)) { r.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'no-store' }); return fs.createReadStream(logo).pipe(r); }
