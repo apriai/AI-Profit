@@ -10,12 +10,19 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
-## [0.10.3] — 2026-11-13
+## [0.10.4] — 2026-11-13
 ### Corregido
 - **TradingView de la Store y de tradingview.com/desktop ya se detecta en Windows.** Esos instaladores dejan el paquete MSIX en `C:\Program Files\WindowsApps`. Esa carpeta niega el listado, así que comprobar si el archivo «existe» daba un falso «no está» aunque la app estuviera abierta. `acceso/profito-estado.mjs` acepta la carpeta que devuelve `Get-AppxPackage TradingView.Desktop` sin esa comprobación, y también el alias de `%LOCALAPPDATA%\Microsoft\WindowsApps`. Si el proceso ya está abierto y no hay ruta, el acceso reinicia TradingView en vez de abrir la página de descarga.
 - **Arranque con conexión a la granja, con respaldo.** `acceso/abrir-tradingview.ps1` prueba el alias, después la activación del paquete (conserva la identidad de la Store) y, si el puerto no responde, el `TradingView.exe` de `WindowsApps`. `acceso/probar-tradingview.ps1` hace esa prueba en la PC e imprime OK o FALLA.
 ### Notas
-- No abre, no mueve y no cierra órdenes. El cuadro de «¿Abro la página oficial?» sigue dentro de `AI Profit.exe` (el acceso compilado): con esta versión deja de salir cuando hay paquete o proceso, porque la ruta que recibe ya no va vacía.
+- No abre, no mueve y no cierra órdenes. El cuadro de «¿Abro la página oficial?» sigue dentro de `AI Profit.exe` (el acceso compilado): con esta versión deja de salir cuando hay paquete o proceso, porque la ruta que recibe ya no va vacía. En la PC del dueño, con TradingView.Desktop 3.5.0.8375, el script de prueba respondió OK por activación del paquete y `http://127.0.0.1:9222/json/version` respondió.
+
+## [0.10.3] — 2026-11-13
+### Cambiado
+- **Textos del selector según el tamaño de la cuenta.** En el panel de operar, el resumen de la estrategia (el texto corto y la descripción) usa los dólares de la cuenta elegida: los mismos que salen al operar. En 25K se ven las cifras guardadas; en 50K, el doble. Al cambiar de cuenta, el texto se vuelve a armar. No cambia cómo se calculan ni cómo se envían las órdenes.
+- **Estrategia propia.** En una cuenta de 50K el editor, la vista previa y la lista muestran el stop, el take profit y los pasos ya duplicados. Lo que se guarda sigue siendo la base: al guardar no se escribe el doble.
+### Notas
+- Solo la página. No abre, no mueve y no cierra órdenes.
 
 ## [0.10.2] — 2026-11-12
 ### Cambiado
