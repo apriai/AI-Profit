@@ -65,11 +65,10 @@ Page custom BienvenidaCrear BienvenidaSalir
 !define MUI_PAGE_CUSTOMFUNCTION_SHOW ProgresoMostrar
 !define MUI_PAGE_CUSTOMFUNCTION_LEAVE ProgresoSalir
 !insertmacro MUI_PAGE_INSTFILES
-!undef MUI_PAGE_CUSTOMFUNCTION_SHOW
-!undef MUI_PAGE_CUSTOMFUNCTION_LEAVE
 Page custom ListoCrear ListoSalir
 
 !insertmacro MUI_LANGUAGE "Spanish"
+ShowInstDetails never
 
 Function .onInit
   ${IfNot} ${RunningX64}
@@ -88,7 +87,6 @@ Function .onInit
   File "gfx\p4-listo.bmp"
   File "gfx\btn-instalar.bmp"
   File "gfx\btn-abrir.bmp"
-  ShowInstDetails never
 FunctionEnd
 
 Function .onGUIInit
