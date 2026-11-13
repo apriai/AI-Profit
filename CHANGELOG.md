@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.7] — 2026-11-13
+### Agregado
+- **Sonidos de clic y de despertar.** Un clic corto de burbuja suena al dormir al agente (o si ya hay una operación en curso), al abrir Historial, Métrica o Negocio, al abrir una planta y al pulsar Trade. Al despertar al agente suena un wuhu, en lugar del clic. BUY y SELL no suenan. Si el audio falla, la página sigue igual.
+### Notas
+- No abre, no mueve y no cierra órdenes. Los archivos están en `motor/sonidos/clic-burbuja.wav` y `motor/sonidos/despertar-wuhu.wav`. El instalador los copia.
+
 ## [0.10.6] — 2026-11-13
 ### Cambiado
 - **El instalador deja la foto como protagonista.** Tres pantallas, sin la de elegir carpeta: se instala directo en la carpeta del usuario y no pide administrador. Cada foto va completa, de borde a borde, a 720×405 (16:9), sin recortar arriba ni abajo. El fondo es oscuro. En una franja baja va una frase corta y un botón verde redondeado, o la barra de progreso verde. Bienvenida: «Instalar AI Profit» y «Instalar». Progreso: «Instalando…». Final: «¡Listo!» y «Abrir».
