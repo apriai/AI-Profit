@@ -48,3 +48,8 @@ subir-a-github.bat
 # Basura del sistema
 Thumbs.db
 desktop.ini
+# El aviso guarda aqui el dia en que la persona dijo No (no se sube)
+aviso-actualizacion.json
+# Salida del instalador
+instalador/stage/
+dist/

@@ -1,0 +1,45 @@
+name: Instalador Windows
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  instalador:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: NSIS 3.11
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP "nsis-3.11.zip"
+          Invoke-WebRequest -Uri "https://github.com/kichik/nsis/releases/download/v3.11/nsis-3.11.zip" -OutFile $zip
+          Expand-Archive -LiteralPath $zip -DestinationPath $env:RUNNER_TEMP
+          $home = Get-ChildItem $env:RUNNER_TEMP -Directory -Filter "nsis-3.11*" | Select-Object -First 1
+          if (-not $home) { throw "No se descomprimio NSIS" }
+          Add-Content -Path $env:GITHUB_PATH -Value $home.FullName
+
+      - name: Construir Profito-Setup.exe
+        shell: pwsh
+        run: .\instalador\construir.ps1
+
+      - name: Publicar en la release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --title "AI Profit $tag" --notes "Instalador de Windows: Profito-Setup.exe"
+          }
+          gh release upload $tag "dist\Profito-Setup.exe" --clobber
