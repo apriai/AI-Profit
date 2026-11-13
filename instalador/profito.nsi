@@ -28,6 +28,7 @@ RequestExecutionLevel user
 !define MUI_UNICON "..\assets\abrir-granja-icon.ico"
 !define MUI_TEXT_INSTALLING_TITLE "Instalando…"
 !define MUI_TEXT_INSTALLING_SUBTITLE " "
+!define MUI_CUSTOMFUNCTION_GUIINIT PrepararVentana
 
 Name "Profito ${VERSION}"
 OutFile "..\dist\Profito-Setup.exe"
@@ -89,7 +90,7 @@ Function .onInit
   File "gfx\btn-abrir.bmp"
 FunctionEnd
 
-Function .onGUIInit
+Function PrepararVentana
   Call AjustarVentana
   Call PintarNoche
 FunctionEnd
