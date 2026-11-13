@@ -10,6 +10,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.3] — 2026-11-13
+### Cambiado
+- **Textos del selector según el tamaño de la cuenta.** En el panel de operar, el resumen de la estrategia (el texto corto y la descripción) usa los dólares de la cuenta elegida: los mismos que salen al operar. En 25K se ven las cifras guardadas; en 50K, el doble. Al cambiar de cuenta, el texto se vuelve a armar. No cambia cómo se calculan ni cómo se envían las órdenes.
+- **Estrategia propia.** En una cuenta de 50K el editor, la vista previa y la lista muestran el stop, el take profit y los pasos ya duplicados, y avisan que el motor duplica los dólares guardados. Lo que se guarda sigue siendo la base: al guardar no se escribe el doble.
+### Notas
+- Solo la página. No abre, no mueve y no cierra órdenes.
+
 ## [0.10.2] — 2026-11-12
 ### Cambiado
 - **La guía de Grok Bot instala siempre la última versión.** `INSTALAR-CON-GROKBOT.md` y `docs/instalacion/` ya no fijan ningún número de versión. El bot consulta la última release publicada (`releases/latest`), baja el zip de esa etiqueta y comprueba que `VERSION` sea esa etiqueta sin la `v`. `profito-guia.json` guarda la versión, la etiqueta y el commit que se instalaron. El Node portable sigue fijado en `v22.23.4` con su SHA-256.
