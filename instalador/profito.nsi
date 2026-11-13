@@ -68,7 +68,7 @@ Page custom BienvenidaCrear BienvenidaSalir
 Page custom ListoCrear ListoSalir
 
 !insertmacro MUI_LANGUAGE "Spanish"
-ShowInstDetails never
+ShowInstDetails nevershow
 
 Function .onInit
   ${IfNot} ${RunningX64}
