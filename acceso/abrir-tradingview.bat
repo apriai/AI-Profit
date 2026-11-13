@@ -2,8 +2,8 @@
 rem Abre TradingView Desktop con --remote-debugging-port=9222.
 rem No envia ordenes y no hace clic dentro de TradingView.
 rem Si el puerto 9222 ya responde, no toca TradingView.
-rem El acceso "AI Profit" (Abrir Granja.bat) lo cierra y lo vuelve a abrir
-rem cuando estaba abierto sin ese puerto.
+rem El paquete MSIX (tradingview.com/desktop y la Store) se abre con
+rem acceso\abrir-tradingview.ps1: alias, activacion del paquete y, si falla, el exe de WindowsApps.
 setlocal EnableExtensions
 cd /d "%~dp0"
 
@@ -13,17 +13,20 @@ if not errorlevel 1 (
   exit /b 0
 )
 
-call :find_tv
-if not defined TV_EXE (
-  echo No encontre TradingView.exe.
-  echo Busque la app de Microsoft Store, %%LOCALAPPDATA%%\TradingView y Program Files.
+where powershell.exe >nul 2>nul
+if errorlevel 1 (
+  echo No encontre PowerShell. No puedo abrir TradingView.
   if not defined GRANJA_CALL pause
   exit /b 1
 )
 
-echo Abriendo: %TV_EXE%
-start "" "%TV_EXE%" --remote-debugging-port=9222
-exit /b 0
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0abrir-tradingview.ps1" -Port 9222
+set "RC=%ERRORLEVEL%"
+if not "%RC%"=="0" (
+  echo TradingView no se conecto.
+  if not defined GRANJA_CALL pause
+)
+exit /b %RC%
 
 :listening
 set "PORT=%~1"
@@ -36,20 +39,3 @@ exit /b 0
 :listening_ps
 powershell -NoProfile -Command "try { $null = Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 'http://127.0.0.1:%PORT%/json/version'; exit 0 } catch { exit 1 }"
 exit /b %errorlevel%
-
-:find_tv
-set "TV_EXE="
-if exist "%LOCALAPPDATA%\TradingView\TradingView.exe" set "TV_EXE=%LOCALAPPDATA%\TradingView\TradingView.exe"
-if not defined TV_EXE if exist "%ProgramFiles%\TradingView\TradingView.exe" set "TV_EXE=%ProgramFiles%\TradingView\TradingView.exe"
-if not defined TV_EXE if exist "%ProgramFiles(x86)%\TradingView\TradingView.exe" set "TV_EXE=%ProgramFiles(x86)%\TradingView\TradingView.exe"
-if not defined TV_EXE (
-  for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "(Get-AppxPackage TradingView.Desktop -ErrorAction SilentlyContinue).InstallLocation"`) do (
-    if exist "%%i\TradingView.exe" set "TV_EXE=%%i\TradingView.exe"
-  )
-)
-if not defined TV_EXE (
-  for /f "delims=" %%i in ('where TradingView.exe 2^>nul') do (
-    if not defined TV_EXE set "TV_EXE=%%i"
-  )
-)
-exit /b 0

@@ -18,7 +18,7 @@ Sin `profito-guia.json` de esta guía, detente. Puede ser la granja de alguien q
 
 ## TradingView no está
 
-Instálalo desde el sitio oficial de TradingView (aplicación de escritorio o Microsoft Store). El zip de Profito no lo trae. `acceso/abrir-tradingview.bat` lo busca en `%LOCALAPPDATA%\TradingView`, en Archivos de programa y en el paquete de la Store.
+Instálalo desde el sitio oficial de TradingView (aplicación de escritorio o Microsoft Store). El zip de Profito no lo trae. `acceso/abrir-tradingview.ps1` acepta la instalación clásica, el alias en `%LOCALAPPDATA%\Microsoft\WindowsApps` y el paquete MSIX (`Get-AppxPackage TradingView.Desktop`) aunque `WindowsApps` niegue el listado.
 
 ## TradingView no se conecta
 

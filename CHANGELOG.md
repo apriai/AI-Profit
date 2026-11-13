@@ -10,6 +10,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.3] — 2026-11-13
+### Corregido
+- **TradingView de la Store y de tradingview.com/desktop ya se detecta en Windows.** Esos instaladores dejan el paquete MSIX en `C:\Program Files\WindowsApps`. Esa carpeta niega el listado, así que comprobar si el archivo «existe» daba un falso «no está» aunque la app estuviera abierta. `acceso/profito-estado.mjs` acepta la carpeta que devuelve `Get-AppxPackage TradingView.Desktop` sin esa comprobación, y también el alias de `%LOCALAPPDATA%\Microsoft\WindowsApps`. Si el proceso ya está abierto y no hay ruta, el acceso reinicia TradingView en vez de abrir la página de descarga.
+- **Arranque con conexión a la granja, con respaldo.** `acceso/abrir-tradingview.ps1` prueba el alias, después la activación del paquete (conserva la identidad de la Store) y, si el puerto no responde, el `TradingView.exe` de `WindowsApps`. `acceso/probar-tradingview.ps1` hace esa prueba en la PC e imprime OK o FALLA.
+### Notas
+- No abre, no mueve y no cierra órdenes. El cuadro de «¿Abro la página oficial?» sigue dentro de `AI Profit.exe` (el acceso compilado): con esta versión deja de salir cuando hay paquete o proceso, porque la ruta que recibe ya no va vacía.
+
 ## [0.10.2] — 2026-11-12
 ### Cambiado
 - **La guía de Grok Bot instala siempre la última versión.** `INSTALAR-CON-GROKBOT.md` y `docs/instalacion/` ya no fijan ningún número de versión. El bot consulta la última release publicada (`releases/latest`), baja el zip de esa etiqueta y comprueba que `VERSION` sea esa etiqueta sin la `v`. `profito-guia.json` guarda la versión, la etiqueta y el commit que se instalaron. El Node portable sigue fijado en `v22.23.4` con su SHA-256.
