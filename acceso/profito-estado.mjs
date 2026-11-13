@@ -9,11 +9,14 @@
 //     -> apaga SOLO el node.exe de esa carpeta que escucha en 8787, y solo si no hay operacion en curso.
 //   node profito-estado.mjs abrir
 //     -> relanza TradingView con el puerto 9222 (mismo metodo que abrir-tradingview.ps1).
+//   node profito-estado.mjs aviso <ini> <carpeta>
+//     -> si hay versión nueva, pregunta. Código 20: ya se abrió el instalador; no sigas.
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { avisarSiHaceFalta } from './aviso-actualizacion.mjs';
 
 const SRV = 8787, TVP = 9222;
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
@@ -202,7 +205,31 @@ function lanzadorDisponible() {
   try { return fs.existsSync(LANZADOR) ? LANZADOR : ''; } catch { return ''; }
 }
 
+async function ofrecerActualizacion(dir) {
+  const root = dir || path.resolve(AQUI, '..');
+  let ocupado = false;
+  try {
+    const s = await servidor(root);
+    ocupado = s.operacion === 'en-curso' || s.operacion === 'desconocida';
+  } catch { ocupado = false; }
+  if (ocupado) return { accion: 'ocupado' };
+  return avisarSiHaceFalta(root);
+}
+
 async function main() {
+  if (cmd === 'aviso' || cmd === 'estado') {
+    const dir = cmd === 'estado' ? (a3 || path.resolve(AQUI, '..')) : (a3 || path.resolve(AQUI, '..'));
+    const aviso = await ofrecerActualizacion(dir);
+    if (aviso.accion === 'si') {
+      if (iniFile) escribir({ actualizar: 'si', listo: 1 });
+      process.exitCode = 20;
+      return;
+    }
+    if (cmd === 'aviso') {
+      if (iniFile) escribir({ actualizar: aviso.accion, listo: 1 });
+      return;
+    }
+  }
   if (cmd === 'estado') {
     const dir = a3 || '';
     const eleccion = buscarTV();
