@@ -21,18 +21,16 @@ jobs:
       - name: NSIS 3.11
         shell: pwsh
         run: |
-          $zip = Join-Path $env:RUNNER_TEMP "nsis-3.11.zip"
-          Invoke-WebRequest -Uri "https://github.com/kichik/nsis/releases/download/v3.11/nsis-3.11.zip" -OutFile $zip
-          Expand-Archive -LiteralPath $zip -DestinationPath $env:RUNNER_TEMP
-          $home = Get-ChildItem $env:RUNNER_TEMP -Directory -Filter "nsis-3.11*" | Select-Object -First 1
-          if (-not $home) { throw "No se descomprimio NSIS" }
-          Add-Content -Path $env:GITHUB_PATH -Value $home.FullName
+          choco install nsis --version=3.11.0 -y --no-progress
+          $nsis = "C:\Program Files (x86)\NSIS"
+          if (-not (Test-Path -LiteralPath "$nsis\makensis.exe")) { throw "No esta makensis" }
+          Add-Content -Path $env:GITHUB_PATH -Value $nsis
 
       - name: Comprobar imagenes del instalador
         shell: pwsh
         run: |
           $gfx = "instalador\gfx"
-          foreach ($nombre in @("1-escenario.jpg","2-multitud-islas.jpg","3-granja-cerca.jpg","4-isla-granja.jpg","p1-bienvenida.bmp","p2-carpeta.bmp","p3-progreso.bmp","p4-listo.bmp")) {
+          foreach ($nombre in @("1-escenario.jpg","2-multitud-islas.jpg","3-granja-cerca.jpg","4-isla-granja.jpg","p1-bienvenida.bmp","p2-carpeta.bmp","p3-progreso.bmp","p4-listo.bmp","btn-instalar.bmp","btn-abrir.bmp")) {
             if (-not (Test-Path -LiteralPath (Join-Path $gfx $nombre))) { throw "Falta $gfx\$nombre" }
           }
 
