@@ -256,17 +256,22 @@
   }).observe(document.documentElement, { childList: true, subtree: true });
 })();
 </script>
-<script>/* Clic burbuja: un buffer, volumen bajo. Si el audio falla, no pasa nada. */
+<script>/* Sonidos de la granja: un buffer por clip, reutilizado. Si el audio falla, no pasa nada. */
 (function(){
-  var VOL=0.35, SRC="/sonidos/clic-burbuja.wav", ctx=null, buf=null, gain=null, crudo=null, decodificando=false;
-  var audio=new Audio(); audio.preload="auto"; audio.src=SRC;
-  function asegurar(){ if(ctx) return; var AC=window.AudioContext||window.webkitAudioContext; if(!AC) return; try{ ctx=new AC(); gain=ctx.createGain(); gain.gain.value=VOL; gain.connect(ctx.destination); }catch(e){ ctx=null; } }
-  function decodificar(){ if(buf||decodificando||!ctx||!crudo) return; decodificando=true; try{ ctx.decodeAudioData(crudo.slice(0)).then(function(b){ buf=b; decodificando=false; }).catch(function(){ decodificando=false; }); }catch(e){ decodificando=false; } }
-  function cargar(){ if(crudo||!window.fetch) return; fetch(SRC).then(function(r){ if(!r.ok) throw new Error("sonido"); return r.arrayBuffer(); }).then(function(ab){ crudo=ab; asegurar(); decodificar(); }).catch(function(){}); }
-  function porElemento(){ try{ var a=audio.cloneNode(); a.volume=VOL; var p=a.play(); if(p&&p.catch) p.catch(function(){}); }catch(e){} }
-  window.__tlClic=function(){ try{ asegurar(); if(ctx&&ctx.state==="suspended"){ var re=ctx.resume(); if(re&&re.catch) re.catch(function(){}); } if(!buf&&crudo) decodificar(); if(ctx&&buf&&gain){ var src=ctx.createBufferSource(); src.buffer=buf; src.connect(gain); src.start(0); src.onended=function(){ try{ src.disconnect(); }catch(e){} }; return; } porElemento(); }catch(e){} };
-  cargar();
-  addEventListener("pointerdown", function(){ try{ asegurar(); if(ctx&&ctx.state==="suspended"){ var re=ctx.resume(); if(re&&re.catch) re.catch(function(){}); } decodificar(); }catch(e){} }, {capture:true});
+  var SONIDOS={
+    clic:{src:"/sonidos/clic-burbuja.wav",vol:0.35},
+    wuhu:{src:"/sonidos/despertar-wuhu.wav",vol:0.4}
+  };
+  var ctx=null, bufs={}, crudos={}, audio={}, pendiente={};
+  Object.keys(SONIDOS).forEach(function(k){ var a=new Audio(); a.preload="auto"; a.src=SONIDOS[k].src; audio[k]=a; });
+  function asegurar(){ if(ctx) return; var AC=window.AudioContext||window.webkitAudioContext; if(!AC) return; try{ ctx=new AC(); }catch(e){ ctx=null; } }
+  function decodificar(k){ if(bufs[k]||pendiente[k]||!ctx||!crudos[k]) return; pendiente[k]=true; try{ ctx.decodeAudioData(crudos[k].slice(0)).then(function(b){ bufs[k]=b; pendiente[k]=false; }).catch(function(){ pendiente[k]=false; }); }catch(e){ pendiente[k]=false; } }
+  function cargar(k){ if(crudos[k]||!window.fetch) return; fetch(SONIDOS[k].src).then(function(r){ if(!r.ok) throw new Error("sonido"); return r.arrayBuffer(); }).then(function(ab){ crudos[k]=ab; asegurar(); decodificar(k); }).catch(function(){}); }
+  function tocar(k){ var s=SONIDOS[k]; if(!s) return; try{ asegurar(); if(ctx&&ctx.state==="suspended"){ var re=ctx.resume(); if(re&&re.catch) re.catch(function(){}); } if(!bufs[k]&&crudos[k]) decodificar(k); if(ctx&&bufs[k]){ var src=ctx.createBufferSource(), g=ctx.createGain(); g.gain.value=s.vol; src.buffer=bufs[k]; src.connect(g); g.connect(ctx.destination); src.start(0); src.onended=function(){ try{ src.disconnect(); g.disconnect(); }catch(e){} }; return; } var a=audio[k].cloneNode(); a.volume=s.vol; var p=a.play(); if(p&&p.catch) p.catch(function(){}); }catch(e){} }
+  window.__tlClic=function(){ tocar("clic"); };
+  window.__tlDespertar=function(){ tocar("wuhu"); };
+  Object.keys(SONIDOS).forEach(cargar);
+  addEventListener("pointerdown", function(){ try{ asegurar(); if(ctx&&ctx.state==="suspended"){ var re=ctx.resume(); if(re&&re.catch) re.catch(function(){}); } Object.keys(SONIDOS).forEach(decodificar); }catch(e){} }, {capture:true});
 })();
 </script>
 <script>/* Negocio: copia del historial en el servidor (negocio.json). Si el navegador esta vacio lo restaura; si no, lo guarda (max 1 vez cada 10 s). */
@@ -5349,9 +5354,10 @@ function showSummary(m){setPhase("summary");const l=m.latencia;live.style.displa
 <button class="act gold" data-ok>Listo</button>`;live.querySelector("[data-ok]").onclick=()=>{live.style.display="none";setPhase("off")}}
 // El pill "Agente" abre/cierra siempre el panel colchón. El clic en el agente solo abre el selector de color.
 const pill=()=>document.getElementById("botToggle");
-addEventListener("click",e=>{const pl=pill();if(!pl||!pl.contains(e.target))return;e.stopImmediatePropagation();e.preventDefault();try{window.__tlClic&&window.__tlClic()}catch(err){}
- if(phase==="running"){poll();return}
+addEventListener("click",e=>{const pl=pill();if(!pl||!pl.contains(e.target))return;e.stopImmediatePropagation();e.preventDefault();
+ if(phase==="running"){try{window.__tlClic&&window.__tlClic()}catch(err){}poll();return}
  const s0=S(),awake=phase==="choose"||phase==="blocked"||(phase!=="sleep"&&!!(s0&&s0.botEnabled()));
+ try{if(awake)window.__tlClic&&window.__tlClic();else window.__tlDespertar&&window.__tlDespertar()}catch(err){}
  if(awake){setPhase("sleep");prevBot=null;if(s0&&s0.setBot)s0.setBot(false);pl.setAttribute("aria-pressed","false");pillLabel();return}
  (async()=>{pl.setAttribute("aria-pressed","true");accs=null;setPhase("choose");prevBot=null;pillLabel();loadAccs();J("/api/colchon/check").then(c=>{chk=c;if(phase==="choose"){const s=card.querySelector(".h small");s&&(s.textContent=c.real?"Cuenta real":c.paper?"Paper OK":"Bloqueado")}})})()},true);
 function pillLabel(){const pl=pill(),b=pl&&pl.querySelector("b");if(!b)return;const s=S(),en=!!(s&&s.botEnabled());const want=phase==="sleep"?"Durmiendo":(phase==="choose"||phase==="running"||en)?"Activo":"Pausado";pl.setAttribute("aria-pressed",String(want==="Activo"));if(want&&b.textContent!==want)b.textContent=want}

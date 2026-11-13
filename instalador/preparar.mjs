@@ -6,7 +6,7 @@ const MOTOR = [
   'tradinglink.mjs', 'colchon.mjs', 'account-size.mjs', 'busy.mjs',
   'estrategias-propias.mjs', 'negocio.mjs', 'orders.mjs', 'rutas.mjs', 'strategies.mjs',
   'tv-reporte.mjs', 'tv-vista-previa.mjs', 'Granja-de-Cuentas-v2.html',
-  'sonidos/clic-burbuja.wav',
+  'sonidos/clic-burbuja.wav', 'sonidos/despertar-wuhu.wav',
 ];
 const TV_MODULOS = ['chrome-remote-interface', 'ws', 'commander'];
 
