@@ -5267,11 +5267,6 @@ function textoCuentaHtml(){
       description+=" Hasta 2 intentos al día (el segundo lo abres tú; el motor no reentra solo).";
     }
   }
-  if(s.propia&&sc===2){
-    const aviso="En 50K el motor duplica los dólares guardados.";
-    short+="\n"+aviso;
-    description+=" "+aviso;
-  }
   const shortHtml=String(short||"").split("\n").map(esc).join("<br>");
   const descHtml=String(description||"").split("\n").map(esc).join("<br>");
   if(!description||description===short) return shortHtml;
@@ -6288,7 +6283,6 @@ st.textContent=`
 #tlPropia .del:hover,#tlPropia .ghost:hover{color:#fff}
 #tlPropia .add{margin-top:8px;width:100%;border-radius:12px;border:1px dashed rgba(255,255,255,.28);background:transparent;color:#fff;padding:8px;cursor:pointer;font:600 13px Inter,system-ui}
 #tlPropia .prev{margin:12px 0;padding:10px 12px;border-radius:12px;background:rgba(0,0,0,.22);white-space:pre-line;font-size:12px;color:rgba(255,255,255,.78)}
-#tlPropia .aviso{margin:8px 0 0;padding:8px 10px;border-radius:10px;background:rgba(255,216,107,.12);border:1px solid rgba(255,216,107,.35);color:#ffe7a3;font-size:12px}
 #tlPropia .base{display:block;margin:-4px 0 8px;font-size:11px;color:rgba(255,255,255,.55)}
 #tlPropia .acts{display:flex;gap:8px}
 #tlPropia .save{flex:1;border:0;border-radius:12px;padding:11px;cursor:pointer;font:750 14px Inter,system-ui;background:linear-gradient(135deg,#ffd86b,#ffb300);color:#1a0f00}
@@ -6312,16 +6306,14 @@ const box=root.querySelector(".box");
 function pull(){const n=box.querySelector("[data-name]");if(n)model.name=n.value}
 let model={id:null,name:"",sl:630,tp:630,steps:[]},saved=[];
 const money=n=>"$"+Number(n).toLocaleString("en-US",{maximumFractionDigits:0});
-const AVISO_50K="En 50K el motor duplica los dólares guardados.";
 function accScale(){try{const s=window.__tlAccScale&&+window.__tlAccScale();return s===2?2:1}catch(e){return 1}}
 function operado(n){const x=Number(n);if(!Number.isFinite(x))return n;return accScale()===2?Math.round(x*2*100)/100:x}
-function avisoHTML(){return accScale()===2?'<p class=aviso data-aviso>'+AVISO_50K+" Lo que se guarda no cambia; al operar se usa el doble.</p>":""}
 function previewText(){
   const sc=accScale();
   const lines=["Se opera: SL −"+money(operado(model.sl))+" / TP +"+money(operado(model.tp))];
   if(!model.steps.length)lines.push("Sin pasos: el stop no se mueve");
   else model.steps.forEach((s,i)=>{lines.push("Paso "+(i+1)+": +"+money(operado(s.trigger))+" → protege "+money(operado(s.lock)))});
-  if(sc===2)lines.push(AVISO_50K+" Guardado: SL −"+money(model.sl)+" / TP +"+money(model.tp)+".");
+  if(sc===2)lines.push("Guardado: SL −"+money(model.sl)+" / TP +"+money(model.tp)+".");
   return lines.join("\n");
 }
 function setMsg(t,bad){const m=box.querySelector("[data-msg]");if(!m)return;m.textContent=t||"";m.className=bad?"msg bad":"msg"}
@@ -6358,7 +6350,7 @@ function drawList(){
     const use=document.createElement("button");use.type="button";use.className="use";
     const sc=accScale();
     const opS=operado(p.SL_USD),opT=operado(p.TP_USD);
-    use.textContent=s.name+" · SL "+money(opS)+" / TP "+money(opT)+(st.length?" · "+st.map(x=>"+"+money(operado(x.trigger))+" → "+money(operado(x.lock))).join(" · "):" · stop fijo")+(sc===2?" · "+AVISO_50K+" Guardado "+money(p.SL_USD)+" / "+money(p.TP_USD):"");
+    use.textContent=s.name+" · SL "+money(opS)+" / TP "+money(opT)+(st.length?" · "+st.map(x=>"+"+money(operado(x.trigger))+" → "+money(operado(x.lock))).join(" · "):" · stop fijo")+(sc===2?" · guardado "+money(p.SL_USD)+" / "+money(p.TP_USD):"");
     use.addEventListener("click",e=>{e.stopPropagation();loadSaved(s)});
     const del=document.createElement("button");del.type="button";del.className="del";del.textContent="Borrar";
     del.addEventListener("click",e=>{e.stopPropagation();removeSaved(s)});
@@ -6369,7 +6361,7 @@ function render(){
   const steps=model.steps.map((s,i)=>`<div class=paso data-step=${i}><div class=top><span>Paso ${i+1}</span><button type=button class=ghost data-rm=${i}>Quitar</button></div>
 <label>Cuando llegue a <b data-tr>+${money(operado(s.trigger))}</b></label><input data-k=trigger type=range min=5 max=${Math.max(5,model.tp-5)} step=5 value=${s.trigger} aria-label="Disparo del paso ${i+1}">
 <label>protege <b data-lk>${money(operado(s.lock))}</b></label><input data-k=lock type=range min=0 max=${Math.max(0,s.trigger-5)} step=5 value=${s.lock} aria-label="Protege en el paso ${i+1}"></div>`).join("");
-  box.innerHTML=`<button type=button class=x aria-label="Cerrar">×</button><h2 id=tlPropiaTitle>Estrategia propia</h2><p class=sub>Se guarda solo en esta computadora. Hasta 3 pasos: cuando llega, protege.</p>${avisoHTML()}
+  box.innerHTML=`<button type=button class=x aria-label="Cerrar">×</button><h2 id=tlPropiaTitle>Estrategia propia</h2><p class=sub>Se guarda solo en esta computadora. Hasta 3 pasos: cuando llega, protege.</p>
 <label for=epName>Nombre</label><input id=epName data-name type=text maxlength=40 autocomplete=off value="">
 <div class=pair><label>Stop loss</label><b data-v=sl>−${money(operado(model.sl))}</b></div><input data-n=sl type=number min=10 max=5000 step=5 value=${model.sl} aria-label="Stop loss en dólares"><input data-k=sl type=range min=10 max=5000 step=5 value=${model.sl} aria-label="Stop loss"><span class=base data-base=sl>${accScale()===2?"Guardado −"+money(model.sl):""}</span>
 <div class=pair><label>Take profit</label><b data-v=tp>+${money(operado(model.tp))}</b></div><input data-n=tp type=number min=10 max=5000 step=5 value=${model.tp} aria-label="Take profit en dólares"><input data-k=tp type=range min=10 max=5000 step=5 value=${model.tp} aria-label="Take profit"><span class=base data-base=tp>${accScale()===2?"Guardado +"+money(model.tp):""}</span>

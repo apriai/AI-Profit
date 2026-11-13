@@ -133,7 +133,7 @@ assert(texts['Granja-de-Cuentas-v2.html'].includes('const scaleP='), 'preview SP
 assert(texts['Granja-de-Cuentas-v2.html'].includes('accountName:accPlan().name'), 'preview envía cuenta');
 assert(texts['Granja-de-Cuentas-v2.html'].includes('function textoCuentaHtml()'), 'selector arma el texto');
 assert(texts['Granja-de-Cuentas-v2.html'].includes('scaleP(s.params, sc)'), 'el texto usa la misma escala que la orden');
-assert(texts['Granja-de-Cuentas-v2.html'].includes('En 50K el motor duplica los dólares guardados.'), 'aviso de dólares duplicados en 50K');
+assert(!texts['Granja-de-Cuentas-v2.html'].includes('En 50K el motor duplica los dólares guardados.'), 'el editor no avisa que duplica');
 assert(texts['Granja-de-Cuentas-v2.html'].includes('__tlPropia.syncSize'), 'al cambiar de cuenta se refresca el editor');
 assert(texts['Granja-de-Cuentas-v2.html'].includes('sl:model.sl,tp:model.tp'), 'el editor guarda la base, no el doble');
 assert(!texts['Granja-de-Cuentas-v2.html'].includes('strDesc=()=>esc(((strs||[]).find(x=>x.id===stratId)||{short:""}).short)'), 'el selector ya no pega el short fijo');
@@ -171,7 +171,7 @@ assert(col.includes('SL −$1,200') && col.includes('TP +$3,200') && col.include
 const propiaVista = { id: 'propia-abc123', name: 'Mía', propia: true, params: { SL_USD: 400, TP_USD: 800, STEPS: [{ trigger: 100, lock: 50 }] } };
 const p25 = textoEnPagina(propiaVista, 1), p50 = textoEnPagina(propiaVista, 2);
 assert(p25.includes('SL −$400') && p25.includes('TP +$800') && p25.includes('+$100') && !p25.includes('duplica'), 'propia 25K muestra lo guardado');
-assert(p50.includes('SL −$800') && p50.includes('TP +$1,600') && p50.includes('+$200') && p50.includes('En 50K el motor duplica los dólares guardados.'), 'propia 50K muestra el doble y el aviso');
+assert(p50.includes('SL −$800') && p50.includes('TP +$1,600') && p50.includes('+$200') && !p50.includes('duplica'), 'propia 50K muestra el doble, sin aviso');
 
 if (failed) { console.error('\n' + failed + ' comprobaciones fallaron'); process.exit(1); }
 console.log('\nTodas las comprobaciones pasaron.');

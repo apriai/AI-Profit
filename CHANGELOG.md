@@ -13,7 +13,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 ## [0.10.3] — 2026-11-13
 ### Cambiado
 - **Textos del selector según el tamaño de la cuenta.** En el panel de operar, el resumen de la estrategia (el texto corto y la descripción) usa los dólares de la cuenta elegida: los mismos que salen al operar. En 25K se ven las cifras guardadas; en 50K, el doble. Al cambiar de cuenta, el texto se vuelve a armar. No cambia cómo se calculan ni cómo se envían las órdenes.
-- **Estrategia propia.** En una cuenta de 50K el editor, la vista previa y la lista muestran el stop, el take profit y los pasos ya duplicados, y avisan que el motor duplica los dólares guardados. Lo que se guarda sigue siendo la base: al guardar no se escribe el doble.
+- **Estrategia propia.** En una cuenta de 50K el editor, la vista previa y la lista muestran el stop, el take profit y los pasos ya duplicados. Lo que se guarda sigue siendo la base: al guardar no se escribe el doble.
 ### Notas
 - Solo la página. No abre, no mueve y no cierra órdenes.
 
