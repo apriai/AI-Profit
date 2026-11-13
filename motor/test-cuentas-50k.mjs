@@ -1,5 +1,6 @@
 import { getStrategy, listStrategies, STRATEGY_ORDER, DEFAULT_STRATEGY } from './strategies.mjs';
 import { accountPlanSize, paramsForAccount, rulesFor, PLANS, maxQtyFor } from './account-size.mjs';
+import vm from 'node:vm';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -130,6 +131,47 @@ assert(texts['Granja-de-Cuentas-v2.html'].includes('dayPn<=-lim0'), 'Listo por h
 assert(texts['Granja-de-Cuentas-v2.html'].includes('e.ddLeft/(e.dd||1e3)*100'), 'barra DD usa e.dd');
 assert(texts['Granja-de-Cuentas-v2.html'].includes('const scaleP='), 'preview SPf escala');
 assert(texts['Granja-de-Cuentas-v2.html'].includes('accountName:accPlan().name'), 'preview envía cuenta');
+assert(texts['Granja-de-Cuentas-v2.html'].includes('function textoCuentaHtml()'), 'selector arma el texto');
+assert(texts['Granja-de-Cuentas-v2.html'].includes('scaleP(s.params, sc)'), 'el texto usa la misma escala que la orden');
+assert(!texts['Granja-de-Cuentas-v2.html'].includes('En 50K el motor duplica los dólares guardados.'), 'el editor no avisa que duplica');
+assert(texts['Granja-de-Cuentas-v2.html'].includes('__tlPropia.syncSize'), 'al cambiar de cuenta se refresca el editor');
+assert(texts['Granja-de-Cuentas-v2.html'].includes('sl:model.sl,tp:model.tp'), 'el editor guarda la base, no el doble');
+assert(!texts['Granja-de-Cuentas-v2.html'].includes('strDesc=()=>esc(((strs||[]).find(x=>x.id===stratId)||{short:""}).short)'), 'el selector ya no pega el short fijo');
+
+function textoEnPagina(strategy, scale) {
+  const html = texts['Granja-de-Cuentas-v2.html'];
+  const start = html.indexOf('function textoCuentaHtml()');
+  const end = html.indexOf('\nconst QS=', start);
+  const PV = { MNQ: 2, NQ: 20 }, CR = { MNQ: 1, NQ: 3.5 };
+  const ctx = {
+    strs: [strategy], stratId: strategy.id, sym: 'MNQ', qty: 8,
+    accPlan: () => ({ scale }),
+    scaleP: (P, sc) => paramsForAccount(P, { plan: sc === 2 ? '50K' : '25K' }),
+    lockU: (y, q, P) => { const t = PV[y] * .25 * q; return Math.round(Math.ceil(((P.NET_USD || 0) + ((P.COMM_RT || CR)[y] || 0) * q + (P.SLIP_TICKS || 0) * t) / t - 1e-9) * t * 100) / 100; },
+    esc: s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])),
+  };
+  vm.createContext(ctx);
+  vm.runInContext(html.slice(start, end) + '\nout = textoCuentaHtml();', ctx);
+  return String(ctx.out).replace(/<[^>]+>/g, '\n');
+}
+const plano = getStrategy('evaluacion-simple');
+const t25 = textoEnPagina(plano, 1), t50 = textoEnPagina(plano, 2);
+assert(t25.includes('SL −$630') && t25.includes('TP +$630') && !t25.includes('$1,260'), 'texto Evaluación 25K');
+assert(t50.includes('SL −$1,260') && t50.includes('TP +$1,260') && !t50.includes('$630'), 'texto Evaluación 50K');
+const dd = getStrategy('dos-disparos');
+const d25 = textoEnPagina(dd, 1), d50 = textoEnPagina(dd, 2);
+assert(d25.includes('SL −$300') && d25.includes('TP +$630') && d25.includes('2 intentos'), 'texto dos disparos 25K');
+assert(d50.includes('SL −$600') && d50.includes('TP +$1,260') && !d50.includes('$300'), 'texto dos disparos 50K');
+const beTxt = textoEnPagina(getStrategy('prueba-be'), 2);
+assert(beTxt.includes('+$30') && beTxt.includes('+3 ticks') && !beTxt.includes('+6 ticks'), 'Fast BE 50K dobla el disparo y deja los ticks');
+const ras = textoEnPagina(getStrategy('rascacielo'), 2);
+assert(ras.includes('SL −$1,200') && ras.includes('TP +$208'), 'texto Rascacielo 50K');
+const col = textoEnPagina(getStrategy('dia-minimo-colchon'), 2);
+assert(col.includes('SL −$1,200') && col.includes('TP +$3,200') && col.includes('$200'), 'texto colchón 50K');
+const propiaVista = { id: 'propia-abc123', name: 'Mía', propia: true, params: { SL_USD: 400, TP_USD: 800, STEPS: [{ trigger: 100, lock: 50 }] } };
+const p25 = textoEnPagina(propiaVista, 1), p50 = textoEnPagina(propiaVista, 2);
+assert(p25.includes('SL −$400') && p25.includes('TP +$800') && p25.includes('+$100') && !p25.includes('duplica'), 'propia 25K muestra lo guardado');
+assert(p50.includes('SL −$800') && p50.includes('TP +$1,600') && p50.includes('+$200') && !p50.includes('duplica'), 'propia 50K muestra el doble, sin aviso');
 
 if (failed) { console.error('\n' + failed + ' comprobaciones fallaron'); process.exit(1); }
 console.log('\nTodas las comprobaciones pasaron.');

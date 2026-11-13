@@ -3,13 +3,14 @@
 Documento de relevo para cualquier agente (Grok) que trabaje en este repositorio. Sin datos personales: no hay cuentas, saldos ni claves aquí.
 
 ## Versión actual
-- **Última versión: 0.10.1** (2026-11-10). Está en el archivo `VERSION` y se ve en la esquina inferior izquierda de la granja.
+- **Última versión: 0.10.3** (2026-11-13). Está en el archivo `VERSION` y se ve en la esquina inferior izquierda de la granja.
 - Historial completo y detallado: `CHANGELOG.md`. Cada versión tiene su release en GitHub (`v0.5.1`, etc.).
 - **Al terminar un cambio, actualiza este documento** (versión, fecha y la lista de abajo).
 
 ## Lo que cambió
 | Versión | Qué cambió |
 |---|---|
+| 0.10.3 | Textos del selector y del editor de estrategias propias con los dólares de la cuenta elegida (25K tal cual, 50K el doble, el mismo escalado que la orden). En 50K se ve el valor duplicado, sin el aviso de que el motor duplica. Al guardar se sigue escribiendo la base. Al cambiar de cuenta se actualizan. Solo página. |
 | 0.10.1 | PROFITO riega una flor solo con su panel abierto; al cerrarlo (también con TRADE) se esconde la regadera. Abrir el panel lo despierta y lo lleva a la flor: no riega desde el banco y el punto queda a ≥1,25 del asiento. Bajar del banco ya no lo pega (sin recálculo en línea recta cada cuadro; si se queda quieto ~1 s replanifica, se desliza o rodea, y sale del rincón al sur de la casa). El punto de riego se elige entre varios sitios alcanzables. La mascota se aparta del camino y, si chocan, se mueve ella. El agua sale solo al llegar, quieto y mirando la flor; un empujón pausa el riego. Se quitó el letrero «Activado · durmiendo…»; la zZ del modelo sigue. Color nuevo «Verde Profit» `#C8E810` (primero en el selector; el defecto sigue en blanco) y colores del agente más vivos. Solo página. |
 | 0.10.0 | Dos disparos · 1:2 (25K −300/+630, 50K −600/+1,260). Cuentas 50K detectadas solas y reglas coherentes (meta, DD, trail, Listo por hoy, barra, marchitez). Tope de contratos LucidFlex: eval 20/40 MNQ; fondeada 25K 10 o 20 y 50K 20, 30 o 40 según el beneficio; defecto 8 MNQ. Panel de operar con scroll y BUY/SELL fijos. P&L ganado en verde. Sonido único de fanfarria + moneda. Celebración ~5,3 s (7 saltos, voltereta, casa y confeti). PROFITO y la mascota rodean los árboles, también el cerezo. Clic en la flor: camina y riega con regadera. Botón TRADE sin la pregunta de dinero real (BUY/SELL sigue confirmando). Vista previa de SL/TP en el gráfico, sin órdenes. El reporte de TradingView reintenta un cierre si faltaron fills o no había API; un dibujo ya hecho no se repite. |
 | 0.9.0 | Reporte de trades en TradingView (`motor/tv-reporte.mjs`, doc `docs/reporte-trades-tradingview.md`). Dibuja el cierre en el gráfico. No toca órdenes. Desde 0.10.0 un fallo pasajero (sin fills o sin API) se reintenta; un dibujo ya hecho no se repite. |
