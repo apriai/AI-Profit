@@ -1,14 +1,15 @@
 // tv-vista-previa.mjs — Vista previa del trade en TradingView.
-// Dibuja, solo mientras el panel está abierto y hay un lado (BUY o SELL bajo el cursor),
-// la entrada estimada, el SL y el TP. No es una orden: no llama a placeOrder, modifyOrder ni closePosition.
+// Dibuja, solo mientras el cursor está en BUY o SELL, dos líneas horizontales grises
+// (SL y TP, mismo color, 1 píxel). Se crean una vez y luego solo se les mueve el precio.
+// No es una orden: no llama a placeOrder, modifyOrder ni closePosition.
 // No guarda el dibujo como reporte. Al cerrar o desactivar el panel se borran solo los ids de esta vista.
 import { getStrategy } from './strategies.mjs';
-import { paramsForAccount } from './account-size.mjs';
+import { paramsForAccount, maxQtyFor } from './account-size.mjs';
 
 export const MODULO = 'tv-vista-previa';
 export const TITULO = 'Vista previa';
 
-const META = { MNQ: { pv: 2, tick: 0.25, max: 20 }, NQ: { pv: 20, tick: 0.25, max: 2 } };
+const META = { MNQ: { pv: 2, tick: 0.25 }, NQ: { pv: 20, tick: 0.25 } };
 const PROHIBIDO = /placeOrder|modifyOrder|editPositionBrackets|closePosition|cancelOrder|setCurrentAccount|removeAllShapes|saveChartToServer/;
 
 export function raizDe(symbol) {
@@ -38,12 +39,28 @@ export function tramo(params, usdKey, ptsKey, ticksKey, qty, pv, tick) {
   return null;
 }
 
-export function nivelesPreview({ side, symbol, qty, price, params }) {
+export function cuentaPreview(p = {}) {
+  const name = p.accountName || p.name || null;
+  return {
+    name,
+    id: name || p.accountId || p.id,
+    type: p.accountType || p.type,
+    balance: p.balance,
+    equity: p.equity,
+    totalPnl: p.totalPnl,
+    plan: p.plan,
+    start: p.start,
+    planStart: p.planStart ?? p.start,
+  };
+}
+
+export function nivelesPreview({ side, symbol, qty, price, params, account }) {
   const raiz = raizDe(symbol);
   const meta = META[raiz];
   if (side !== 'long' && side !== 'short') return { ok: false, motivo: 'sin-direccion' };
   if (!meta) return { ok: false, motivo: 'simbolo' };
-  if (!Number.isInteger(qty) || qty < 1 || qty > meta.max) return { ok: false, motivo: 'cantidad' };
+  const tope = maxQtyFor(raiz, account || {});
+  if (!Number.isInteger(qty) || qty < 1 || qty > tope) return { ok: false, motivo: 'cantidad', max: tope };
   if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0) return { ok: false, motivo: 'sin-precio' };
   const sl = tramo(params, 'SL_USD', 'SL_PTS', 'SL_TICKS', qty, meta.pv, meta.tick);
   const tp = tramo(params, 'TP_USD', 'TP_PTS', 'TP_TICKS', qty, meta.pv, meta.tick);
@@ -62,8 +79,8 @@ export function nivelesPreview({ side, symbol, qty, price, params }) {
 }
 
 export const BARRAS = 6;
-export const COLOR_SL = '#ef5350';
-export const COLOR_TP = '#26a69a';
+export const COLOR_LINEA = '#9aa3b2';
+export const GROSOR_LINEA = 1;
 
 // Resolución de TradingView: "15" minutos, "60" una hora, "1S" segundos, "1D"/"D" día, "1W" semana.
 // El mes ("1M"/"M") no tiene duración fija: el ancho se hace con el índice de barra, no con segundos inventados.
@@ -99,8 +116,6 @@ export function expresionVista(job) {
   return `(async function(){
     var JOB=${j};
     var BARRAS=JOB.barras||6;
-    var COLOR_SL=JOB.colorSl||'#ef5350';
-    var COLOR_TP=JOB.colorTp||'#26a69a';
     function raiz(s){var x=String(s||'').toUpperCase().replace(/^.*:/,'');if(x.indexOf('MNQ')===0)return 'MNQ';if(x.indexOf('NQ')===0)return 'NQ';return ''}
     function paso(res){
       var r=String(res||'').toUpperCase();
@@ -173,71 +188,6 @@ export function expresionVista(job) {
     if(!JOB.espacioYa){
       try{var ts=escala(); if(ts&&typeof ts.rightOffset==='function'&&typeof ts.setRightOffset==='function'){var cur=ts.rightOffset(); if(typeof cur==='number'&&cur<BARRAS+2){espacioPrev=cur; ts.setRightOffset(BARRAS+2)}}}catch(e){}
     }
-    function tiempoEnIndice(idx){
-      var ts=escala(); if(!ts||typeof idx!=='number') return null;
-      var nombres=['indexToTimePoint','indexToUserTime','indexToTime'];
-      for(var i=0;i<nombres.length;i++){
-        if(typeof ts[nombres[i]]!=='function') continue;
-        try{
-          var v=ts[nombres[i]](idx);
-          var t=typeof v==='number'?v:(v&&typeof v.timestamp==='number'?v.timestamp:(v&&typeof v.time==='number'?v.time:null));
-          if(typeof t!=='number') continue;
-          if(t>1e12) t=Math.floor(t/1000);
-          if(t>t0) return t;
-        }catch(e){}
-      }
-      return null;
-    }
-    function anchoDe(id){
-      var src=fuente(id);
-      if(!src||typeof src.points!=='function') return {ok:false,motivo:'sin-puntos'};
-      var ps=[]; try{ps=src.points()||[]}catch(e){return {ok:false,motivo:'sin-puntos'}}
-      var min=null,max=null;
-      for(var i=0;i<ps.length;i++){
-        var ix=ps[i]&&typeof ps[i].index==='number'?ps[i].index:null;
-        if(ix==null) continue;
-        if(min==null||ix<min) min=ix;
-        if(max==null||ix>max) max=ix;
-      }
-      return {ok:min!=null&&max!=null&&(max-min)>=BARRAS,min:min,max:max,n:ps.length};
-    }
-    function fijarCaja(id){
-      var src=fuente(id);
-      if(!src||typeof src.setPoint!=='function'||typeof src.points!=='function') return {ok:false,motivo:'sin-setPoint'};
-      var ps=[]; try{ps=src.points()||[]}catch(e){ps=[]}
-      if(ps.length<2) return {ok:false,motivo:'sin-puntos',n:ps.length};
-      var proy=tiempoEnIndice(i1);
-      function dato(indice,precio,futuro){
-        var o={index:indice,price:precio};
-        if(!futuro) o.time=t0;
-        else if(proy!=null) o.time=proy;
-        return o;
-      }
-      var p0=typeof ps[0].price==='number'?ps[0].price:JOB.entrada;
-      try{
-        src.setPoint(0,dato(i0,p0,false));
-        for(var n=1;n<ps.length;n++){
-          var precio=typeof ps[n].price==='number'?ps[n].price:JOB.entrada;
-          src.setPoint(n,dato(i1,precio,true));
-        }
-      }catch(e){return {ok:false,motivo:'setPoint',n:ps.length,proy:proy!=null}}
-      return {ok:true,n:ps.length,proy:proy!=null};
-    }
-    function reponerNiveles(id){
-      if(id==null) return;
-      try{
-        var sh=c.getShapeById(id);
-        if(sh&&sh.setProperties) sh.setProperties({stopLevel:JOB.ticksSl,profitLevel:JOB.ticksTp,qty:JOB.qty});
-      }catch(e){}
-    }
-    function nivelStop(id){
-      try{
-        var sh=c.getShapeById(id);
-        var pr=sh&&sh.getProperties?sh.getProperties():null;
-        if(!pr||typeof pr.stopLevel!=='number') return null;
-        return pr.stopLevel;
-      }catch(e){return null}
-    }
     async function multipunto(prev,pts,opts){
       if(prev){try{var sh=c.getShapeById(prev); if(sh.setPoints){sh.setPoints(pts); return String(prev)}}catch(e){}}
       var o=Object.assign({disableSave:true,lock:false},opts);
@@ -249,59 +199,35 @@ export function expresionVista(job) {
       try{return String(await c.createShape(pt,o))}catch(e){delete o.disableSave; return String(await c.createShape(pt,o))}
     }
     try{
-      function nombreDe(id){
-        try{var all=c.getAllShapes(); for(var i=0;i<all.length;i++) if(String(all[i].id)===String(id)) return String(all[i].name||'');}catch(e){}
-        return '';
-      }
-      async function raya(prev,precio,color){
+      var COLOR=${JSON.stringify(COLOR_LINEA)}, GROSOR=${GROSOR_LINEA};
+      async function raya(prev,precio){
         var pt={time:t0,price:precio};
-        var over={linecolor:color,linewidth:2,linestyle:2};
-        if(prev && /horizontal.?line/i.test(nombreDe(prev))){
-          try{var sh=c.getShapeById(prev); if(sh.setPoints)sh.setPoints([pt]); try{sh.setProperties(over)}catch(e0){} return String(prev);}catch(e){}
+        if(prev){
+          try{var sh=c.getShapeById(prev); if(sh&&sh.setPoints){sh.setPoints([pt]); return String(prev);}}catch(e){}
         }
-        if(prev){try{c.removeEntity(prev)}catch(e1){}}
+        var over={linecolor:COLOR,linewidth:GROSOR,linestyle:0};
         try{return await punto(null,pt,{shape:'horizontal_line',overrides:over});}
         catch(e2){
           try{return await punto(null,pt,{shape:'horizontal_ray',overrides:over});}
           catch(e3){return await multipunto(null,[{time:t0,price:precio},{time:t1,price:precio}],{shape:'trend_line',overrides:over});}
         }
       }
-      var sl=await raya(JOB.prev&&JOB.prev.sl,JOB.stop,COLOR_SL);
-      var tp=await raya(JOB.prev&&JOB.prev.tp,JOB.take,COLOR_TP);
-      var forma=JOB.lado==='long'?'long_position':'short_position';
-      var niveles={stopLevel:JOB.ticksSl,profitLevel:JOB.ticksTp,qty:JOB.qty};
-      var box=JOB.prev&&JOB.prev.box?String(JOB.prev.box):null;
-      if(box) reponerNiveles(box);
-      else{
-        try{box=await punto(null,{time:t0,price:JOB.entrada},{shape:forma,overrides:niveles});}
-        catch(e6){try{box=await multipunto(null,[{time:t0,price:JOB.entrada},{time:t0,price:JOB.entrada}],{shape:forma,overrides:niveles})}catch(e7){box=null}}
+      var sobra=[];
+      if(JOB.prev){
+        if(JOB.prev.box) sobra.push(String(JOB.prev.box));
+        if(JOB.prev.tx) sobra.push(String(JOB.prev.tx));
+        var ex=JOB.prev.extra||[];
+        for(var ei=0;ei<ex.length;ei++) if(ex[ei]!=null&&ex[ei]!=='') sobra.push(String(ex[ei]));
       }
-      await new Promise(function(r){setTimeout(r,50)});
-      var fija=box?fijarCaja(box):{ok:false,motivo:'sin-caja'};
-      await new Promise(function(r){setTimeout(r,50)});
-      var medida=box?anchoDe(box):{ok:false};
-      var riesgo=null;
-      if(box&&medida.ok){
-        reponerNiveles(box);
-        await new Promise(function(r){setTimeout(r,50)});
-        var tras=anchoDe(box);
-        if(!tras.ok){
-          fijarCaja(box);
-          await new Promise(function(r){setTimeout(r,50)});
-          medida=anchoDe(box);
-          riesgo=false;
-        }else{
-          medida=tras;
-          var slv=nivelStop(box);
-          riesgo=slv==null?null:slv>0;
-        }
-      }
-      if(!medida.ok&&box){quitar(box); if(!presente(box)) box=null}
-      var tx=await punto(JOB.prev&&JOB.prev.tx,{time:t1,price:JOB.entrada},{shape:'text',text:JOB.texto,overrides:{color:'#ffffff',fontsize:12,bold:true,fillBackground:true,backgroundColor:'rgba(20,16,28,0.92)',backgroundTransparency:8,drawBorder:true,borderColor:'#b0b4c0',wordWrap:true,wordWrapWidth:220}});
-      ids=[sl,tp,box,tx].filter(Boolean);
+      for(var si=0;si<sobra.length;si++) quitar(sobra[si]);
+      var extra=[];
+      for(var sj=0;sj<sobra.length;sj++) if(presente(sobra[sj])&&extra.indexOf(sobra[sj])<0) extra.push(sobra[sj]);
+      var sl=await raya(JOB.prev&&JOB.prev.sl,JOB.stop);
+      var tp=await raya(JOB.prev&&JOB.prev.tp,JOB.take);
+      ids=[sl,tp].concat(extra).filter(Boolean);
       try{c.getSeries().sendToBack()}catch(e2){}
       for(var k=0;k<ids.length;k++){try{c.getShapeById(ids[k]).bringToFront()}catch(e3){}}
-      return {ok:true,caja:!!(medida&&medida.ok),riesgo:riesgo,ids:{sl:sl,tp:tp,box:box,tx:tx},lista:ids,espacioPrev:espacioPrev,ancla:{res:res,step:step,t0:t0,t1:t1,i0:i0,i1:i1,barras:BARRAS,min:medida&&medida.min,max:medida&&medida.max,n:medida&&medida.n,proy:!!(fija&&fija.proy)}};
+      return {ok:true,ids:{sl:sl,tp:tp,box:null,tx:null,extra:extra},lista:ids,espacioPrev:espacioPrev};
     }catch(e){
       return {ok:false,motivo:'dibujo',error:String(e&&e.message||e),ids:ids,espacioPrev:espacioPrev};
     }
@@ -386,11 +312,15 @@ export function createVistaPrevia(opt = {}) {
       if (dibujadoEn) await borrarDibujos();
       return { ok: false, estado: 'no-disponible', texto: textoEstado('no-disponible') };
     }
-    const niv = nivelesPreview({ side: p.side, symbol: p.symbol, qty: Number(p.qty), price: cot.price, params: paramsForAccount(strat.params, { name: p.accountName, id: p.accountName || p.accountId }) });
-    if (!niv.ok) return { ok: false, estado: 'no-disponible', texto: textoEstado('no-disponible') };
+    const cuenta = cuentaPreview(p);
+    const niv = nivelesPreview({ side: p.side, symbol: p.symbol, qty: Number(p.qty), price: cot.price, params: paramsForAccount(strat.params, cuenta), account: cuenta });
+    if (!niv.ok) {
+      if (niv.motivo === 'cantidad' && dibujadoEn) await borrarDibujos();
+      return { ok: false, estado: 'no-disponible', texto: textoEstado('no-disponible') };
+    }
     const expr = expresionVista({ raiz });
     if (PROHIBIDO.test(expr)) return { ok: false, estado: 'no-disponible', texto: textoEstado('no-disponible') };
-    const job = { raiz, lado: p.side, entrada: niv.entrada, stop: niv.stop, take: niv.take, ticksSl: niv.ticksSl, ticksTp: niv.ticksTp, qty: niv.qty, barras: BARRAS, colorSl: COLOR_SL, colorTp: COLOR_TP, texto: niv.texto, espacioYa: espacioPrev != null, prev: ids && dibujadoEn === raiz ? ids : null };
+    const job = { raiz, lado: p.side, entrada: niv.entrada, stop: niv.stop, take: niv.take, ticksSl: niv.ticksSl, ticksTp: niv.ticksTp, qty: niv.qty, barras: BARRAS, texto: niv.texto, espacioYa: espacioPrev != null, prev: ids && dibujadoEn === raiz ? ids : null };
     let res = null;
     try { res = await opt.dibujar(expresionVista(job)); } catch { res = null; }
     if (pendiente && pendiente !== p) {
@@ -400,9 +330,7 @@ export function createVistaPrevia(opt = {}) {
     if (!res || !res.ok || !res.ids) return { ok: false, estado: 'no-disponible', texto: textoEstado('no-disponible') };
     ids = res.ids; dibujadoEn = raiz;
     if (typeof res.espacioPrev === 'number' && espacioPrev == null) espacioPrev = res.espacioPrev;
-    const aviso = res.caja === false ? '\nLa caja no quedó en 6 barras futuras.' : '';
-    const avisoRiesgo = res.riesgo === false ? '\nLa zona roja de riesgo no quedó en la caja.' : '';
-    return { ok: true, estado: 'vista', texto: niv.texto + aviso + avisoRiesgo, niveles: { entrada: niv.entrada, stop: niv.stop, take: niv.take, slUsd: niv.sl.usd, tpUsd: niv.tp.usd, slPts: niv.sl.pts, tpPts: niv.tp.pts, modoSl: niv.sl.modo } };
+    return { ok: true, estado: 'vista', texto: niv.texto, niveles: { entrada: niv.entrada, stop: niv.stop, take: niv.take, slUsd: niv.sl.usd, tpUsd: niv.tp.usd, slPts: niv.sl.pts, tpPts: niv.tp.pts, modoSl: niv.sl.modo } };
   }
   function aplicar(p) {
     const seq = Number(p && p.seq) || 0;

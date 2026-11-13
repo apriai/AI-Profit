@@ -13,6 +13,11 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 ## [0.10.6] — 2026-11-13
 ### Cambiado
 - **El instalador deja la foto como protagonista.** Tres pantallas, sin la de elegir carpeta: se instala directo en la carpeta del usuario y no pide administrador. Cada foto va completa, de borde a borde, a 720×405 (16:9), sin recortar arriba ni abajo. El fondo es oscuro. En una franja baja va una frase corta y un botón verde redondeado, o la barra de progreso verde. Bienvenida: «Instalar AI Profit» y «Instalar». Progreso: «Instalando…». Final: «¡Listo!» y «Abrir».
+- **Vista previa: solo dos líneas grises.** Al pasar el cursor por BUY o SELL se dibujan el stop y el take profit como dos líneas horizontales del mismo gris, de 1 píxel. Se crean una vez y, si cambia el lado o la cantidad, solo se les mueve el precio. Al salir el mouse o cerrar el panel se borran. Ya no hay caja de riesgo ni zona de color.
+- **Tope de la 25K fondeada.** 10 MNQ (1 NQ) hasta un saldo de $26,100 (ganancia de $1,100 sobre 25,000); desde ahí, 20 MNQ (2 NQ). La 50K no cambia: 20, 30 desde $1,000 y 40 desde $2,000.
+- **El instalador se publica solo.** Si `VERSION` cambia en `main`, GitHub Actions crea la etiqueta `vX.Y.Z`, construye `Profito-Setup.exe` y lo sube a una release publicada (ni borrador ni prerelease). Si esa versión es mayor que la Latest, queda como Latest.
+### Corregido
+- **La vista previa usa el tope de la cuenta.** Ya no se corta siempre en 20 MNQ. Usa `maxQtyFor`, el mismo tope del motor, también en la etapa fondeada.
 ### Notas
 - No abre, no mueve y no cierra órdenes. La foto de la granja de cerca queda en `instalador/gfx` y no se muestra: la del progreso es la multitud y las islas, para no parpadear entre dos fotos mientras copia archivos.
 
