@@ -1,9 +1,22 @@
+# Publica Profito-Setup.exe.
+# Cuenta como versión nueva:
+# - un push a main que cambie el archivo VERSION (x.y.z), o
+# - un push de una etiqueta vX.Y.Z.
+# En el primer caso este mismo job crea la etiqueta y la release.
+# Un push de etiqueta hecho con el token de Actions no vuelve a disparar
+# workflows, así que no hay un segundo job: aquí se construye y se publica.
+# La release queda publicada (ni draft ni prerelease). Si la versión es mayor
+# que la Latest actual, se marca Latest para que releases/latest la encuentre.
 name: Instalador Windows
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
+    paths:
+      - "VERSION"
 
 permissions:
   contents: write
@@ -13,41 +26,137 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Decidir si hay version nueva
+        id: ver
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          function Escribir([string]$linea) {
+            Add-Content -Path $env:GITHUB_OUTPUT -Value $linea -Encoding utf8NoBOM
+          }
+          $tipo = "${{ github.ref_type }}"
+          if ($tipo -eq "tag") {
+            $tag = "${{ github.ref_name }}"
+            if ($tag -notmatch '^v\d+\.\d+\.\d+$') { throw "La etiqueta $tag no es vX.Y.Z. No se publica." }
+            $version = $tag.Substring(1)
+            $archivo = (Get-Content -LiteralPath VERSION -Raw).Trim()
+            if ($archivo -ne $version) { throw "VERSION ($archivo) no coincide con la etiqueta $tag" }
+            Write-Output "Etiqueta $tag. Se publica."
+          } else {
+            $version = (Get-Content -LiteralPath VERSION -Raw).Trim()
+            if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "VERSION no es x.y.z: $version" }
+            $tag = "v$version"
+            $antes = "${{ github.event.before }}"
+            $prev = ""
+            if ($antes -match '^[0-9a-fA-F]{40}$' -and $antes -ne ('0' * 40)) {
+              git fetch --depth=1 origin $antes
+              if ($LASTEXITCODE -ne 0) { throw "No pude leer el commit anterior $antes" }
+              $prev = (git show "${antes}:VERSION" | Out-String).Trim()
+            }
+            if ($prev -eq $version) {
+              Write-Output "VERSION sigue en $version. No se crea etiqueta ni release."
+              Escribir "publicar=false"
+              exit 0
+            }
+            $ya = git ls-remote --tags origin "refs/tags/$tag"
+            if ($LASTEXITCODE -ne 0) { throw "No pude consultar si la etiqueta $tag ya existe" }
+            if ($ya) { throw "La etiqueta $tag ya existe. No la muevo y no publico encima." }
+            Write-Output "VERSION paso de '$prev' a $version. Se publicara $tag."
+          }
+          Escribir "publicar=true"
+          Escribir "tag=$tag"
+          Escribir "version=$version"
 
       - uses: actions/setup-node@v4
+        if: steps.ver.outputs.publicar == 'true'
         with:
           node-version: "22"
 
       - name: NSIS 3.11
+        if: steps.ver.outputs.publicar == 'true'
         shell: pwsh
         run: |
-          $zip = Join-Path $env:RUNNER_TEMP "nsis-3.11.zip"
-          Invoke-WebRequest -Uri "https://github.com/kichik/nsis/releases/download/v3.11/nsis-3.11.zip" -OutFile $zip
-          Expand-Archive -LiteralPath $zip -DestinationPath $env:RUNNER_TEMP
-          $home = Get-ChildItem $env:RUNNER_TEMP -Directory -Filter "nsis-3.11*" | Select-Object -First 1
-          if (-not $home) { throw "No se descomprimio NSIS" }
-          Add-Content -Path $env:GITHUB_PATH -Value $home.FullName
+          $ErrorActionPreference = 'Stop'
+          choco install nsis --version=3.11.0 -y --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "choco install nsis salio $LASTEXITCODE" }
+          $nsis = "C:\Program Files (x86)\NSIS"
+          if (-not (Test-Path -LiteralPath "$nsis\makensis.exe")) { throw "No esta makensis" }
+          Add-Content -Path $env:GITHUB_PATH -Value $nsis
 
       - name: Comprobar imagenes del instalador
+        if: steps.ver.outputs.publicar == 'true'
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           $gfx = "instalador\gfx"
           foreach ($nombre in @("1-escenario.jpg","2-multitud-islas.jpg","3-granja-cerca.jpg","4-isla-granja.jpg","p1-bienvenida.bmp","p2-carpeta.bmp","p3-progreso.bmp","p4-listo.bmp")) {
             if (-not (Test-Path -LiteralPath (Join-Path $gfx $nombre))) { throw "Falta $gfx\$nombre" }
           }
 
       - name: Construir Profito-Setup.exe
+        if: steps.ver.outputs.publicar == 'true'
         shell: pwsh
         run: .\instalador\construir.ps1
 
       - name: Publicar en la release
+        if: steps.ver.outputs.publicar == 'true'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = "${{ github.ref_name }}"
-          gh release view $tag 2>$null
-          if ($LASTEXITCODE -ne 0) {
-            gh release create $tag --title "AI Profit $tag" --notes "Instalador de Windows: Profito-Setup.exe"
+          $ErrorActionPreference = 'Stop'
+          $tag = "${{ steps.ver.outputs.tag }}"
+          $sha = "${{ github.sha }}"
+          if ($tag -notmatch '^v\d+\.\d+\.\d+$') { throw "Etiqueta inesperada: $tag" }
+          $exe = "dist\Profito-Setup.exe"
+          if (-not (Test-Path -LiteralPath $exe)) { throw "No esta $exe" }
+
+          function Parte([string]$texto) {
+            if ($texto -notmatch '^v?(\d+)\.(\d+)\.(\d+)$') { return $null }
+            return @([int]$Matches[1], [int]$Matches[2], [int]$Matches[3])
           }
-          gh release upload $tag "dist\Profito-Setup.exe" --clobber
+          function EsMayor([string]$a, [string]$b) {
+            $pa = Parte $a
+            $pb = Parte $b
+            if ($null -eq $pa) { return $false }
+            if ($null -eq $pb) { return $true }
+            for ($i = 0; $i -lt 3; $i++) {
+              if ($pa[$i] -gt $pb[$i]) { return $true }
+              if ($pa[$i] -lt $pb[$i]) { return $false }
+            }
+            return $false
+          }
+
+          $marcarLatest = $true
+          gh release view --json tagName --jq .tagName 1>$null 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            $actual = (gh release view --json tagName --jq .tagName).Trim()
+            if (-not (EsMayor $tag $actual)) { $marcarLatest = $false }
+          }
+          $latestFlag = "--latest"
+          if (-not $marcarLatest) { $latestFlag = "--latest=false" }
+
+          gh release view $tag 1>$null 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            if ("${{ github.ref_type }}" -eq "tag") {
+              gh release create $tag $exe --verify-tag --target $sha $latestFlag --title "AI Profit $tag" --notes "Instalador de Windows: Profito-Setup.exe"
+            } else {
+              gh release create $tag $exe --target $sha $latestFlag --title "AI Profit $tag" --notes "Instalador de Windows: Profito-Setup.exe"
+            }
+            if ($LASTEXITCODE -ne 0) { throw "gh release create salio $LASTEXITCODE" }
+          } else {
+            gh release edit $tag --draft=false --prerelease=false $latestFlag
+            if ($LASTEXITCODE -ne 0) { throw "gh release edit salio $LASTEXITCODE" }
+            gh release upload $tag $exe --clobber
+            if ($LASTEXITCODE -ne 0) { throw "gh release upload salio $LASTEXITCODE" }
+          }
+
+          $vista = gh release view $tag --json isDraft,isPrerelease,tagName,assets --jq "{tag:.tagName,draft:.isDraft,pre:.isPrerelease,assets:[.assets[].name]}"
+          Write-Output $vista
+          if ($vista -notmatch '"draft":false') { throw "La release $tag quedo como borrador" }
+          if ($vista -notmatch '"pre":false') { throw "La release $tag quedo como prerelease" }
+          if ($vista -notmatch 'Profito-Setup\.exe') { throw "La release $tag no tiene Profito-Setup.exe" }
+          Write-Output "PUBLICADO https://github.com/apriai/AI-Profit/releases/download/$tag/Profito-Setup.exe"
