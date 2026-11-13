@@ -8,6 +8,10 @@ $version = (Get-Content -LiteralPath (Join-Path $root 'VERSION') -Raw).Trim()
 if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "VERSION no es x.y.z: $version" }
 $vernum = "$version.0"
 
+$gfx = Join-Path $root 'instalador\gfx'
+foreach ($nombre in @('mui-bienvenida.bmp','mui-cabecera.bmp','p1-bienvenida.bmp','p2-carpeta.bmp','p3-progreso.bmp','p4-listo.bmp')) {
+  if (-not (Test-Path -LiteralPath (Join-Path $gfx $nombre))) { throw "Falta instalador\gfx\$nombre" }
+}
 Write-Output "Preparando archivos de $version"
 & node (Join-Path $root 'instalador\preparar.mjs')
 if ($LASTEXITCODE -ne 0) { throw "preparar.mjs salio $LASTEXITCODE" }

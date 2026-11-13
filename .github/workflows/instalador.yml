@@ -28,6 +28,14 @@ jobs:
           if (-not $home) { throw "No se descomprimio NSIS" }
           Add-Content -Path $env:GITHUB_PATH -Value $home.FullName
 
+      - name: Comprobar imagenes del instalador
+        shell: pwsh
+        run: |
+          $gfx = "instalador\gfx"
+          foreach ($nombre in @("1-escenario.jpg","2-multitud-islas.jpg","3-granja-cerca.jpg","4-isla-granja.jpg","mui-bienvenida.bmp","mui-cabecera.bmp","p1-bienvenida.bmp","p2-carpeta.bmp","p3-progreso.bmp","p4-listo.bmp")) {
+            if (-not (Test-Path -LiteralPath (Join-Path $gfx $nombre))) { throw "Falta $gfx\$nombre" }
+          }
+
       - name: Construir Profito-Setup.exe
         shell: pwsh
         run: .\instalador\construir.ps1
