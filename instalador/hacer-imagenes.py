@@ -18,16 +18,20 @@ FILES = {
 }
 
 
-def cover(im, size, focus=(0.5, 0.5)):
+ANCHO = 496
+ALTO = 279  # 496 * 9 / 16. La foto entra entera; si no es 16:9, sobra margen a los lados.
+
+
+def contener(im, size, fondo=(246, 241, 255)):
+    """Escala la foto para que se vea completa. No recorta arriba ni abajo."""
     tw, th = size
     sw, sh = im.size
-    scale = max(tw / sw, th / sh)
-    nw, nh = max(tw, int(round(sw * scale))), max(th, int(round(sh * scale)))
+    scale = min(tw / sw, th / sh)
+    nw, nh = max(1, int(round(sw * scale))), max(1, int(round(sh * scale)))
     resized = im.resize((nw, nh), Image.Resampling.LANCZOS)
-    cx, cy = int(nw * focus[0]), int(nh * focus[1])
-    left = max(0, min(nw - tw, cx - tw // 2))
-    top = max(0, min(nh - th, cy - th // 2))
-    return resized.crop((left, top, left + tw, top + th)).convert("RGB")
+    lienzo = Image.new("RGB", size, fondo)
+    lienzo.paste(resized, ((tw - nw) // 2, (th - nh) // 2))
+    return lienzo
 
 
 def save_bmp(im, path):
@@ -46,20 +50,21 @@ def font(size, bold=False):
 
 
 def mockup(banner, titulo, lineas, botones, destino):
-    W, H = 680, 460
+    W, H = 548, 620
     img = Image.new("RGB", (W, H), "#f6f1ff")
     d = ImageDraw.Draw(img)
     d.rectangle((0, 0, W, 36), fill="#3a1d6e")
     d.text((16, 8), "Instalar Profito", font=font(16, True), fill="white")
     d.text((W - 28, 6), "×", font=font(18, True), fill="white")
-    img.paste(banner.resize((W, 210), Image.Resampling.LANCZOS), (0, 36))
-    y = 260
-    d.text((28, y), titulo, font=font(26, True), fill="#2a1848")
-    y += 40
+    x = (W - banner.width) // 2
+    img.paste(banner, (x, 48))
+    y = 48 + banner.height + 18
+    d.text((26, y), titulo, font=font(24, True), fill="#2a1848")
+    y += 36
     for linea in lineas:
-        d.text((28, y), linea, font=font(16), fill="#3d3454")
+        d.text((26, y), linea, font=font(16), fill="#3d3454")
         y += 26
-    bx = W - 28
+    bx = W - 24
     for texto, fondo, tinta in reversed(botones):
         tw = 118
         bx -= tw + 10
@@ -79,16 +84,8 @@ def main():
         chica = im.resize((ancho, alto), Image.Resampling.LANCZOS)
         chica.save(OUT / (Path(FILES[i]).stem + ".jpg"), "JPEG", quality=84, optimize=True)
 
-    bienvenida = cover(fotos[1], (164, 314), (0.50, 0.46))
-    cabecera = cover(fotos[3], (150, 57), (0.40, 0.36))
-    banners = {
-        1: cover(fotos[1], (470, 150), (0.50, 0.44)),
-        2: cover(fotos[2], (470, 150), (0.58, 0.68)),
-        3: cover(fotos[3], (470, 150), (0.42, 0.46)),
-        4: cover(fotos[4], (470, 150), (0.50, 0.52)),
-    }
-    save_bmp(bienvenida, OUT / "mui-bienvenida.bmp")
-    save_bmp(cabecera, OUT / "mui-cabecera.bmp")
+    marco = (ANCHO, ALTO)
+    banners = {i: contener(fotos[i], marco) for i in fotos}
     save_bmp(banners[1], OUT / "p1-bienvenida.bmp")
     save_bmp(banners[2], OUT / "p2-carpeta.bmp")
     save_bmp(banners[3], OUT / "p3-progreso.bmp")

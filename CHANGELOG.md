@@ -14,7 +14,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 ### Agregado
 - **Aviso de actualización al abrir.** En Windows, al arrancar, se consulta la última release de GitHub. Si es más nueva que el `VERSION` de esta carpeta, una ventana pregunta: «Hay una versión nueva de Profito (X). ¿Actualizar ahora?» Sí descarga `Profito-Setup.exe` a la carpeta temporal, lo abre y cierra este Profito. Si no hay internet, si la página falla o si tarda, no dice nada y el arranque sigue. Si se pulsa No, ese día no vuelve a preguntar. No pregunta si hay una operación en curso.
 - **Construcción del instalador.** `instalador/construir.ps1` arma `dist/Profito-Setup.exe` con NSIS, el mismo tipo de empaquetador que el de 0.10.2. Al publicar una etiqueta `v*`, GitHub Actions lo construye y lo sube a la release.
-- **El instalador muestra la granja.** Cuatro pantallas, cada una con su imagen: bienvenida (Profito en el escenario), carpeta (la multitud y las islas), instalación (la granja de cerca) y final (la isla). Textos cortos, en español.
+- **El instalador muestra la granja.** Cuatro pantallas, cada una con su foto completa en 16:9 (496×279), sin recortar arriba ni abajo: bienvenida (Profito en el escenario), carpeta (la multitud y las islas), instalación (la granja de cerca) y final (la isla). La ventana es más alta y el texto queda debajo. Textos cortos, en español.
 ### Notas
 - No abre, no mueve y no cierra órdenes. El lanzador compilado `AI Profit.exe` no tiene fuente en el repositorio: el aviso entra por `acceso/profito-estado.mjs`, que ese exe ya ejecuta. El instalador nuevo crea el acceso con `acceso/AI Profit.cmd`.
 

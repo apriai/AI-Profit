@@ -19,10 +19,7 @@ RequestExecutionLevel user
   !define VERNUM "0.0.0.0"
 !endif
 
-!define MUI_HEADERIMAGE
-!define MUI_HEADERIMAGE_BITMAP "gfx\mui-cabecera.bmp"
-!define MUI_HEADERIMAGE_RIGHT
-!define MUI_WELCOMEFINISHPAGE_BITMAP "gfx\mui-bienvenida.bmp"
+; La foto va entera, 496x279 (16:9), en cada pantalla. No se usa el recorte 164x314.
 !define MUI_ABORTWARNING
 !define MUI_ABORTWARNING_TEXT "¿Seguro que quieres salir? Profito no quedará instalado."
 !define MUI_ICON "..\assets\abrir-granja-icon.ico"
@@ -72,8 +69,6 @@ Function .onInit
   ${EndIf}
   InitPluginsDir
   SetOutPath $PLUGINSDIR
-  File "gfx\mui-bienvenida.bmp"
-  File "gfx\mui-cabecera.bmp"
   File "gfx\p1-bienvenida.bmp"
   File "gfx\p2-carpeta.bmp"
   File "gfx\p3-progreso.bmp"
@@ -81,10 +76,27 @@ Function .onInit
   ShowInstDetails never
 FunctionEnd
 
+Function .onGUIInit
+  ; Ventana más alta: la foto 16:9 (496x279) y el texto debajo.
+  System::Call 'user32::SetWindowPos(p $HWNDPARENT, p 0, i 0, i 0, i 548, i 700, i 0x16)'
+FunctionEnd
+
+Function MoverBotones
+  GetDlgItem $R0 $HWNDPARENT 1
+  System::Call 'user32::SetWindowPos(p $R0, p 0, i 410, i 610, i 110, i 28, i 0x4)'
+  GetDlgItem $R0 $HWNDPARENT 3
+  System::Call 'user32::SetWindowPos(p $R0, p 0, i 290, i 610, i 110, i 28, i 0x4)'
+  GetDlgItem $R0 $HWNDPARENT 2
+  System::Call 'user32::SetWindowPos(p $R0, p 0, i 16, i 610, i 110, i 28, i 0x4)'
+FunctionEnd
+
 !macro Foto ARCHIVO
-  ${NSD_CreateBitmap} 0 0 100% 78u
-  Pop $Imagen
-  ${NSD_SetImage} $Imagen "$PLUGINSDIR\${ARCHIVO}" $ImagenHandle
+  System::Call 'user32::SetWindowPos(p $Dialogo, p 0, i 0, i 0, i 532, i 580, i 0x14)'
+  System::Call 'user32::LoadImage(p 0, t "$PLUGINSDIR\${ARCHIVO}", i ${IMAGE_BITMAP}, i 0, i 0, i ${LR_LOADFROMFILE}) p.R2'
+  System::Call 'user32::CreateWindowEx(i 0, t "STATIC", t "", i ${WS_CHILD}|${WS_VISIBLE}|${SS_BITMAP}, i 18, i 8, i 496, i 279, p $Dialogo, p 0, p 0, p 0) p.R3'
+  System::Call 'user32::SendMessage(p $R3, i ${STM_SETIMAGE}, i ${IMAGE_BITMAP}, p $R2)'
+  StrCpy $ImagenHandle $R2
+  Call MoverBotones
 !macroend
 
 Function Botones
@@ -101,9 +113,8 @@ Function BienvenidaCrear
   nsDialogs::Create 1018
   Pop $Dialogo
   !insertmacro Foto "p1-bienvenida.bmp"
-  ${NSD_CreateLabel} 12u 84u 90% 48u "Hola. Soy Profito.$\r$\n$\r$\nVoy a poner tu granja en esta computadora.$\r$\nPulsa Siguiente. Es fácil y no pide contraseña."
-  Pop $R0
-  CreateFont $R1 "Segoe UI" 11 700
+  CreateFont $R1 "Segoe UI" 12 700
+  System::Call 'user32::CreateWindowEx(i 0, t "STATIC", t "Hola. Soy Profito.$\r$\n$\r$\nVoy a poner tu granja en esta computadora.$\r$\nPulsa Siguiente. Es fácil y no pide contraseña.", i ${WS_CHILD}|${WS_VISIBLE}, i 18, i 300, i 496, i 90, p $Dialogo, p 0, p 0, p 0) p.R0'
   SendMessage $R0 ${WM_SETFONT} $R1 0
   Push "Siguiente"
   Call Botones
@@ -113,19 +124,19 @@ Function BienvenidaCrear
 FunctionEnd
 
 Function BienvenidaSalir
-  ${NSD_FreeImage} $ImagenHandle
+  ${If} $ImagenHandle != 0
+    System::Call 'gdi32::DeleteObject(p $ImagenHandle)'
+  ${EndIf}
 FunctionEnd
 
 Function CarpetaCrear
   nsDialogs::Create 1018
   Pop $Dialogo
   !insertmacro Foto "p2-carpeta.bmp"
-  ${NSD_CreateLabel} 12u 82u 90% 28u "¿Dónde la guardo?$\r$\nLa dejo en tu carpeta. Así está bien. Si quieres otro sitio, pulsa Examinar."
-  Pop $R0
-  ${NSD_CreateDirRequest} 12u 114u 230u 14u "$INSTDIR"
+  System::Call 'user32::CreateWindowEx(i 0, t "STATIC", t "¿Dónde la guardo?$\r$\nLa dejo en tu carpeta. Así está bien.$\r$\nSi quieres otro sitio, pulsa Examinar.", i ${WS_CHILD}|${WS_VISIBLE}, i 18, i 300, i 496, i 70, p $Dialogo, p 0, p 0, p 0) p.R0'
+  System::Call 'user32::CreateWindowEx(i 0x200, t "EDIT", t "$INSTDIR", i ${WS_CHILD}|${WS_VISIBLE}|${ES_AUTOHSCROLL}, i 18, i 380, i 370, i 24, p $Dialogo, p 0, p 0, p 0) p.s'
   Pop $CampoCarpeta
-  ${NSD_CreateBrowseButton} 248u 114u 40u 14u "Examinar"
-  Pop $R0
+  System::Call 'user32::CreateWindowEx(i 0, t "BUTTON", t "Examinar", i ${WS_CHILD}|${WS_VISIBLE}|${WS_TABSTOP}, i 400, i 378, i 114, i 28, p $Dialogo, p 0, p 0, p 0) p.R0'
   ${NSD_OnClick} $R0 ElegirCarpeta
   Push "Siguiente"
   Call Botones
@@ -133,18 +144,22 @@ Function CarpetaCrear
 FunctionEnd
 
 Function ElegirCarpeta
-  ${NSD_GetText} $CampoCarpeta $R0
+  System::Call 'user32::SendMessage(p $CampoCarpeta, i ${WM_GETTEXT}, i ${NSIS_MAX_STRLEN}, t.s)'
+  Pop $R0
   nsDialogs::SelectFolderDialog "Elige una carpeta" $R0
   Pop $R0
   ${If} $R0 != error
   ${AndIf} $R0 != ""
-    ${NSD_SetText} $CampoCarpeta $R0
+    System::Call 'user32::SendMessage(p $CampoCarpeta, i ${WM_SETTEXT}, i 0, t R0)'
   ${EndIf}
 FunctionEnd
 
 Function CarpetaSalir
-  ${NSD_GetText} $CampoCarpeta $INSTDIR
-  ${NSD_FreeImage} $ImagenHandle
+  System::Call 'user32::SendMessage(p $CampoCarpeta, i ${WM_GETTEXT}, i ${NSIS_MAX_STRLEN}, t.s)'
+  Pop $INSTDIR
+  ${If} $ImagenHandle != 0
+    System::Call 'gdi32::DeleteObject(p $ImagenHandle)'
+  ${EndIf}
   ${If} $INSTDIR == ""
     MessageBox MB_OK|MB_ICONEXCLAMATION "Elige una carpeta para Profito."
     Abort
@@ -155,8 +170,14 @@ Function ProgresoMostrar
   FindWindow $R0 "#32770" "" $HWNDPARENT
   GetDlgItem $R1 $R0 1016
   ShowWindow $R1 ${SW_HIDE}
-  System::Call 'user32::LoadImage(p 0, t "$PLUGINSDIR\p3-progreso.bmp", i ${IMAGE_BITMAP}, i 470, i 120, i ${LR_LOADFROMFILE}) p.R2'
-  System::Call 'user32::CreateWindowEx(i 0, t "STATIC", t "", i ${WS_CHILD}|${WS_VISIBLE}|${SS_BITMAP}, i 8, i 36, i 470, i 120, p $R0, p 0, p 0, p 0) p.R3'
+  System::Call 'user32::SetWindowPos(p $R0, p 0, i 0, i 0, i 532, i 560, i 0x14)'
+  Call MoverBotones
+  System::Call 'user32::LoadImage(p 0, t "$PLUGINSDIR\p3-progreso.bmp", i ${IMAGE_BITMAP}, i 0, i 0, i ${LR_LOADFROMFILE}) p.R2'
+  System::Call 'user32::CreateWindowEx(i 0, t "STATIC", t "", i ${WS_CHILD}|${WS_VISIBLE}|${SS_BITMAP}, i 18, i 8, i 496, i 279, p $R0, p 0, p 0, p 0) p.R3'
+  GetDlgItem $R4 $R0 1006
+  System::Call 'user32::SetWindowPos(p $R4, p 0, i 18, i 300, i 496, i 36, i 0x4)'
+  GetDlgItem $R4 $R0 1004
+  System::Call 'user32::SetWindowPos(p $R4, p 0, i 18, i 344, i 496, i 18, i 0x4)'
   System::Call 'user32::SendMessage(p $R3, i ${STM_SETIMAGE}, i ${IMAGE_BITMAP}, p $R2)'
   StrCpy $BmpProgreso $R2
   GetDlgItem $R1 $HWNDPARENT 1
@@ -175,9 +196,8 @@ Function ListoCrear
   nsDialogs::Create 1018
   Pop $Dialogo
   !insertmacro Foto "p4-listo.bmp"
-  ${NSD_CreateLabel} 12u 84u 90% 48u "¡Listo!$\r$\n$\r$\nProfito ya está en tu computadora.$\r$\nEn el escritorio verás AI Profit. Ábrelo con doble clic."
-  Pop $R0
   CreateFont $R1 "Segoe UI" 12 700
+  System::Call 'user32::CreateWindowEx(i 0, t "STATIC", t "¡Listo!$\r$\n$\r$\nProfito ya está en tu computadora.$\r$\nEn el escritorio verás AI Profit. Ábrelo con doble clic.", i ${WS_CHILD}|${WS_VISIBLE}, i 18, i 300, i 496, i 100, p $Dialogo, p 0, p 0, p 0) p.R0'
   SendMessage $R0 ${WM_SETFONT} $R1 0
   Push "Cerrar"
   Call Botones
