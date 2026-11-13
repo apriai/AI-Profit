@@ -59,6 +59,9 @@ export function elegirTv(info = {}) {
       return { ruta: linea, tipo: esRutaWindowsApps(linea) ? 'msix' : 'clasico' };
     }
   }
+  for (const f of info.registro || []) {
+    if (f && !esRutaWindowsApps(f) && !esAliasEjecucion(f) && existe(f)) return { ruta: f, tipo: 'clasico' };
+  }
   return { ruta: '', tipo: 'ninguno' };
 }
 
@@ -118,17 +121,22 @@ function leerSondaTv() {
     "$appx = (Get-AppxPackage -Name 'TradingView.Desktop' -ErrorAction SilentlyContinue | Select-Object -First 1).InstallLocation",
     "if (-not $appx) { $hit = @(Get-AppxPackage -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '*TradingView*' } | Select-Object -First 1); if ($hit) { $appx = $hit.InstallLocation } }",
     "$proc = (Get-CimInstance Win32_Process -Filter \"Name = 'TradingView.exe'\" -ErrorAction SilentlyContinue | Select-Object -First 1).ExecutablePath",
+    "$reg = ''",
+    "$bases = @('HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*','HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*','HKLM:\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*')",
+    "foreach ($base in $bases) { if ($reg) { break }; Get-ItemProperty -Path $base -ErrorAction SilentlyContinue | ForEach-Object { if ($reg) { return }; if ([string]$_.DisplayName -notmatch 'TradingView') { return }; $icon = (([string]$_.DisplayIcon -replace '\"','' ) -split ',')[0].Trim(); $loc = ''; if ($_.InstallLocation) { $loc = Join-Path ([string]$_.InstallLocation) 'TradingView.exe' }; foreach ($c in @($icon, $loc)) { if ($c -match 'TradingView\\.exe$' -and $c -notmatch '\\\\WindowsApps\\\\' -and (Test-Path -LiteralPath $c)) { $reg = $c } } } }",
     "'APPX=' + [string]$appx",
     "'PROC=' + [string]$proc",
+    "'REG=' + [string]$reg",
   ].join('; ');
   const txt = run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], 15000);
-  const out = { appx: '', proceso: '' };
+  const out = { appx: '', proceso: '', registro: '' };
   for (const linea of txt.split(/\r?\n/)) {
-    const m = /^(APPX|PROC)=(.*)$/.exec(linea.trim());
+    const m = /^(APPX|PROC|REG)=(.*)$/.exec(linea.trim());
     if (!m) continue;
     const valor = m[2].trim();
     if (m[1] === 'APPX') out.appx = valor;
-    else out.proceso = valor;
+    else if (m[1] === 'PROC') out.proceso = valor;
+    else out.registro = valor;
   }
   return out;
 }
@@ -148,6 +156,7 @@ export function buscarTV(env = process.env, fsImpl = fs) {
   return elegirTv({
     existe: f => { try { return fsImpl.existsSync(f); } catch { return false; } },
     clasicas, alias, appx: sonda.appx, proceso: sonda.proceso, where,
+    registro: sonda.registro ? [sonda.registro] : [],
   });
 }
 
@@ -250,7 +259,11 @@ async function main() {
   } else if (cmd === 'parar') {
     const dir = a3; const s = await servidor(dir);
     if (s.servidor !== 'profito') return escribir({ ...s, parado: s.servidor === 'libre' ? 1 : 0, listo: 1 });
-    if (s.operacion !== 'ninguna') return escribir({ ...s, parado: 0, motivo: 'operacion', listo: 1 });
+    if (s.operacion !== 'ninguna') {
+      escribir({ ...s, parado: 0, motivo: 'operacion', listo: 1 });
+      process.exitCode = 30;
+      return;
+    }
     if (!s.servidor_nuestro) return escribir({ ...s, parado: 0, motivo: 'otra-carpeta', listo: 1 });
     const pids = s.servidor_ruta && pidEnPuerto(SRV) ? [pidEnPuerto(SRV)] : String(s.nuestros || '').split(' ').filter(Boolean).map(Number);
     for (const p of pids) { try { process.kill(p); } catch {} }

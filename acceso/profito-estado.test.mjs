@@ -45,6 +45,12 @@ const whereApps = elegirTv({
 eq(whereApps.ruta, MS);
 eq(whereApps.tipo, 'msix', 'where dentro de WindowsApps no exige existsSync');
 
+const DISCO = 'D:\\Programas\\TradingView\\TradingView.exe';
+const registro = elegirTv({ existe: f => f === DISCO, registro: [DISCO], appx: '' });
+eq(registro, { ruta: DISCO, tipo: 'clasico' }, 'el registro encuentra una carpeta en otro disco');
+const registroNoPisa = elegirTv({ existe: f => f === DISCO, registro: [DISCO], appx: APPX });
+eq(registroNoPisa.tipo, 'msix', 'el paquete gana sobre el registro');
+
 const nada = elegirTv({ existe: () => false });
 eq(nada.tipo, 'ninguno');
 eq(tvexeParaLanzador(nada, LANZADOR, false), '');

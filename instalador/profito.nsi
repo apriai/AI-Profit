@@ -263,6 +263,11 @@ Section "Profito" SecMain
   IfFileExists "$INSTDIR\node-win\node.exe" 0 sin_previo
   nsExec::ExecToStack '"$INSTDIR\node-win\node.exe" "$INSTDIR\acceso\profito-estado.mjs" parar "$PLUGINSDIR\parar.ini" "$INSTDIR"'
   Pop $0
+  Pop $2
+  ${If} $0 == 30
+    MessageBox MB_OK|MB_ICONSTOP "Hay un trade abierto, o no pude comprobarlo. Espera a que termine y vuelve a abrir el instalador."
+    Abort
+  ${EndIf}
   ReadINIStr $1 "$PLUGINSDIR\parar.ini" "estado" "motivo"
   ${If} $1 == "operacion"
     MessageBox MB_OK|MB_ICONSTOP "Hay un trade abierto. Espera a que termine y vuelve a abrir el instalador."

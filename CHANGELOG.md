@@ -18,6 +18,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **El instalador se publica solo.** Si `VERSION` cambia en `main`, GitHub Actions crea la etiqueta `vX.Y.Z`, construye `Profito-Setup.exe` y lo sube a una release publicada (ni borrador ni prerelease). Si esa versión es mayor que la Latest, queda como Latest.
 ### Corregido
 - **La vista previa usa el tope de la cuenta.** Ya no se corta siempre en 20 MNQ. Usa `maxQtyFor`, el mismo tope del motor, también en la etapa fondeada.
+- **TradingView en otra carpeta o en otro disco.** Si el desinstalador de Windows guarda la ruta, se usa aunque no esté en AppData ni en Archivos de programa. Si hay un ejecutable viejo y también el de la Store, y el viejo no abre el puerto, se prueba el de la Store. Si hay un trade abierto, el instalador se detiene por el código de salida, no solo por el archivo de estado.
 ### Notas
 - No abre, no mueve y no cierra órdenes. La foto de la granja de cerca queda en `instalador/gfx` y no se muestra: la del progreso es la multitud y las islas, para no parpadear entre dos fotos mientras copia archivos.
 

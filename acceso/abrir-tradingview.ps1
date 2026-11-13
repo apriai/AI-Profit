@@ -7,7 +7,8 @@
 #   3. TradingView.exe dentro de WindowsApps, directo
 param(
   [int]$Port = 9222,
-  [switch]$Forzar
+  [switch]$Forzar,
+  [switch]$SoloDetectar
 )
 
 $ErrorActionPreference = 'Continue'
@@ -47,8 +48,40 @@ function Get-PaqueteTradingView {
   return $pkg
 }
 
+function Get-RutasRegistroTv {
+  $rutas = @()
+  $bases = @(
+    'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
+    'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
+    'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+  )
+  foreach ($base in $bases) {
+    $items = @(Get-ItemProperty -Path $base -ErrorAction SilentlyContinue)
+    foreach ($item in $items) {
+      $nombre = [string]$item.DisplayName
+      if ($nombre -notmatch 'TradingView') { continue }
+      $candidatas = @()
+      if ($item.DisplayIcon) {
+        $icono = ([string]$item.DisplayIcon) -replace '^"', '' -replace '"$', ''
+        $icono = ($icono -split ',')[0].Trim()
+        if ($icono) { $candidatas += $icono }
+      }
+      if ($item.InstallLocation) {
+        $candidatas += (Join-Path ([string]$item.InstallLocation) 'TradingView.exe')
+      }
+      foreach ($c in $candidatas) {
+        if ($c -notmatch 'TradingView\.exe$') { continue }
+        if (Test-RutaWindowsApps $c) { continue }
+        if (Test-Path -LiteralPath $c) { $rutas += $c }
+      }
+    }
+  }
+  return @($rutas | Select-Object -Unique)
+}
+
 function Get-DeteccionTv {
-  $vacio = @{ Ruta = ''; Tipo = 'ninguno'; Alias = ''; Msix = ''; Paquete = $null }
+  $vacio = @{ Ruta = ''; Tipo = 'ninguno'; Alias = ''; Msix = ''; Clasico = ''; Paquete = $null }
+  $clasico = ''
   $clasicas = @()
   if ($env:LOCALAPPDATA) {
     $clasicas += (Join-Path $env:LOCALAPPDATA 'TradingView\TradingView.exe')
@@ -58,42 +91,57 @@ function Get-DeteccionTv {
   $pf86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
   if ($pf86) { $clasicas += (Join-Path $pf86 'TradingView\TradingView.exe') }
   foreach ($f in $clasicas) {
-    if ($f -and -not (Test-RutaWindowsApps $f) -and (Test-Path -LiteralPath $f)) {
-      return @{ Ruta = $f; Tipo = 'clasico'; Alias = ''; Msix = ''; Paquete = $null }
-    }
+    if ($f -and -not (Test-RutaWindowsApps $f) -and (Test-Path -LiteralPath $f)) { $clasico = $f; break }
   }
   $alias = ''
   if ($env:LOCALAPPDATA) { $alias = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps\TradingView.exe' }
   $tieneAlias = [bool]($alias -and (Test-Path -LiteralPath $alias))
+  if (-not $tieneAlias) { $alias = '' }
   $pkg = Get-PaqueteTradingView
   $msix = ''
   if ($pkg -and $pkg.InstallLocation) { $msix = Join-Path $pkg.InstallLocation 'TradingView.exe' }
-  if ($tieneAlias) { return @{ Ruta = $alias; Tipo = 'alias'; Alias = $alias; Msix = $msix; Paquete = $pkg } }
-  if ($msix) { return @{ Ruta = $msix; Tipo = 'msix'; Alias = ''; Msix = $msix; Paquete = $pkg } }
-  $proc = $null
-  try { $proc = Get-CimInstance Win32_Process -Filter "Name = 'TradingView.exe'" -ErrorAction SilentlyContinue | Select-Object -First 1 } catch {}
+  $proceso = ''
+  $tipoProc = ''
+  try { $proc = Get-CimInstance Win32_Process -Filter "Name = 'TradingView.exe'" -ErrorAction SilentlyContinue | Select-Object -First 1 } catch { $proc = $null }
   if ($proc -and $proc.ExecutablePath) {
-    $tipo = 'proceso'
-    $msixProc = ''
-    if (Test-RutaWindowsApps $proc.ExecutablePath) { $tipo = 'msix'; $msixProc = $proc.ExecutablePath }
-    return @{ Ruta = $proc.ExecutablePath; Tipo = $tipo; Alias = ''; Msix = $msixProc; Paquete = $pkg }
+    $proceso = [string]$proc.ExecutablePath
+    $tipoProc = 'proceso'
+    if (Test-RutaWindowsApps $proceso) { $tipoProc = 'msix'; if (-not $msix) { $msix = $proceso } }
   }
+  $whereRuta = ''
+  $whereTipo = ''
   $where = @()
   try { $where = @(& where.exe TradingView.exe 2>$null) } catch {}
   foreach ($w in $where) {
     $linea = ([string]$w).Trim()
     if (-not $linea) { continue }
     if ($linea -match '\\Microsoft\\WindowsApps\\TradingView\.exe$') {
-      return @{ Ruta = $linea; Tipo = 'alias'; Alias = $linea; Msix = $msix; Paquete = $pkg }
+      if (-not $alias) { $alias = $linea }
+      if (-not $whereRuta) { $whereRuta = $linea; $whereTipo = 'alias' }
+      continue
     }
-    if ((Test-RutaWindowsApps $linea) -or (Test-Path -LiteralPath $linea)) {
-      if (Test-RutaWindowsApps $linea) {
-        return @{ Ruta = $linea; Tipo = 'msix'; Alias = ''; Msix = $linea; Paquete = $pkg }
-      }
-      return @{ Ruta = $linea; Tipo = 'clasico'; Alias = ''; Msix = ''; Paquete = $null }
+    if (Test-RutaWindowsApps $linea) {
+      if (-not $msix) { $msix = $linea }
+      if (-not $whereRuta) { $whereRuta = $linea; $whereTipo = 'msix' }
+      continue
+    }
+    if (Test-Path -LiteralPath $linea) {
+      if (-not $clasico) { $clasico = $linea }
+      if (-not $whereRuta) { $whereRuta = $linea; $whereTipo = 'clasico' }
     }
   }
-  return $vacio
+  if (-not $clasico) {
+    foreach ($reg in (Get-RutasRegistroTv)) { $clasico = $reg; break }
+  }
+  $ruta = ''
+  $tipo = 'ninguno'
+  if ($clasico) { $ruta = $clasico; $tipo = 'clasico' }
+  elseif ($alias) { $ruta = $alias; $tipo = 'alias' }
+  elseif ($msix) { $ruta = $msix; $tipo = 'msix' }
+  elseif ($proceso) { $ruta = $proceso; $tipo = $tipoProc }
+  elseif ($whereRuta) { $ruta = $whereRuta; $tipo = $whereTipo }
+  if (-not $ruta) { return $vacio }
+  return @{ Ruta = $ruta; Tipo = $tipo; Alias = $alias; Msix = $msix; Clasico = $clasico; Paquete = $pkg }
 }
 
 function Start-ExeTv([string]$Archivo, [int]$N) {
@@ -153,6 +201,15 @@ $det = Get-DeteccionTv
 Write-Output ("RUTA={0}" -f $det.Ruta)
 Write-Output ("TIPO={0}" -f $det.Tipo)
 
+if ($SoloDetectar) {
+  if ($det.Tipo -eq 'ninguno') {
+    Write-Output 'RESULTADO=FALLA'
+    exit 1
+  }
+  Write-Output 'RESULTADO=OK'
+  exit 0
+}
+
 if ((Test-PuertoTv $Port) -and -not $Forzar) {
   Write-Output 'RESULTADO=OK'
   exit 0
@@ -161,16 +218,13 @@ if ((Test-PuertoTv $Port) -and -not $Forzar) {
 $plan = @()
 $aumid = $null
 $directo = ''
-if ($det.Tipo -eq 'clasico' -and $det.Ruta) {
-  $plan += 'clasico'
-} else {
-  if ($det.Alias -and (Test-Path -LiteralPath $det.Alias)) { $plan += 'alias' }
-  $aumid = Get-AumidTv $det
-  if ($aumid) { $plan += 'activacion' }
-  if ($det.Msix) { $directo = $det.Msix }
-  elseif (Test-RutaWindowsApps $det.Ruta) { $directo = $det.Ruta }
-  if ($directo) { $plan += 'windowsapps' }
-}
+if ($det.Clasico) { $plan += 'clasico' }
+if ($det.Alias -and (Test-Path -LiteralPath $det.Alias)) { $plan += 'alias' }
+$aumid = Get-AumidTv $det
+if ($aumid) { $plan += 'activacion' }
+if ($det.Msix) { $directo = $det.Msix }
+elseif (Test-RutaWindowsApps $det.Ruta) { $directo = $det.Ruta }
+if ($directo) { $plan += 'windowsapps' }
 
 if ($plan.Count -eq 0) {
   Write-Output 'RESULTADO=FALLA'
@@ -182,14 +236,14 @@ foreach ($nombre in $plan) {
   Stop-TradingView
   Write-Output ("INTENTO={0}" -f $nombre)
   try {
-    if ($nombre -eq 'clasico') { Start-ExeTv $det.Ruta $Port }
+    if ($nombre -eq 'clasico') { Start-ExeTv $det.Clasico $Port }
     elseif ($nombre -eq 'alias') { Start-ExeTv $det.Alias $Port }
     elseif ($nombre -eq 'activacion') { Start-ActivacionTv $aumid $Port }
     elseif ($nombre -eq 'windowsapps') { Start-ExeTv $directo $Port }
   } catch {
     Write-Output ("FALLO={0} {1}" -f $nombre, $_.Exception.Message)
   }
-  if (Wait-PuertoTv $Port 15) {
+  if (Wait-PuertoTv $Port 25) {
     Write-Output ("METODO={0}" -f $nombre)
     Write-Output 'RESULTADO=OK'
     exit 0
