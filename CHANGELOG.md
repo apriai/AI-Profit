@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.6] — 2026-11-13
+### Corregido
+- **Vista previa con el tope de la cuenta.** Al pasar el cursor por BUY o SELL, el dibujo (líneas y caja de riesgo) solo sale si la cantidad cabe en el tope que ya usa el motor (`maxQtyFor`): evaluación 20 o 40 MNQ según 25K o 50K, y en fondeada las etapas por beneficio. Antes la vista se negaba por encima de 20 MNQ aunque la cuenta de 50K permitiera más, y no miraba la etapa fondeada.
+### Notas
+- No cambia los topes del motor ni abre, mueve o cierra órdenes. El bloque de color de la caja ya estaba en `motor/tv-vista-previa.mjs` (herramienta `long_position` / `short_position`).
+
 ## [0.10.5] — 2026-11-13
 ### Agregado
 - **Aviso de actualización al abrir.** En Windows, al arrancar, se consulta la última release de GitHub. Si es más nueva que el `VERSION` de esta carpeta, una ventana pregunta: «Hay una versión nueva de Profito (X). ¿Actualizar ahora?» Sí descarga `Profito-Setup.exe` a la carpeta temporal, lo abre y cierra este Profito. Si no hay internet, si la página falla o si tarda, no dice nada y el arranque sigue. Si se pulsa No, ese día no vuelve a preguntar. No pregunta si hay una operación en curso.

@@ -3,13 +3,14 @@
 Documento de relevo para cualquier agente (Grok) que trabaje en este repositorio. Sin datos personales: no hay cuentas, saldos ni claves aquí.
 
 ## Versión actual
-- **Última versión: 0.10.5** (2026-11-13). Está en el archivo `VERSION` y se ve en la esquina inferior izquierda de la granja.
+- **Última versión: 0.10.6** (2026-11-13). Está en el archivo `VERSION` y se ve en la esquina inferior izquierda de la granja.
 - Historial completo y detallado: `CHANGELOG.md`. Cada versión tiene su release en GitHub (`v0.5.1`, etc.).
 - **Al terminar un cambio, actualiza este documento** (versión, fecha y la lista de abajo).
 
 ## Lo que cambió
 | Versión | Qué cambió |
 |---|---|
+| 0.10.6 | La vista previa de BUY/SELL usa el mismo tope de contratos que el motor (`maxQtyFor`), por tamaño y por etapa fondeada. Ya no se corta siempre en 20 MNQ. No cambia los topes. |
 | 0.10.5 | Al abrir, si GitHub tiene una versión más nueva, pregunta en español si actualizar. Sí baja `Profito-Setup.exe` y lo abre. Sin internet no dice nada. Un No no vuelve a preguntar ese día. El instalador NSIS muestra cuatro fotos completas en 16:9 (bienvenida, carpeta, instalación y final), sin recortar arriba ni abajo, y GitHub Actions lo sube al publicar una etiqueta `v*`. |
 | 0.10.4 | Windows: TradingView MSIX (Store y tradingview.com/desktop) se detecta aunque `WindowsApps` niegue el listado. El arranque prueba el alias, la activación del paquete y el exe directo. Si el proceso ya está abierto y no hay ruta, se reinicia en vez de mandar a la página de descarga. En la PC del dueño, TradingView.Desktop 3.5.0.8375 respondió OK por activación y el puerto de la granja contestó. |
 | 0.10.3 | Textos del selector y del editor de estrategias propias con los dólares de la cuenta elegida (25K tal cual, 50K el doble, el mismo escalado que la orden). En 50K se ve el valor duplicado, sin el aviso de que el motor duplica. Al guardar se sigue escribiendo la base. Al cambiar de cuenta se actualizan. Solo página. |

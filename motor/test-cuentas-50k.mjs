@@ -118,6 +118,7 @@ assert(texts['colchon.mjs'].includes('rulesFor({ id: a.name'), 'colchon publica 
 assert(texts['tradinglink.mjs'].includes('function applyPlan'), 'tradinglink applyPlan');
 assert(texts['tradinglink.mjs'].includes('R.start - R.dd'), 'tradinglink piso por plan');
 assert(texts['tv-vista-previa.mjs'].includes('paramsForAccount(strat.params'), 'vista previa escala');
+assert(texts['tv-vista-previa.mjs'].includes('maxQtyFor(raiz, account'), 'vista previa usa el tope del motor');
 assert(texts['orders.mjs'].includes('R.start - R.dd'), 'orders piso por plan');
 assert(texts['colchon.mjs'].includes('maxQtyFor'), 'colchon valida qty por plan');
 assert(texts['colchon.mjs'].includes('maxMicros: maxQtyFor'), 'colchon publica maxMicros');
@@ -130,7 +131,8 @@ assert(texts['Granja-de-Cuentas-v2.html'].includes('dd=n.dd??'), 'Ln usa dd de l
 assert(texts['Granja-de-Cuentas-v2.html'].includes('dayPn<=-lim0'), 'Listo por hoy usa dailyLoss');
 assert(texts['Granja-de-Cuentas-v2.html'].includes('e.ddLeft/(e.dd||1e3)*100'), 'barra DD usa e.dd');
 assert(texts['Granja-de-Cuentas-v2.html'].includes('const scaleP='), 'preview SPf escala');
-assert(texts['Granja-de-Cuentas-v2.html'].includes('accountName:accPlan().name'), 'preview envía cuenta');
+assert(texts['Granja-de-Cuentas-v2.html'].includes('accountName:a.name||accPlan().name'), 'preview envía cuenta');
+assert(texts['Granja-de-Cuentas-v2.html'].includes('totalPnl:a.totalPnl'), 'preview envía el beneficio para la etapa');
 assert(texts['Granja-de-Cuentas-v2.html'].includes('function textoCuentaHtml()'), 'selector arma el texto');
 assert(texts['Granja-de-Cuentas-v2.html'].includes('scaleP(s.params, sc)'), 'el texto usa la misma escala que la orden');
 assert(!texts['Granja-de-Cuentas-v2.html'].includes('En 50K el motor duplica los dólares guardados.'), 'el editor no avisa que duplica');

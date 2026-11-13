@@ -3,12 +3,12 @@
 // la entrada estimada, el SL y el TP. No es una orden: no llama a placeOrder, modifyOrder ni closePosition.
 // No guarda el dibujo como reporte. Al cerrar o desactivar el panel se borran solo los ids de esta vista.
 import { getStrategy } from './strategies.mjs';
-import { paramsForAccount } from './account-size.mjs';
+import { paramsForAccount, maxQtyFor } from './account-size.mjs';
 
 export const MODULO = 'tv-vista-previa';
 export const TITULO = 'Vista previa';
 
-const META = { MNQ: { pv: 2, tick: 0.25, max: 20 }, NQ: { pv: 20, tick: 0.25, max: 2 } };
+const META = { MNQ: { pv: 2, tick: 0.25 }, NQ: { pv: 20, tick: 0.25 } };
 const PROHIBIDO = /placeOrder|modifyOrder|editPositionBrackets|closePosition|cancelOrder|setCurrentAccount|removeAllShapes|saveChartToServer/;
 
 export function raizDe(symbol) {
@@ -38,12 +38,28 @@ export function tramo(params, usdKey, ptsKey, ticksKey, qty, pv, tick) {
   return null;
 }
 
-export function nivelesPreview({ side, symbol, qty, price, params }) {
+export function cuentaPreview(p = {}) {
+  const name = p.accountName || p.name || null;
+  return {
+    name,
+    id: name || p.accountId || p.id,
+    type: p.accountType || p.type,
+    balance: p.balance,
+    equity: p.equity,
+    totalPnl: p.totalPnl,
+    plan: p.plan,
+    start: p.start,
+    planStart: p.planStart ?? p.start,
+  };
+}
+
+export function nivelesPreview({ side, symbol, qty, price, params, account }) {
   const raiz = raizDe(symbol);
   const meta = META[raiz];
   if (side !== 'long' && side !== 'short') return { ok: false, motivo: 'sin-direccion' };
   if (!meta) return { ok: false, motivo: 'simbolo' };
-  if (!Number.isInteger(qty) || qty < 1 || qty > meta.max) return { ok: false, motivo: 'cantidad' };
+  const tope = maxQtyFor(raiz, account || {});
+  if (!Number.isInteger(qty) || qty < 1 || qty > tope) return { ok: false, motivo: 'cantidad', max: tope };
   if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0) return { ok: false, motivo: 'sin-precio' };
   const sl = tramo(params, 'SL_USD', 'SL_PTS', 'SL_TICKS', qty, meta.pv, meta.tick);
   const tp = tramo(params, 'TP_USD', 'TP_PTS', 'TP_TICKS', qty, meta.pv, meta.tick);
@@ -386,8 +402,12 @@ export function createVistaPrevia(opt = {}) {
       if (dibujadoEn) await borrarDibujos();
       return { ok: false, estado: 'no-disponible', texto: textoEstado('no-disponible') };
     }
-    const niv = nivelesPreview({ side: p.side, symbol: p.symbol, qty: Number(p.qty), price: cot.price, params: paramsForAccount(strat.params, { name: p.accountName, id: p.accountName || p.accountId }) });
-    if (!niv.ok) return { ok: false, estado: 'no-disponible', texto: textoEstado('no-disponible') };
+    const cuenta = cuentaPreview(p);
+    const niv = nivelesPreview({ side: p.side, symbol: p.symbol, qty: Number(p.qty), price: cot.price, params: paramsForAccount(strat.params, cuenta), account: cuenta });
+    if (!niv.ok) {
+      if (niv.motivo === 'cantidad' && dibujadoEn) await borrarDibujos();
+      return { ok: false, estado: 'no-disponible', texto: textoEstado('no-disponible') };
+    }
     const expr = expresionVista({ raiz });
     if (PROHIBIDO.test(expr)) return { ok: false, estado: 'no-disponible', texto: textoEstado('no-disponible') };
     const job = { raiz, lado: p.side, entrada: niv.entrada, stop: niv.stop, take: niv.take, ticksSl: niv.ticksSl, ticksTp: niv.ticksTp, qty: niv.qty, barras: BARRAS, colorSl: COLOR_SL, colorTp: COLOR_TP, texto: niv.texto, espacioYa: espacioPrev != null, prev: ids && dibujadoEn === raiz ? ids : null };
