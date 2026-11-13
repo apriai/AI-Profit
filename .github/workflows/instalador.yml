@@ -86,11 +86,16 @@ jobs:
         if: steps.ver.outputs.publicar == 'true'
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          choco install nsis --version=3.11.0 -y --no-progress
-          if ($LASTEXITCODE -ne 0) { throw "choco install nsis salio $LASTEXITCODE" }
+          $ErrorActionPreference = 'Continue'
           $nsis = "C:\Program Files (x86)\NSIS"
-          if (-not (Test-Path -LiteralPath "$nsis\makensis.exe")) { throw "No esta makensis" }
+          $ok = $false
+          foreach ($i in 1..4) {
+            choco install nsis --version=3.11.0 -y --no-progress
+            if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath "$nsis\makensis.exe")) { $ok = $true; break }
+            Write-Output "Intento $i de NSIS fallo. Se reintenta."
+            Start-Sleep -Seconds 15
+          }
+          if (-not $ok) { throw "No se pudo instalar NSIS 3.11" }
           Add-Content -Path $env:GITHUB_PATH -Value $nsis
 
       - name: Comprobar imagenes del instalador
