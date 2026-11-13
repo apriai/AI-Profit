@@ -10,6 +10,7 @@
 name: Instalador Windows
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -38,7 +39,13 @@ jobs:
             Add-Content -Path $env:GITHUB_OUTPUT -Value $linea -Encoding utf8NoBOM
           }
           $tipo = "${{ github.ref_type }}"
-          if ($tipo -eq "tag") {
+          $evento = "${{ github.event_name }}"
+          if ($evento -eq "workflow_dispatch") {
+            $version = (Get-Content -LiteralPath VERSION -Raw).Trim()
+            if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "VERSION no es x.y.z: $version" }
+            $tag = "v$version"
+            Write-Output "Disparo manual de $tag."
+          } elseif ($tipo -eq "tag") {
             $tag = "${{ github.ref_name }}"
             if ($tag -notmatch '^v\d+\.\d+\.\d+$') { throw "La etiqueta $tag no es vX.Y.Z. No se publica." }
             $version = $tag.Substring(1)
@@ -92,7 +99,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $gfx = "instalador\gfx"
-          foreach ($nombre in @("1-escenario.jpg","2-multitud-islas.jpg","3-granja-cerca.jpg","4-isla-granja.jpg","p1-bienvenida.bmp","p2-carpeta.bmp","p3-progreso.bmp","p4-listo.bmp")) {
+          foreach ($nombre in @("1-escenario.jpg","2-multitud-islas.jpg","3-granja-cerca.jpg","4-isla-granja.jpg","p1-bienvenida.bmp","p2-carpeta.bmp","p3-progreso.bmp","p4-listo.bmp","btn-instalar.bmp","btn-abrir.bmp")) {
             if (-not (Test-Path -LiteralPath (Join-Path $gfx $nombre))) { throw "Falta $gfx\$nombre" }
           }
 

@@ -9,7 +9,7 @@ if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "VERSION no es x.y.z: $version
 $vernum = "$version.0"
 
 $gfx = Join-Path $root 'instalador\gfx'
-foreach ($nombre in @('p1-bienvenida.bmp','p2-carpeta.bmp','p3-progreso.bmp','p4-listo.bmp')) {
+foreach ($nombre in @('p1-bienvenida.bmp','p2-carpeta.bmp','p3-progreso.bmp','p4-listo.bmp','btn-instalar.bmp','btn-abrir.bmp')) {
   if (-not (Test-Path -LiteralPath (Join-Path $gfx $nombre))) { throw "Falta instalador\gfx\$nombre" }
 }
 Write-Output "Preparando archivos de $version"
