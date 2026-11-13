@@ -14,6 +14,7 @@ const debe = [
   'motor/tradinglink.mjs',
   'motor/colchon.mjs',
   'motor/Granja-de-Cuentas-v2.html',
+  'motor/sonidos/clic-burbuja.wav',
   'acceso/profito-estado.mjs',
   'acceso/aviso-actualizacion.mjs',
   'acceso/aviso-actualizacion.ps1',
