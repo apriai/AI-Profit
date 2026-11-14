@@ -3,13 +3,14 @@
 Documento de relevo para cualquier agente (Grok) que trabaje en este repositorio. Sin datos personales: no hay cuentas, saldos ni claves aquí.
 
 ## Versión actual
-- **Última versión: 0.10.7** (2026-11-13). Está en el archivo `VERSION` y se ve en la esquina inferior izquierda de la granja.
+- **Última versión: 0.10.8** (2026-11-14). Está en el archivo `VERSION` y se ve en la esquina inferior izquierda de la granja.
 - Historial completo y detallado: `CHANGELOG.md`. Cada versión tiene su release en GitHub (`v0.5.1`, etc.).
 - **Al terminar un cambio, actualiza este documento** (versión, fecha y la lista de abajo).
 
 ## Lo que cambió
 | Versión | Qué cambió |
 |---|---|
+| 0.10.8 | Al abrir la granja, una sola vez, la misma celebración visual de un trade ganado (casa, confeti y el resto), con `window.__tlCelebrate`. No anota ganancia ni cambia saldos, historial, métricas ni sonidos. |
 | 0.10.7 | Clic de burbuja al dormir al agente, abrir Historial, Métrica, Negocio, una planta o Trade. Al despertar suena un wuhu en lugar del clic. BUY y SELL no suenan. |
 | 0.10.6 | Instalador oscuro de tres pantallas (foto 720×405, sin elegir carpeta). Al cambiar VERSION en main se publica Profito-Setup.exe como Latest. Vista previa: dos líneas grises y el tope real de la cuenta. Fondeada 25K: 10 MNQ hasta $26,100 y 20 desde ahí. TradingView también se busca en el registro de desinstalación (otra carpeta u otro disco). |
 | 0.10.5 | Al abrir, si GitHub tiene una versión más nueva, pregunta en español si actualizar. Sí baja `Profito-Setup.exe` y lo abre. Sin internet no dice nada. Un No no vuelve a preguntar ese día. El instalador NSIS muestra cuatro fotos completas en 16:9 (bienvenida, carpeta, instalación y final), sin recortar arriba ni abajo, y GitHub Actions lo sube al publicar una etiqueta `v*`. |

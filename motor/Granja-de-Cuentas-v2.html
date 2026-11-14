@@ -5921,7 +5921,7 @@ function hook(){const G=window.__granja&&window.__granja.pet;if(!G||!G.renderer|
  if(cfg.kind!=="perro"||cfg.body!==A.perro.b||cfg.accent!==A.perro.a){try{applyPet(G,cfg)}catch(err){console.warn("mascota",err)}}
  (function lab(){const p=window.__pet.screen();if(p&&cfg.name){tag.textContent=cfg.name;tag.style.left=p.x+"px";tag.style.top=(p.y-8)+"px";tag.style.display="block"}else tag.style.display="none";requestAnimationFrame(lab)})()}
 setTimeout(hook,600);})();</script>
-<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.7</div>
+<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.8</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/VERSION",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
 <script>/* 0.7.0: Profito duerme al abrir (granja en pausa), riega con laptop durante un trade, y etiquetas de cuentas con saldo y etapa. Solo visual: no toca el motor de trading. */
 (function(){
@@ -6009,7 +6009,7 @@ function sfxWhoosh(at,dur,vol,f0,f1,q){if(!ac)return;const sr=ac.sampleRate,n=Ma
 function sfxPopper(at,amp){amp=amp||1;sweep(200,60,at,.13,"sine",.2*amp);tone(110,at,.07,"sine",.16*amp);sfxWhoosh(at,.16,.22*amp,2800,350,.55);tone(2200,at,.025,"square",.09*amp);[[.08,2093,.07],[.14,2637,.065],[.19,2349,.06],[.25,3136,.07],[.31,2794,.055],[.38,3520,.06],[.44,3951,.05],[.52,4186,.055],[.61,3136,.045],[.70,4699,.05],[.82,5274,.04],[.95,3951,.035],[1.08,4186,.03]].forEach(function(p){tone(p[1],at+p[0],.22,"sine",p[2]*amp);tone(p[1]*1.5,at+p[0]+.02,.12,"sine",p[2]*.35*amp)})}
 function sfxWarble(f0,f1,at,dur,depth0,depth1,lfo0,lfo1,vol){if(!ac)return;const o=ac.createOscillator(),g=ac.createGain(),l=ac.createOscillator(),lg=ac.createGain();o.type="sine";o.frequency.setValueAtTime(Math.max(f0,1),at);o.frequency.exponentialRampToValueAtTime(Math.max(f1,1),at+dur);l.type="sine";l.frequency.setValueAtTime(lfo0,at);l.frequency.linearRampToValueAtTime(lfo1,at+dur);const k=Math.log(2)/12;lg.gain.setValueAtTime(f0*k*depth0,at);lg.gain.linearRampToValueAtTime(f1*k*depth1,at+dur);l.connect(lg);lg.connect(o.frequency);g.gain.setValueAtTime(0,at);g.gain.linearRampToValueAtTime(vol,at+.02);g.gain.setValueAtTime(vol,at+dur*.72);g.gain.exponentialRampToValueAtTime(.0001,at+dur);o.connect(g);g.connect(ac.destination);o.start(at);o.stop(at+dur+.02);l.start(at);l.stop(at+dur+.02)}
 function sfxWiii(at,amp){amp=amp||1;sfxWarble(349.23,880,at,.58,.15,.85,5.5,7.5,.22*amp);sfxWarble(880,932.33,at+.58,.16,.55,.22,7.5,6,.16*amp);tone(1318.51,at+.66,.12,"triangle",.045*amp);tone(1760,at+.68,.1,"sine",.028*amp)}
-function celebra(big){
+function celebra(big, silencio){
   const g=window.__gx;if(!g||!g.ci)return false;
   const id=++_cwId;
   const o=g.ci,dog=g.Ri,house=(window.__tlWin&&window.__tlWin.parent)||null,ud=o.userData||{};
@@ -6079,7 +6079,7 @@ function celebra(big){
   const flipJ=jumps.filter(function(j){return j.fl})[0]||jumps[3];
   const burstAt=flipJ.s+flipJ.d+.05;
   DUR=Math.round(Math.max(5.3,burstAt+2.2)*1000);
-  if(!muted&&ac&&ac.state==="running"){const tS=ac.currentTime+.02;jumps.forEach(function(J){sfxBoing(tS+J.s,.42*(.72+.28*(J.h/2.40)))});sfxPopper(tS+burstAt,.42);sfxWiii(tS+flipJ.s,.75)}
+  if(!silencio&&!muted&&ac&&ac.state==="running"){const tS=ac.currentTime+.02;jumps.forEach(function(J){sfxBoing(tS+J.s,.42*(.72+.28*(J.h/2.40)))});sfxPopper(tS+burstAt,.42);sfxWiii(tS+flipJ.s,.75)}
   const dogHops=[.32,.66,1.00,1.36,1.72,2.08,2.46,2.84,3.22,3.58];
   const dogAmp=[.24,.40,.30,.44,.32,.42,.28,.38,.26,.22];
   const houseSmall=[.18,.92,1.62];
@@ -6263,14 +6263,32 @@ function nube(cuenta){const g=window.__gx;if(!g||!g.At||!g.Xt||!g.wt||!g.P)retur
  const w=n.g.getWorldPosition(new g.P);G.position.set(w.x,w.y+(n.h||2)+1.3,w.z);g.Xt.add(G);const T0=performance.now(),DUR=5000;
  (function f(now){const k=(now-T0)/DUR;if(k>=1){G.removeFromParent();return}const op=.75*Math.min(1,k*5,(1-k)*4);mats.forEach(m=>m.opacity=op);G.position.x=w.x+Math.sin(k*3)*.15;requestAnimationFrame(f)})(T0);return true}
 window.__tlCelebrate=function(sm){const p=Number(sm&&sm.pnlFinalUSD);
- if(p>0){try{tlPushOut(ci);tlPushOut(Ri)}catch(e){}const big=sm.motivo==="Take profit"&&!sm.pnlFinalAprox;confeti(big);const j=celebra(big),s=play(big);return{tipo:"gana",big,salto:j,sonido:s}}
+ if(p>0){try{tlPushOut(ci);tlPushOut(Ri)}catch(e){}const big=sm.motivo==="Take profit"&&!sm.pnlFinalAprox,visual=!!(sm&&sm.soloVisual);confeti(big);const j=celebra(big,visual),s=visual?false:play(big);return{tipo:"gana",big,salto:j,sonido:s}}
  if(p<0||(sm&&sm.motivo==="Stop loss")){const c=p<0?nube(sm.cuenta):false,s=playPerdida();return{tipo:"pierde",nube:c,sonido:s}}
  return null};
 window.__tlProbarCelebracion=function(){try{unlock()}catch(e){}const sm={pnlFinalUSD:630,pnlFinalAprox:false,motivo:"Take profit",direccion:"Compra",tamano:"8 MNQ",estrategia:"Dos disparos \u00b7 1:2",modo:"",duracionSeg:0,pasosTotal:0,abiertaET:"\u2014",cerradaET:"\u2014",precisionMs:0,__demo:true};try{if(window.__tlShowSummary)window.__tlShowSummary(sm)}catch(e){}return window.__tlCelebrate(sm)};
 /* 3) Bot\u00f3n de silencio */
 const B=document.getElementById("tlMute");function set(v){muted=!!v;try{localStorage.setItem(KM,muted?"1":"0")}catch(e){}B.innerHTML=muted?"\u{1F507}":"\u{1F50A}";B.setAttribute("aria-pressed",String(muted))}
 B.addEventListener("click",e=>{e.stopPropagation();unlock();set(!muted);if(!muted)play(false)});["pointerdown","mousedown"].forEach(t=>B.addEventListener(t,e=>e.stopPropagation()));
-window.__tlMuted=()=>muted;set(muted)})();
+window.__tlMuted=()=>muted;set(muted);
+/* Al abrir: una sola vez, la misma celebración de un trade ganado (casa, confeti y el resto).
+   No muestra el resumen ni escribe historial, saldos ni métricas. Los sonidos no se tocan. */
+let tlApertura=false,tlAperturaN=0;
+(function tlCelebrarAlAbrir(){
+  if(tlApertura)return;
+  const g=window.__gx;
+  if(!g||!g.ci){if(++tlAperturaN<40)setTimeout(tlCelebrarAlAbrir,200);return}
+  tlApertura=true;
+  try{window.__tlCelebrate({pnlFinalUSD:1,motivo:"Take profit",pnlFinalAprox:false,soloVisual:true})}catch(e){}
+  (function volver(){
+    if(typeof window.__tlWinTick==="function"){setTimeout(volver,200);return}
+    try{
+      if(window.__tlWaterForce??(window.__prueba&&window.__prueba().phase==="running"))return;
+      const s=g.Wu&&g.Wu.state;if(!s)return;
+      g.ci.position.set(1.75,0,-3);s.mode="sit";s.sit=1;s.route=[];s.after=null;
+    }catch(e){}
+  })();
+})();})();
 </script>
 <script>/* 0.7.3: Estrategia propia. Se guarda solo en esta computadora. No cambia las estrategias de serie. */
 (function(){
