@@ -61,6 +61,15 @@ Var BrochaNoche
 !ifndef PBM_SETBKCOLOR
   !define PBM_SETBKCOLOR 0x2001
 !endif
+!ifndef BS_BITMAP
+  !define BS_BITMAP 0x00000080
+!endif
+!ifndef BS_FLAT
+  !define BS_FLAT 0x00008000
+!endif
+!ifndef BM_SETIMAGE
+  !define BM_SETIMAGE 0x00F7
+!endif
 
 Page custom BienvenidaCrear BienvenidaSalir
 !define MUI_PAGE_CUSTOMFUNCTION_SHOW ProgresoMostrar
@@ -181,20 +190,33 @@ FunctionEnd
 
 Function PonerBoton
   Exch $R9
+  StrCpy $R1 "Instalar"
+  StrCpy $R4 1200
+  ${If} $R9 == "btn-abrir.bmp"
+    StrCpy $R1 "Abrir"
+    StrCpy $R4 1201
+  ${EndIf}
   System::Call 'user32::LoadImage(p 0, t "$PLUGINSDIR\$R9", i ${IMAGE_BITMAP}, i 0, i 0, i ${LR_LOADFROMFILE}) p.R2'
   StrCpy $BmpBoton $R2
-  ; STATIC con aviso de clic: el BMP ya trae la pastilla verde, sin marco del botón de Windows.
-  System::Call 'user32::CreateWindowEx(i 0, t "STATIC", t "", i ${WS_CHILD}|${WS_VISIBLE}|${WS_TABSTOP}|${SS_NOTIFY}|${SS_BITMAP}, i 570, i 420, i 132, i 36, p $Dialogo, p 0, p 0, p 0) p.R8'
-  System::Call 'user32::SendMessage(p $R8, i ${STM_SETIMAGE}, i ${IMAGE_BITMAP}, p $R2)'
+  ; Botón real (id distinto de 0). Un STATIC con id 0 no entrega el clic,
+  ; y BM_CLICK sobre el Siguiente oculto no cambia de página.
+  System::Call 'user32::CreateWindowEx(i 0, t "BUTTON", t r1, i ${WS_CHILD}|${WS_VISIBLE}|${WS_TABSTOP}|${BS_BITMAP}|${BS_FLAT}, i 570, i 420, i 132, i 36, p $Dialogo, i r4, p 0, p 0) p.R8'
+  System::Call 'uxtheme::SetWindowTheme(p $R8, p 0, p 0)'
+  System::Call 'user32::SendMessage(p $R8, i ${BM_SETIMAGE}, i ${IMAGE_BITMAP}, p $R2)'
   Pop $R9
 FunctionEnd
 
 Function PulsarSiguiente
+  Pop $0
   GetDlgItem $0 $HWNDPARENT 1
-  SendMessage $0 ${BM_CLICK} 0 0
+  EnableWindow $0 1
+  ; El botón 1 sigue oculto. PostMessage entrega el comando al asistente
+  ; cuando este clic ya terminó, sin reentrar en el cuadro.
+  System::Call 'user32::PostMessage(p $HWNDPARENT, i ${WM_COMMAND}, i 1, i 0)'
 FunctionEnd
 
 Function PulsarAbrir
+  Pop $0
   ExecShell "open" "$INSTDIR\acceso\AI Profit.cmd"
   Quit
 FunctionEnd
