@@ -329,6 +329,9 @@ export const etDay = (t = Date.now()) => new Intl.DateTimeFormat('en-CA', { time
 // ese trade pasa a la sesión siguiente (la que empieza a las 18:00 y termina a las 16:00 del otro día).
 // Sábado y domingo no se juntan con el lunes: cada uno lleva la fecha de sus 16:00. El horario de verano lo resuelve America/New_York.
 export const diaFarm = (t = Date.now()) => { const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false }).formatToParts(new Date(t)).map(x => [x.type, x.value])); const d = new Date(Date.UTC(+p.year, +p.month - 1, +p.day)); if ((+p.hour % 24) >= 16) d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); };
+// Fuera de sesión: de las 16:00 inclusive a las 18:00 exclusive, hora de Nueva York.
+// Ese hueco es el cierre de la sesión que acaba de terminar. El pico del max loss solo sube con un saldo de aquí, no con un saldo intradía.
+export function fueraDeSesion(t = Date.now()) { const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date(t)).map(x => [x.type, x.value])); const m = (+p.hour % 24) * 60 + +p.minute; return m >= 16 * 60 && m < 18 * 60; }
 // Informe del día (Markdown) desde colchon-eventos.jsonl
 export function buildReport(dir = DIR, day = diaFarm()) {
   let L = []; try { L = fs.readFileSync(path.join(dir, 'colchon-eventos.jsonl'), 'utf8').split('\n').filter(Boolean).map(x => { try { return JSON.parse(x); } catch { return null; } }).filter(x => x && x.at && diaFarm(Date.parse(x.at)) === day); } catch {}

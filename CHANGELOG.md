@@ -17,8 +17,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 ### Corregido
 - **El P&L del día es el de toda la sesión.** La sesión va de las 18:00 a las 16:00 del día siguiente, hora de Nueva York, y se nombra con la fecha de esas 16:00. Un trade entre las 16:00 y las 18:00 (fuera de sesión) pasa a la sesión siguiente. El sábado y el domingo no se juntan con el lunes. El mismo corte vale para el encabezado, las rachas, el historial, las métricas, el Negocio, la pérdida diaria y «Listo por hoy». Antes, si la granja se abría tarde, el día empezaba en esa primera lectura y se perdían los trades de la sesión (en un caso, 534.5 en la granja y 610 en Lucid). Si el bróker manda la comisión, se usa. Si manda el saldo de inicio de sesión, se usa. Si no, se resta la comisión conocida (MNQ $1 y NQ $3.50 por contrato). La primera lectura tardía no cuenta como inicio.
 - **Cualquier cuenta Lucid (LFE o LFF) se puede operar** aunque no exista `real-allowlist.json`, esté vacío o no se pueda leer. Siguen la confirmación, la cuenta activa, el tope de contratos, la pérdida del día y no operar con una posición abierta. Una cuenta que no sea Lucid ni Paper sigue bloqueada.
+- **El pico del max loss usa el cierre de las 16:00 ET.** Sube con el saldo leído de las 16:00 a las 18:00, que es el hueco en que la sesión ya terminó. Un saldo de las 18:00 a las 15:59 no lo sube. Si la granja estaba apagada en ese hueco, al volver se usa el último saldo guardado.
+- **`orders.mjs` sigue apagado y en simulación.** Su reloj usa el mismo corte: de las 16:00 a las 18:00 no abre y pide estar plano, y el conteo de «un trade hoy» usa el día de la sesión. No coloca órdenes.
 ### Notas
-- No abre, no mueve y no cierra órdenes. El pico del max loss sigue tomándose a las 17:00 ET.
+- No abre, no mueve y no cierra órdenes. El cierre automático del colchón en marcha sigue a las 4:45 PM ET.
 
 ## [0.10.12] — 2026-11-16
 ### Corregido

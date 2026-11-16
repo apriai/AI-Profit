@@ -3,7 +3,7 @@
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
 import * as orders from './orders.mjs';
 import { negocio } from './negocio.mjs';
-import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, diaFarm, cdpEvaluator, PAGE, acctGuard, js } from './colchon.mjs';
+import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, diaFarm, fueraDeSesion, cdpEvaluator, PAGE, acctGuard, js } from './colchon.mjs';
 import { attachReporte } from './tv-reporte.mjs';
 import { createVistaPrevia } from './tv-vista-previa.mjs';
 import { estrategiasPropias } from './estrategias-propias.mjs';
@@ -59,7 +59,7 @@ function save(c) {
     // cambio de día: se conservan peak y breachedAt (quema pegajosa; −$600 + −$600 en 2 días = −$1,200 → quemada)
     // cuenta de EVALUACION vista por primera vez en una granja que ya tenia cuentas: empieza el dia en el saldo inicial (25,000), no en la primera lectura (que puede traer una posicion abierta con P&L flotante). Instalacion nueva (sod vacio): se mantiene la primera lectura.
     const nuevaEval = !s && /^LFE/.test(c.id) && Object.keys(sod.accounts).length > 0;
-    if (!s || s.day !== day) sod.accounts[c.id] = nuevaEval ? { day, bal: rulesOf(c.id).start, inicio: rulesOf(c.id).start, lastBal: a.balance } : { ...(s || {}), ...(s && s.lastBal != null && ![16, 17].includes(horaET()) ? { peak: Math.max(rulesOf(c.id).start, s.peak ?? 0, s.lastBal) } : {}), day, bal: s && s.lastBal != null ? s.lastBal : a.balance, lastBal: a.balance, ...(s && s.day && s.lastBal != null && s.bal != null ? { prev: { day: s.day, pnl: netoSesionGuardado(s.day, c.id) ?? Math.round((s.lastBal - s.bal) * 100) / 100 } } : {}) };
+    if (!s || s.day !== day) sod.accounts[c.id] = nuevaEval ? { day, bal: rulesOf(c.id).start, inicio: rulesOf(c.id).start, lastBal: a.balance } : { ...(s || {}), ...(s && s.lastBal != null && !fueraDeSesion() ? { peak: Math.max(rulesOf(c.id).start, s.peak ?? 0, s.lastBal) } : {}), day, bal: s && s.lastBal != null ? s.lastBal : a.balance, lastBal: a.balance, ...(s && s.day && s.lastBal != null && s.bal != null ? { prev: { day: s.day, pnl: netoSesionGuardado(s.day, c.id) ?? Math.round((s.lastBal - s.bal) * 100) / 100 } } : {}) };
     else s.lastBal = a.balance;
     sod.accounts[c.id].readAt = a.readAt;
     sod.accounts[c.id].lastAt = a.readAt;
@@ -73,9 +73,9 @@ function save(c) {
 // FIX quema fondeada: piso de max loss calculado en el servidor (mismas reglas que Ln() de la granja) para que
 // una fondeada que rompe el max loss SIEMPRE se marque, aunque la lectura completa esté en pausa.
 const RULES = { start: 25000, dd: 1000, lockTriggerOver: 1100, lockFloorOver: 100 }; // fallback 25K; preferir rulesOf(id)
-// PICO = mayor SALDO DE CIERRE de sesion (regla Lucid EOD trailing). Un saldo intradia NUNCA sube el pico: solo cuenta si la lectura es de la ventana de cierre (17:00-17:59 ET, mercado en pausa y todo plano) o via el cambio de dia.
-const horaET = () => +new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: '2-digit', hourCycle: 'h23' }).format(new Date());
-const enCierre = () => horaET() === 17;
+// PICO = mayor SALDO DE CIERRE de la sesión (18:00 a 16:00 ET). Un saldo intradía no lo sube.
+// De las 16:00 a las 18:00 la sesión ya cerró: esa lectura es el cierre. Si la granja estaba apagada en ese hueco, al cambiar el día se usa el último saldo guardado.
+const enCierre = () => fueraDeSesion();
 function peakDe(id, bal, cierre) { const s = sod.accounts[id] || {}; const R = rulesOf(id); let p = Math.max(R.start, s.peak ?? 0, cierre ? (bal ?? 0) : 0);
   try { const d = JSON.parse(fs.readFileSync(path.join(DIR, 'days.json'), 'utf8'))[id] || []; for (const x of d) p = Math.max(p, x.close ?? 0); } catch {}
   if (sod.accounts[id]) sod.accounts[id].peak = p; return p; }
