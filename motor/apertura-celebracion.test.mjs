@@ -32,8 +32,10 @@ for (const no of ['__tlShowSummary', '__tlSumNew', 'localStorage', 'play(', 'neg
 }
 assert.equal(html.split('tlCelebrarAlAbrir').length - 1, 2, 'definición y reintento');
 
-assert.ok(html.includes('clic:{src:"/sonidos/clic-burbuja.wav",vol:0.35}'));
-assert.ok(html.includes('wuhu:{src:"/sonidos/despertar-wuhu.wav",vol:0.4}'));
+assert.ok(html.includes('window.__tlAudioCtx=function()'));
+assert.ok(html.includes('if(window.__tlAudioCtx)ac=window.__tlAudioCtx()'));
+assert.equal(html.includes('tocar("wuhu")'), false);
+assert.equal(html.includes('__tlClic'), false);
 assert.ok(html.includes('function play(big){if(muted||!ac||ac.state!=="running")return false;'));
 assert.ok(html.includes('function playPerdida(){'));
 assert.ok(html.includes('>v0.10.11</div>'));

@@ -13,6 +13,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 ## [0.10.11] — 2026-11-16
 ### Cambiado
 - **La fanfarria suena al abrir, junto con la celebración.** El acceso AI Profit abre la granja en una ventana de Edge o Chrome, con permiso para sonar sin un clic previo. En ese momento salen juntos el salto, la casa, el confeti y la fanfarria de un trade ganado (`window.__tlCelebrate`). Si el audio siguiera bloqueado, se ven los efectos y el sonido no queda para un clic posterior. El botón de silencio se respeta. No anota una ganancia.
+- **Sonidos de la interfaz, sintetizados.** Al abrir Historial, Métrica, Negocio o una planta suena abrir carta. Los botones suenan selección. Día/noche, silencio y el ojito suenan interruptor. Cerrar un panel suena un toque. Al despertar a Profito suena «DJ Inicio», en lugar del wuhu; si el agente ya está despierto, ese clic cierra el panel con un toque. La fanfarria de un trade, el sonido de pérdida y el silencio de BUY y SELL no cambian. Todo usa un solo AudioContext y respeta el silencio.
 ### Notas
 - No abre, no mueve y no cierra órdenes. La versión 0.10.10 queda para el arreglo del instalador que está en revisión. Esta no se publica todavía.
 
