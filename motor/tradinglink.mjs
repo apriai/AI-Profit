@@ -13,6 +13,7 @@ import { rulesFor, maxQtyFor } from './account-size.mjs';
 import { textoVersion } from './version-api.mjs';
 import { cerrarSesion } from './pnl-sesion.mjs';
 import { crearAlgoTv } from './pine-algo.mjs';
+import { manejar } from './rutas-api.mjs';
 const DIR = dataDir();
 const TV = TV_CLI;
 const PORT = 8787, EVERY_MS = 5 * 60 * 1000;
@@ -320,80 +321,13 @@ async function conexion() { if (conn.v && Date.now() - conn.at < 10000) return c
 const negocioH = negocio({ dir: DIR, port: PORT, day: () => diaFarm() }); // /api/negocio: copia del historial del Negocio (negocio.json)
 const propiasH = estrategiasPropias({ port: PORT }); // /api/estrategias-propias: estrategias de esta computadora (raíz, no se sube)
 aplicarNetoGuardado();
-http.createServer((q, r) => {
-  if (propiasH(q, r)) return;
-  if (negocioH(q, r)) return;
-  if (q.url.startsWith('/api/vista-previa')) { let b = ''; q.on('data', c => b += c); q.on('end', async () => { let out; try { let j = {}; try { j = JSON.parse(b || '{}'); } catch { j = {}; } if (colchon.status().state === 'running') j = { activo: false, seq: j.seq || 0 }; out = await vistaPrevia.aplicar(j); } catch (e) { out = { ok: false, estado: 'no-disponible', texto: 'Vista previa no disponible' }; } r.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); r.end(JSON.stringify(out)); }); return; }
-  if (/^\/(logros|metas)\.json/.test(q.url)) { let t='{}'; try { t = fs.readFileSync(path.join(DIR, q.url.startsWith('/logros') ? 'logros.json' : 'metas.json'), 'utf8'); } catch {} r.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); return r.end(t); }
-  if (q.url.startsWith('/accounts.json')) { r.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); return r.end(JSON.stringify(state)); }
-  if (q.url.startsWith('/api/colchon/')) { let b=''; q.on('data',c=>b+=c); q.on('end', async()=>{ let j={}; try{j=JSON.parse(b||'{}')}catch{} let out;
-    try {
-      if (q.url.startsWith('/api/colchon/reporte')) { const d = new URL(q.url, 'http://x').searchParams.get('dia'); const md = buildReport(DIR, /^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d : diaFarm());
-        r.writeHead(200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-store' }); return r.end(md); }
-      if (q.url.startsWith('/api/colchon/informe')) { const f = path.basename(new URL(q.url, 'http://x').searchParams.get('f') || ''); let md = 'No encontré ese informe.';
-        if (/^[\w.-]+\.md$/.test(f)) try { md = maskId(fs.readFileSync(path.join(DIR, 'reportes', f), 'utf8')); } catch {}
-        r.writeHead(200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-store' }); return r.end(md); }
-      if (q.url.startsWith('/api/colchon/detalle')) { const out2 = detalleTrade(new URL(q.url, 'http://x').searchParams.get('at') || ''); r.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); return r.end(JSON.stringify(out2)); }
-      if (q.url.startsWith('/api/colchon/lectura')) { const f = path.join(DIR, 'pausa-lectura.flag');
-        if (q.method === 'POST') { const p = j.pause ?? !fs.existsSync(f); if (p) fs.writeFileSync(f, 'pausa manual ' + new Date().toISOString()); else fs.rmSync(f, { force: true }); }
-        out = { paused: fs.existsSync(f), ultimaLecturaCompleta: lastFull ? new Date(lastFull).toISOString() : null, ultimaActividad: new Date(lastBusy).toISOString(), esperaSeg: Math.max(0, Math.ceil((QUIET_MS - (Date.now() - lastBusy)) / 1000)) }; }
-      else if (q.url.startsWith('/api/colchon/metricas')) out = await metricasDe(q.url);
-      else if (q.url.startsWith('/api/colchon/trades')) { const d = new URL(q.url, 'http://x').searchParams.get('dia'); out = await tradesDe(/^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d : diaFarm()); }
-      else if (q.url.startsWith('/api/colchon/conexion')) out = await conexion();
-      else if (q.url.startsWith('/api/colchon/status')) out = { ...colchon.status(), cfg: colchonCFG };
-      else if (q.url.startsWith('/api/colchon/summary')) out = colchon.summary() || { ok: false, err: 'Todavía no hay resumen' };
-      else if (q.url.startsWith('/api/colchon/strategies')) out = colchon.strategies();
-      else if (q.url.startsWith('/api/colchon/accounts')) out = await colchon.accounts();
-      else if (q.url.startsWith('/api/colchon/check')) out = await colchon.check();
-      else if (q.url.startsWith('/api/colchon/start') && q.method === 'POST') out = await colchon.start(j);
-      else if (q.url.startsWith('/api/colchon/stop') && q.method === 'POST') out = await colchon.stop(j);
-      else out = { ok: false, err: 'ruta desconocida' };
-    } catch (e) { out = { ok: false, err: String(e.message || e) }; }
-    r.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); r.end(JSON.stringify(out)); }); return; }
-  if (q.method === 'POST' || q.url === '/bot') { let b=''; q.on('data',c=>b+=c); q.on('end', async()=>{ let j={}; try{j=JSON.parse(b||'{}')}catch{} let out;
-    if (q.url==='/bot') out={enabled: q.method==='POST'? orders.bot.set(j.enabled): orders.bot.get(), simulated: orders.DRY_RUN};
-    else if (q.url==='/order') out=orders.request(j, state.accounts);
-    else if (q.url==='/confirm') out=await orders.confirm(j.id, state.accounts);
-    else if (q.url==='/cancel') out={ok: orders.cancel(j.id)};
-    else out={ok:false,err:['ruta desconocida']};
-    console.log(new Date().toLocaleTimeString(), q.url, JSON.stringify(out)); r.writeHead(200,{'content-type':'application/json'}); r.end(JSON.stringify(out)); }); return; }
-  if (q.method === 'GET' && (q.url === '/api/version' || q.url.startsWith('/api/version?'))) {
-    const t = textoVersion(path.join(ROOT, 'VERSION'));
-    if (!t) { r.writeHead(204, { 'cache-control': 'no-store' }); return r.end(); }
-    r.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
-    return r.end(t);
-  }
-  if (q.url === '/api/algo-tv' || q.url.startsWith('/api/algo-tv?')) {
-    if (q.method === 'GET') {
-      let e = { conectado: false, algos: [], texto: '' };
-      try { e = algoTv.estado(); } catch {}
-      r.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-      return r.end(JSON.stringify(e));
-    }
-    if (q.method === 'POST') {
-      let b = ''; q.on('data', c => b += c); q.on('end', async () => {
-        let j = {}; try { j = JSON.parse(b || '{}'); } catch {}
-        let out = { ok: false, conectado: false, algos: [], texto: '' };
-        try { out = await algoTv.fijar(j.nombre, j.visible); } catch (e) { out.motivo = String(e && e.message || e); }
-        r.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-        r.end(JSON.stringify(out));
-      });
-      return;
-    }
-  }
-  if (q.method === 'GET' && q.url.startsWith('/sonidos/')) {
-    const nombre = path.basename(q.url.split('?')[0]);
-    if (nombre === 'clic-burbuja.wav' || nombre === 'despertar-wuhu.wav') {
-      const wav = path.join(ROOT, 'motor', 'sonidos', nombre);
-      if (fs.existsSync(wav)) { r.writeHead(200, { 'content-type': 'audio/wav', 'cache-control': 'public, max-age=86400' }); return fs.createReadStream(wav).pipe(r); }
-    }
-  }
-  if (q.method === 'GET' && (q.url === '/propfarm-logo.png' || q.url.startsWith('/propfarm-logo.png?'))) {
-    const logo = path.join(ROOT, 'assets', 'propfarm-logo.png');
-    if (fs.existsSync(logo)) { r.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'no-store' }); return fs.createReadStream(logo).pipe(r); }
-  }
-  r.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' }); fs.createReadStream(HTML).pipe(r);
-}).listen(PORT, '127.0.0.1', () => console.log(`Granja: http://localhost:${PORT}`));
+http.createServer((q, r) => manejar(q, r, {
+  propiasH, negocioH, vistaPrevia, colchon, colchonCFG, DIR, state,
+  buildReport, diaFarm, maskId, detalleTrade,
+  lastFull: () => lastFull, lastBusy: () => lastBusy, quietMs: () => QUIET_MS,
+  metricasDe, tradesDe, conexion, orders,
+  algoTv: () => algoTv, textoVersion, ROOT, HTML,
+})).listen(PORT, '127.0.0.1', () => console.log(`Granja: http://localhost:${PORT}`));
 let lastFull = 0, lastFunded = 0, lastBusy = Date.now(); const FULL_MS = EVERY_MS, QUIET_MS = 5 * 60 * 1000;
 cycle(); setInterval(cycle, 30 * 1000);
 

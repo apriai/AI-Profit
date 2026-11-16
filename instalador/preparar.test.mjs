@@ -23,13 +23,28 @@ const debe = [
   'motor/pine/manifest.json',
   'motor/sonidos/clic-burbuja.wav',
   'motor/sonidos/despertar-wuhu.wav',
+  'motor/rutas-api.mjs',
   'acceso/profito-estado.mjs',
   'acceso/aviso-actualizacion.mjs',
   'acceso/aviso-actualizacion.ps1',
   'acceso/AI Profit.cmd',
+  'acceso/AI Profit.vbs',
+  'acceso/oculto.vbs',
+  'acceso/lanzar-tradingview.vbs',
+  'acceso/profito-bandeja.ps1',
+  'acceso/profito-bandeja.mjs',
+  'acceso/profito-log.mjs',
+  'acceso/profito-arranque.ps1',
+  'acceso/abrir-granja.ps1',
   'acceso/Abrir Granja.bat',
   'acceso/abrir-tradingview.ps1',
   'assets/abrir-granja-icon.ico',
+  'assets/profito.ico',
+  'assets/propfarm-logo.png',
+  'assets/carga/1-escenario.jpg',
+  'assets/carga/2-multitud-islas.jpg',
+  'assets/carga/3-granja-cerca.jpg',
+  'assets/carga/4-isla-granja.jpg',
   'datos/LEEME.md',
   'tradingview-mcp/package.json',
   'tradingview-mcp/node_modules/chrome-remote-interface/index.js',
@@ -47,16 +62,16 @@ function archivosCitados(texto) {
   const out = new Set();
   const add = (s) => {
     const base = String(s || '').replace(/\\/g, '/').split('/').pop();
-    if (/^[A-Za-z0-9 ._-]+\.(mjs|js|bat|cmd|ps1)$/.test(base)) out.add(base);
+    if (/^[A-Za-z0-9 ._-]+\.(mjs|js|bat|cmd|ps1|vbs)$/.test(base)) out.add(base);
   };
   for (const m of texto.matchAll(/%~dp0([^\s"%]+)/g)) add(m[1]);
   for (const m of texto.matchAll(/path\.join\(AQUI,\s*'([^']+)'\)/g)) add(m[1]);
-  for (const m of texto.matchAll(/['"]([^'"\r\n]+\.(?:mjs|js|bat|cmd|ps1))['"]/g)) add(m[1]);
+  for (const m of texto.matchAll(/['"]([^'"\r\n]+\.(?:mjs|js|bat|cmd|ps1|vbs))['"]/g)) add(m[1]);
   return [...out];
 }
 const accesoDir = path.join(root, 'acceso');
 for (const name of fs.readdirSync(accesoDir)) {
-  if (!/\.(mjs|js|bat|cmd|ps1)$/i.test(name) || /\.test\.mjs$/.test(name)) continue;
+  if (!/\.(mjs|js|bat|cmd|ps1|vbs)$/i.test(name) || /\.test\.mjs$/.test(name)) continue;
   const texto = fs.readFileSync(path.join(accesoDir, name), 'utf8');
   for (const citado of archivosCitados(texto)) {
     if (citado === name || !fs.existsSync(path.join(accesoDir, citado))) continue;

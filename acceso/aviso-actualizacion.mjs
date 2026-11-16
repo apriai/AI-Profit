@@ -162,9 +162,9 @@ function preguntarConScript(version, script) {
   return new Promise(resolve => {
     let out = '';
     const child = spawn('powershell.exe', [
-      '-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass',
+      '-NoProfile', '-STA', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass',
       '-File', script, '-Version', version,
-    ], { windowsHide: false, stdio: ['ignore', 'pipe', 'ignore'] });
+    ], { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });
     const timer = setTimeout(() => { try { child.kill(); } catch {} resolve('silencio'); }, 10 * 60 * 1000);
     child.stdout.on('data', c => { out += c.toString('utf8'); });
     child.on('error', () => { clearTimeout(timer); resolve('silencio'); });
@@ -184,11 +184,17 @@ function ejecutarSetup(destino) {
 }
 
 function cerrarProfito() {
+  const bandeja = path.join(path.dirname(fileURLToPath(import.meta.url)), 'profito-bandeja.mjs');
+  try {
+    execFileSync(process.execPath, [bandeja, 'cerrar', '--bandeja'], {
+      windowsHide: true, timeout: 15000, stdio: 'ignore',
+    });
+  } catch { /* sin bandeja, sigue el acceso viejo */ }
   try {
     execFileSync('taskkill.exe', ['/F', '/IM', 'AI Profit.exe'], {
       windowsHide: true, timeout: 8000, stdio: 'ignore',
     });
-  } catch { /* si no esta el acceso compilado, el .cmd mira el codigo 20 */ }
+  } catch { /* si no esta el acceso compilado, el lanzador mira el codigo 20 */ }
 }
 
 export async function avisarSiHaceFalta(root) {

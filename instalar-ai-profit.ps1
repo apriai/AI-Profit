@@ -3,12 +3,13 @@
 # No abre TradingView y no envia ordenes.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$bat = Join-Path $root 'acceso\Abrir Granja.bat'
+$vbs = Join-Path $root 'acceso\AI Profit.vbs'
+$bat = $vbs
 if (-not (Test-Path -LiteralPath (Join-Path $root 'motor\tradinglink.mjs'))) {
   throw "No encuentro motor\tradinglink.mjs en $root"
 }
 if (-not (Test-Path -LiteralPath $bat)) {
-  throw "Falta acceso\Abrir Granja.bat en $root"
+  throw "Falta acceso\AI Profit.vbs en $root"
 }
 
 function Convert-PngToIco([string]$PngPath, [string]$IcoPath) {
@@ -84,14 +85,15 @@ function Convert-PngToIco([string]$PngPath, [string]$IcoPath) {
 
 $png = $null
 foreach ($candidate in @(
+  (Join-Path $root 'assets\propfarm-logo.png'),
   (Join-Path $root 'assets\abrir-granja-icon.png'),
-  (Join-Path $root 'assets\ai-profit-icon.png'),
-  (Join-Path $root 'assets\propfarm-logo.png')
+  (Join-Path $root 'assets\ai-profit-icon.png')
 )) {
   if (Test-Path -LiteralPath $candidate) { $png = $candidate; break }
 }
 
-$ico = Join-Path $root 'assets\abrir-granja-icon.ico'
+$ico = Join-Path $root 'assets\profito.ico'
+if (-not (Test-Path -LiteralPath $ico)) { $ico = Join-Path $root 'assets\abrir-granja-icon.ico' }
 $iconNote = ''
 if ($png) {
   try {
@@ -117,10 +119,12 @@ if ([string]::IsNullOrWhiteSpace($desktop)) {
 $lnkPath = Join-Path $desktop 'AI Profit.lnk'
 $wsh = New-Object -ComObject WScript.Shell
 $lnk = $wsh.CreateShortcut($lnkPath)
-$lnk.TargetPath = $bat
+$wscript = Join-Path $env:SystemRoot 'System32\wscript.exe'
+$lnk.TargetPath = $wscript
+$lnk.Arguments = "//B //Nologo `"$vbs`""
 $lnk.WorkingDirectory = $root
-$lnk.WindowStyle = 1
-$lnk.Description = 'Abre TradingView, TradingLink y la Granja de AI Profit. No envia ordenes.'
+$lnk.WindowStyle = 7
+$lnk.Description = 'AI Profit en la bandeja, junto al reloj. No envia ordenes.'
 if (Test-Path -LiteralPath $ico) {
   $lnk.IconLocation = "$ico,0"
 }

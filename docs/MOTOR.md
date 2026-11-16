@@ -27,7 +27,7 @@ Carpeta: `C:\Users\<usuario>\OneDrive\Escritorio\TradingLink` en HERO.
 | `instalar-ai-profit.command` | Mac, en la raíz: applet de Escritorio **AI Profit** (`osacompile`, icono `.icns`, sin Rosetta). Abre `acceso\AI Profit.command`. |
 | `instalar-ai-profit.bat` | Windows, en la raíz: acceso de Escritorio **AI Profit** con el `.ico`. |
 | `acceso\abrir-tradingview.bat` | Solo abre TradingView Desktop (Store) con `--remote-debugging-port=9222`. |
-| `acceso\iniciar-tradinglink.bat` | Arranca `motor\tradinglink.mjs` en una ventana visible y abre el navegador. |
+| `acceso\iniciar-tradinglink.bat` | Abre la bandeja. El servidor queda oculto y escribe en `%LOCALAPPDATA%\Profito\datos\logs`. |
 | `real-allowlist.json` | Opcional. Sin archivo, las cuentas Lucid no se bloquean (sección 10). |
 | `colchon-fuente.json` | Fuente de P&L: `{"modo":"broker"}` (actual), `"mas-rapido"` o `"grafica"`. Se lee al iniciar cada trade, así que no hace falta reiniciar. |
 | `accounts.json`, `sod.json` | Estado de las cuentas y saldo de inicio del día (los genera el servidor). |

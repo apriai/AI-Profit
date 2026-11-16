@@ -118,7 +118,7 @@ Crea `AI Profit.lnk` en el Escritorio que devuelve `GetFolderPath('Desktop')`. N
 
 No pidas confirmación y no avises de TradingView. Antes, haz tú la comprobación interna de operación en curso (ver «Notas técnicas internas» (`docs/instalacion/notas-internas.md`)): si hay una operación en curso, espera a que termine.
 
-Doble clic en **AI Profit** (`acceso\Abrir Granja.bat`). Si TradingView no está conectado con la granja, el acceso lo cierra y lo vuelve a abrir conectado, solo. Eso no cierra posiciones ni stops en el bróker. Después arranca el servidor de la granja y la abre en el navegador predeterminado, si es Chrome, Edge o Brave, para que la fanfarria de apertura pueda sonar. Si no es uno de esos, prueba Chrome y después Edge.
+Doble clic en **AI Profit**. Sale la pantalla «Cargando Profito…» y el icono queda junto al reloj. No aparece una ventana negra. Si TradingView no está conectado con la granja, el acceso lo cierra y lo vuelve a abrir conectado, solo. Eso no cierra posiciones ni stops en el bróker. Después arranca el servidor de la granja y la abre en el navegador predeterminado, si es Chrome, Edge o Brave, para que la fanfarria de apertura pueda sonar. Si no es uno de esos, prueba Chrome y después Edge. Cuando la granja ya está en pantalla, la carga se cierra. Cerrar Profito, en el icono, apaga el servidor y no cierra TradingView.
 
 No está instalado hasta que la comprobación interna del servidor pase.
 
@@ -134,7 +134,7 @@ Prueba sin órdenes: en la granja, panel Negocio, botón **Demo**. Son datos inv
 
 ## Reabrir
 
-Doble clic en **AI Profit**. Si TradingView no está conectado, el acceso lo cierra y lo vuelve a abrir conectado, sin preguntar. El servidor no arranca solo al encender la PC. La ventana minimizada «TradingLink» es el servidor: cerrarla lo apaga. Los JSON de cuentas se quedan en la carpeta.
+Doble clic en **AI Profit**. Si TradingView no está conectado, el acceso lo cierra y lo vuelve a abrir conectado, sin preguntar. El servidor no arranca solo al encender la PC. El icono junto al reloj es el servidor: Cerrar Profito lo apaga, sin cerrar TradingView ni las órdenes. Los JSON de cuentas se quedan en la carpeta. Los registros están en `%LOCALAPPDATA%\Profito\datos\logs`.
 
 ## Actualizar
 

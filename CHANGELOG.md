@@ -10,6 +10,15 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.18] — 2026-11-16
+### Agregado
+- **Profito queda en la bandeja, junto al reloj.** El acceso AI Profit abre un icono con la mascota (tooltip «AI Profit») y no deja ventanas negras de consola. El menú dice: Abrir granja, Estado, Ver logs y Cerrar Profito. Cerrar apaga el servidor y lo que Profito arrancó. No cierra TradingView ni las órdenes del bróker. Los registros van a `%LOCALAPPDATA%\Profito\datos\logs` y rotan solos. Si ya está abierto, volver a abrirlo solo trae la granja al frente.
+- **Pantalla de carga.** Al abrir sale «Cargando Profito…», con las fotos del instalador en otro orden, el logo y el paso en curso: Encendiendo servidor, Conectando TradingView, Abriendo granja. Se cierra sola cuando la granja ya está en pantalla. Si pasa cerca de un minuto, dice qué sigue pendiente.
+### Corregido
+- **El ojo de los algoritmos vuelve a mostrar y ocultar.** `POST /api/algo-tv` lo respondía el atajo de `/order` con «ruta desconocida» y el clic no hacía nada. Ahora esa ruta llega a `fijar`.
+### Notas
+- No abre, no mueve y no cierra órdenes. `orders.mjs` sigue apagado.
+
 ## [0.10.17] — 2026-11-16
 ### Corregido
 - **El estudio de Pine se añade con el inserter `{type:'pine'}`.** En Desktop 3.5.0 un texto cae en el inserter java y un metaInfo JSON hace que `insertStudy` devuelva null. El id `script$user;<hash>` se pasa como `pineId: 'USER;<hash>'` y `pineVersion: 'last'`. El texto queda solo para estudios estándar. Si el estudio ya está en el gráfico, no se añade otro.

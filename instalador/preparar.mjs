@@ -6,7 +6,7 @@ const MOTOR = [
   'tradinglink.mjs', 'colchon.mjs', 'account-size.mjs', 'busy.mjs',
   'estrategias-propias.mjs', 'negocio.mjs', 'orders.mjs', 'rutas.mjs', 'strategies.mjs',
   'tv-reporte.mjs', 'tv-vista-previa.mjs', 'version-api.mjs', 'pnl-sesion.mjs',
-  'pine-algo.mjs', 'pine/manifest.json', 'pine/ai-profit-camp-algo.pine', 'pine/smart-money-algo.pine', 'Granja-de-Cuentas-v2.html',
+  'pine-algo.mjs', 'rutas-api.mjs', 'pine/manifest.json', 'pine/ai-profit-camp-algo.pine', 'pine/smart-money-algo.pine', 'Granja-de-Cuentas-v2.html',
   'sonidos/clic-burbuja.wav', 'sonidos/despertar-wuhu.wav',
 ];
 const TV_MODULOS = ['chrome-remote-interface', 'ws', 'commander'];
@@ -39,12 +39,15 @@ export function preparar(root, dest) {
   for (const entrada of fs.readdirSync(acceso, { withFileTypes: true })) {
     if (!entrada.isFile()) continue;
     if (/\.test\.mjs$/.test(entrada.name)) continue;
-    const ok = /\.(mjs|js|bat|cmd|ps1)$/i.test(entrada.name);
+    const ok = /\.(mjs|js|bat|cmd|ps1|vbs)$/i.test(entrada.name);
     if (!ok) continue;
     copiarArchivo(path.join(acceso, entrada.name), path.join(dest, 'acceso', entrada.name));
   }
-  for (const nombre of ['abrir-granja-icon.ico', 'propfarm-logo.png']) {
+  for (const nombre of ['abrir-granja-icon.ico', 'profito.ico', 'propfarm-logo.png']) {
     copiarArchivo(path.join(root, 'assets', nombre), path.join(dest, 'assets', nombre));
+  }
+  for (const nombre of ['1-escenario.jpg', '2-multitud-islas.jpg', '3-granja-cerca.jpg', '4-isla-granja.jpg']) {
+    copiarArchivo(path.join(root, 'instalador', 'gfx', nombre), path.join(dest, 'assets', 'carga', nombre));
   }
   copiarArchivo(path.join(root, 'datos', 'LEEME.md'), path.join(dest, 'datos', 'LEEME.md'));
   const tv = path.join(root, 'tradingview-mcp');

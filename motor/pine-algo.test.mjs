@@ -265,6 +265,7 @@ assert.match(malId.algos[0].motivo, /unexpected study id:script\$user;4637f0d246
 
 const html = fs.readFileSync(new URL('./Granja-de-Cuentas-v2.html', import.meta.url), 'utf8');
 const server = fs.readFileSync(new URL('./tradinglink.mjs', import.meta.url), 'utf8');
+const rutas = fs.readFileSync(new URL('./rutas-api.mjs', import.meta.url), 'utf8');
 assert.match(html, /window\.__tlDia=_pd;const Wo=/);
 assert.match(html, /id="tlAlgosBtn"/);
 assert.match(html, /id="tlAlgosPanel"/);
@@ -279,8 +280,9 @@ assert.ok(html.indexOf('id="tlAlgosBtn"') < html.indexOf('id="tlAlgoAviso"'));
 assert.match(html, /Instalando los algoritmos en tu TradingView\. Tarda de 1 a 2 minutos\. Es normal que veas moverse el gráfico y el editor de Pine\./);
 assert.match(html, /Algoritmos listos/);
 assert.match(html, /j\.fase === 'instalando'/);
-assert.match(server, /q\.method === 'POST'/);
-assert.match(server, /algoTv\.fijar/);
+assert.match(rutas, /q\.method === 'POST'/);
+assert.match(rutas, /algoTv\.fijar/);
+assert.ok(rutas.indexOf("'/api/algo-tv'") < rutas.indexOf("q.method === 'POST' || q.url === '/bot'"), 'el ojo no cae en el POST genérico');
 assert.match(server, /algoTv\.sincronizar/);
 assert.doesNotMatch(server.slice(server.indexOf('crearAlgoTv(')), /ocupado:/);
 assert.doesNotMatch(fs.readFileSync(new URL('./orders.mjs', import.meta.url), 'utf8'), /pine-algo|Ai Profit Camp Algo/);
