@@ -3,13 +3,14 @@
 Documento de relevo para cualquier agente (Grok) que trabaje en este repositorio. Sin datos personales: no hay cuentas, saldos ni claves aquí.
 
 ## Versión actual
-- **Última versión: 0.10.9** (2026-11-16). Está en el archivo `VERSION` y se ve en la esquina inferior izquierda de la granja.
+- **Última versión: 0.10.10** (2026-11-16). Está en el archivo `VERSION` y se ve en la esquina inferior izquierda de la granja.
 - Historial completo y detallado: `CHANGELOG.md`. Cada versión tiene su release en GitHub (`v0.5.1`, etc.).
 - **Al terminar un cambio, actualiza este documento** (versión, fecha y la lista de abajo).
 
 ## Lo que cambió
 | Versión | Qué cambió |
 |---|---|
+| 0.10.10 | Al llenarse la barra, el instalador pasa solo a ¡Listo! con el botón Abrir. Antes se quedaba en Instalando aunque la copia ya había terminado. Aún no publicado. |
 | 0.10.9 | El botón Instalar del instalador vuelve a pasar a la copia. Antes el clic en la pastilla verde no hacía nada. Aún no publicado. |
 | 0.10.8 | Al abrir la granja, una sola vez, la misma celebración visual de un trade ganado (casa, confeti y el resto), con `window.__tlCelebrate`. No anota ganancia ni cambia saldos, historial, métricas ni sonidos. |
 | 0.10.7 | Clic de burbuja al dormir al agente, abrir Historial, Métrica, Negocio, una planta o Trade. Al despertar suena un wuhu en lugar del clic. BUY y SELL no suenan. |
