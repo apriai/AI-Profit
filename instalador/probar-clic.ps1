@@ -119,7 +119,6 @@ function Elegir-Boton([IntPtr]$Raiz) {
 }
 
 if (Test-Path -LiteralPath $Dir) { Remove-Item -LiteralPath $Dir -Recurse -Force }
-New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Dir) | Out-Null
 
 if ($Modo -eq 'silencioso') {
   Write-Output "SILENCIOSO $Exe -> $Dir"
