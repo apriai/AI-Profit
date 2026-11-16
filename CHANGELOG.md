@@ -16,7 +16,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **La luz de Tradovate ve la cuenta aunque el panel esté cerrado.** Si TradingView no muestra el nombre en la página, se toma de la API del bróker (cuenta actual y su ficha). La luz puede ponerse verde y la comprobación de cuenta deja de decir que no la ve. Cambiar de cuenta para operar sigue exigiendo el nombre visible, y la lista de cuentas reales permitidas no cambia.
 - **Sonidos de la interfaz, sintetizados.** Al abrir Historial, Métrica, Negocio o una planta suena abrir carta. Los botones suenan selección. Día/noche, silencio y el ojito suenan interruptor. Cerrar un panel suena un toque. Al despertar a Profito suena «DJ Inicio», en lugar del wuhu; si el agente ya está despierto, ese clic cierra el panel con un toque. La fanfarria de un trade, el sonido de pérdida y el silencio de BUY y SELL no cambian. Todo usa un solo AudioContext y respeta el silencio.
 ### Notas
-- No abre, no mueve y no cierra órdenes. La versión 0.10.10 queda para el arreglo del instalador que está en revisión. Esta no se publica todavía.
+- No abre, no mueve y no cierra órdenes. El arreglo del instalador está en 0.10.10, aquí abajo.
+
+## [0.10.10] — 2026-11-16
+### Corregido
+- **Al terminar de copiar, el instalador pasa a ¡Listo!** La barra se llenaba y los archivos quedaban en la carpeta, pero la pantalla se quedaba en «Instalando…». El avance estaba en `.onInstSuccess`, y eso solo corre al cerrar el instalador. Ahora, al acabar la sección, la página de progreso se cierra sola y aparece «Abrir».
+### Notas
+- No abre, no mueve y no cierra órdenes. Esta versión aún no está publicada.
 
 ## [0.10.9] — 2026-11-16
 ### Corregido
