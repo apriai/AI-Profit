@@ -33,11 +33,11 @@ assert.match(expr, /getAllStudies/);
 assert.match(expr, /Ai Profit Camp Algo/);
 assert.match(expr, /pine-facade\/save\/new/);
 assert.match(expr, /pine-facade\/save\/next/);
-assert.doesNotMatch(expr, /placeOrder|modifyOrder|closePosition|editPositionBrackets|cancelOrder|setVisible/);
+assert.doesNotMatch(expr, /placeOrder|modifyOrder|closePosition|editPositionBrackets|cancelOrder|setVisible|setCurrentAccount|setSymbol|activeBroker|paper_trading|positions\(|activeOrders|sin-broker|sin-posiciones/);
 new vm.Script(expr);
 const ojos = exprOjos({ accion: 'fijar', nombre: ALGO_NOMBRE, visible: false });
 assert.match(ojos, /setVisible/);
-assert.doesNotMatch(ojos, /placeOrder|closePosition/);
+assert.doesNotMatch(ojos, /placeOrder|closePosition|activeBroker|positions\(|activeOrders|setCurrentAccount|setSymbol/);
 new vm.Script(ojos);
 assert.match(exprOjos({ nombres: [ALGO_NOMBRE], accion: 'leer' }), /accion==='leer'/);
 
@@ -51,7 +51,6 @@ const algo = crearAlgoTv({
     if (codigo.includes('setVisible')) return { ok: true, visible: false, studyId: 's1' };
     return { ok: true, estado: 'instalado', version: '1', enGrafico: 1, visible: true, studyId: 's1', scriptId: 'USER;1', plan: 'instalar' };
   },
-  ocupado: () => false,
   log: () => {},
 });
 assert.match(algo.estado().texto, /Ai Profit Camp Algo pendiente/);
@@ -75,19 +74,19 @@ assert.equal(ojo.ok, true);
 assert.equal(ojo.algos[0].visible, false);
 assert.equal(vistos.some(c => c.includes('setVisible')), true);
 
-const ocupado = crearAlgoTv({
-  dir: fs.mkdtempSync(path.join(os.tmpdir(), 'algo-ocup-')),
+const enTrade = crearAlgoTv({
+  dir: fs.mkdtempSync(path.join(os.tmpdir(), 'algo-trade-')),
   pineDir: PINE_DIR,
-  evaluar: async () => { throw new Error('no debía evaluar'); },
-  ocupado: () => true,
+  evaluar: async () => ({ ok: true, estado: 'instalado', version: '1', enGrafico: 1, visible: false, studyId: 's9', scriptId: 'USER;9', plan: 'instalar' }),
 });
-assert.match((await ocupado.intentar()).texto, /pendiente/);
+const durante = await enTrade.intentar();
+assert.match(durante.texto, /Ai Profit Camp Algo instalado v1/);
+assert.equal(durante.algos.find(a => a.nombre === 'Ai Profit Camp Algo').visible, false);
 
 const caido = crearAlgoTv({
   dir: fs.mkdtempSync(path.join(os.tmpdir(), 'algo-caido-')),
   pineDir: PINE_DIR,
   evaluar: async () => { throw new Error('connect ECONNREFUSED 127.0.0.1:9222'); },
-  ocupado: () => false,
 });
 assert.match((await caido.intentar()).texto, /pendiente/);
 assert.equal((await caido.intentar()).conectado, false);
@@ -96,7 +95,6 @@ const fallo = crearAlgoTv({
   dir: fs.mkdtempSync(path.join(os.tmpdir(), 'algo-fallo-')),
   pineDir: PINE_DIR,
   evaluar: async () => ({ ok: false, estado: 'error', motivo: 'guardar 401' }),
-  ocupado: () => false,
 });
 assert.match((await fallo.intentar()).texto, /error/);
 
@@ -112,6 +110,7 @@ assert.match(html, /\/api\/algo-tv/);
 assert.match(server, /q\.method === 'POST'/);
 assert.match(server, /algoTv\.fijar/);
 assert.match(server, /algoTv\.sincronizar/);
+assert.doesNotMatch(server.slice(server.indexOf('crearAlgoTv(')), /ocupado:/);
 assert.doesNotMatch(fs.readFileSync(new URL('./orders.mjs', import.meta.url), 'utf8'), /pine-algo|Ai Profit Camp Algo/);
 
 console.log('pine-algo ok');

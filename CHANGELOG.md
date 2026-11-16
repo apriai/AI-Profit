@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.15] — 2026-11-16
+### Corregido
+- **Los indicadores se instalan aunque haya un trade y aunque la luz de Tradovate cambie.** Antes se quedaban en «pendiente» con el motivo «sin-broker» si el panel de órdenes de TradingView no devolvía el bróker, aunque las tres luces estuvieran verdes. Instalar o mostrar u ocultar un algoritmo ya no mira el bróker, la cuenta, el símbolo, las posiciones ni las órdenes. Un estudio que la persona ocultó sigue oculto.
+### Notas
+- No abre, no mueve y no cierra órdenes. `orders.mjs` sigue apagado. El stop, el objetivo y el colchón no cambian.
+
 ## [0.10.14] — 2026-11-16
 ### Agregado
 - **Indicadores de TradingView desde un manifiesto.** Cada `.pine` de `motor/pine/manifest.json` es un estudio aparte. Van Ai Profit Camp Algo y Smart Money Structure, cada uno con su propio ojo. Si falta en el gráfico se guarda y se añade; si ya está, aunque esté oculto, no se duplica ni se vuelve a mostrar. La barra de arriba tiene un ojo junto a Hoy: al abrirlo lista cada algoritmo y su ojo lo muestra o lo oculta en el gráfico. Abrir y cerrar suenan como los otros paneles; el ojo de cada fila suena como el interruptor. BUY y SELL siguen en silencio. Si TradingView no está conectado, la lista se ve apagada.

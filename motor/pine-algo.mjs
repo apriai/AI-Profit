@@ -1,5 +1,5 @@
-// Instala cada indicador de motor/pine/manifest.json en el TradingView Desktop ya abierto.
-// No coloca, no modifica y no cierra órdenes. Si falla, el motor sigue.
+// Instala cada indicador de motor/pine/manifest.json en el gráfico de TradingView Desktop.
+// No lee el bróker, la cuenta, el símbolo, las posiciones ni las órdenes. Si falla, el motor sigue.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -62,9 +62,6 @@ export function exprAlgo({ source, nombre = ALGO_NOMBRE, version = ALGO_VERSION,
   const datos = JSON.stringify({ source: String(source || ''), nombre, version, versionGuardada: String(versionGuardada || ''), studyId: String(studyIdGuardado || '') });
   return `(async function(){
 var D=${datos};
-function tvWv(x){if(x==null||typeof x!=='object')return x;if(typeof x.value==='function')return x.value();if('value' in x)return x.value;return x}
-function tvTrading(){var b=window.TradingView&&window.TradingView.bottomWidgetBar;if(!b)return null;var c=b._widgetControllers&&b._widgetControllers.get('paper_trading');return c&&c._trading||null}
-function tvBroker(t){if(!t||!t.activeBroker)return null;try{return tvWv(t.activeBroker())}catch(e){return null}}
 function mismo(n){return String(n||'').trim().toLowerCase()===String(D.nombre).toLowerCase()}
 function chart(){var api=window.TradingViewApi; if(!api||typeof api.activeChart!=='function') return null; try{return api.activeChart()}catch(e){return null}}
 function meter(mapa, s){
@@ -109,17 +106,6 @@ function todos(){
 }
 function lista(){
   return todos().filter(function(s){return mismo(s.name) || (D.studyId && s.id===D.studyId)});
-}
-async function ocupada(){
-  var t=tvTrading(), ab=tvBroker(t);
-  if(!ab) return 'sin-broker';
-  var pos=[];
-  try{pos=(await ab.positions()||[]).filter(function(p){return p&&Number(p.qty)!==0})}catch(e){return 'sin-posiciones'}
-  var ord=[];
-  try{ord=tvWv(t._ordersService&&t._ordersService.activeOrders())||[]}catch(e2){ord=[]}
-  if(!Array.isArray(ord)) ord=[];
-  if(pos.length||ord.length) return 'ocupada';
-  return '';
 }
 async function scripts(){
   var r=await fetch(${JSON.stringify(FACADE + '/list?filter=saved')},{credentials:'include'});
@@ -184,9 +170,7 @@ function escribirEditor(){
 }
 return (async function(){
   var estudios=lista();
-  var bloque=await ocupada();
   if(estudios.length>0 && D.versionGuardada===D.version && estudios.length<2) return {ok:true, estado:'instalado', version:D.version, enGrafico:estudios.length, plan:'nada', visible:!estudios[0].oculto, studyId:estudios[0].id||''};
-  if(bloque) return {ok:false, estado:'pendiente', motivo:bloque, enGrafico:estudios.length};
   if(estudios.length>1 && D.versionGuardada===D.version){
     var quedan=quitarExtras(estudios);
     return {ok:quedan<=1, estado:quedan<=1?'instalado':'error', version:D.version, enGrafico:quedan, plan:'deduplicar'};
@@ -309,7 +293,6 @@ export function crearAlgoTv({
   dir,
   pineDir = PINE_DIR,
   evaluar,
-  ocupado = () => false,
   log = () => {},
 } = {}) {
   const archivo = path.join(dir, 'algo-tv.json');
@@ -401,7 +384,6 @@ export function crearAlgoTv({
   }
   async function intentar() {
     try {
-      if (ocupado()) return estado();
       for (const m of manifiesto) {
         try { await uno(m); }
         catch (e) {
