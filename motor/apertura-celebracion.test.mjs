@@ -38,14 +38,12 @@ assert.equal(html.includes('tocar("wuhu")'), false);
 assert.equal(html.includes('__tlClic'), false);
 assert.ok(html.includes('function play(big){if(muted||!ac||ac.state!=="running")return false;'));
 assert.ok(html.includes('function playPerdida(){'));
-assert.ok(html.includes('>v0.10.11</div>'));
+assert.ok(html.includes('>v0.10.12</div>'));
 
 assert.ok(bat.includes('--autoplay-policy=no-user-gesture-required'), 'el acceso pide autoplay');
 assert.ok(bat.includes('--app="http://localhost:8787/Granja-de-Cuentas-v2.html"'), 'abre en modo app');
 assert.ok(bat.includes('--user-data-dir="%PERFIL%"'), 'perfil propio para que el flag no se pierda');
-assert.ok(bat.includes('msedge.exe'), 'prueba Edge');
-assert.ok(bat.includes('chrome.exe'), 'prueba Chrome');
-assert.ok(bat.indexOf('msedge.exe') < bat.indexOf('chrome.exe'), 'Edge antes que Chrome');
+assert.ok(bat.includes('navegador-granja.mjs'), 'elige el navegador predeterminado');
 assert.ok(cmd.includes('Abrir Granja.bat'), 'el acceso del escritorio llega a este bat');
 assert.ok(nsi.includes('acceso\\AI Profit.cmd'), 'el instalador crea el acceso hacia el cmd');
 

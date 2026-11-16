@@ -170,7 +170,7 @@ Los archivos personales de cada PC (`accounts.json`, `sod.json`, `negocio.json`,
 
 ### Arranque diario
 
-1. Doble clic en el acceso **AI Profit** del Escritorio (o en `acceso/Abrir Granja.bat`). Si TradingView no está conectado con la granja, lo cierra y lo vuelve a abrir conectado, solo y sin preguntar. Después enciende el servidor y abre la granja en una ventana de Edge o de Chrome.
+1. Doble clic en el acceso **AI Profit** del Escritorio (o en `acceso/Abrir Granja.bat`). Si TradingView no está conectado con la granja, lo cierra y lo vuelve a abrir conectado, solo y sin preguntar. Después enciende el servidor y abre la granja en el navegador predeterminado (Chrome, Edge o Brave).
 2. En la granja, comprueba que las luces de TradingView y Tradovate estén encendidas.
 3. Si no se conecta: cierra y vuelve a abrir **AI Profit**. Si la granja no abre: «No pude abrir la granja. Cierra y vuelve a abrir AI Profit.»
 
