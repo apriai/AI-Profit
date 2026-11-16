@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.10] — 2026-11-16
+### Corregido
+- **Al terminar de copiar, el instalador pasa a ¡Listo!** La barra se llenaba y los archivos quedaban en la carpeta, pero la pantalla se quedaba en «Instalando…». El avance estaba en `.onInstSuccess`, y eso solo corre al cerrar el instalador. Ahora, al acabar la sección, la página de progreso se cierra sola y aparece «Abrir».
+### Notas
+- No abre, no mueve y no cierra órdenes. Esta versión aún no está publicada.
+
 ## [0.10.9] — 2026-11-16
 ### Corregido
 - **El botón Instalar del instalador ya avanza.** El botón verde era una imagen estática con identificador 0, y el clic no llegaba. Aunque llegara, llamaba al botón Siguiente, que está oculto, y la página no cambiaba. Ahora es un botón de verdad y el avance se envía al asistente. La instalación puede empezar.

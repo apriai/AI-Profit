@@ -3,7 +3,7 @@
 #   -Modo silencioso  ejecuta el exe con /S.
 # Sale 0 si la versión esperada quedó instalada. Si -DebeFallar, sale 0 cuando NO instala.
 param(
-  [ValidateSet('clic', 'silencioso')]
+  [ValidateSet('clic', 'silencioso', 'flujo')]
   [string]$Modo = 'clic',
   [Parameter(Mandatory = $true)][string]$Exe,
   [Parameter(Mandatory = $true)][string]$Dir,
@@ -34,6 +34,10 @@ public class InstUI {
   [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
   [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint flags);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+  [DllImport("user32.dll")] public static extern void mouse_event(uint f, uint dx, uint dy, uint data, System.UIntPtr extra);
+  [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, System.UIntPtr extra);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowTextW(IntPtr h, StringBuilder s, int n);
   public struct RECT { public int L, T, R, B; }
   public static List<IntPtr> Tops(uint pid) {
     var found = new List<IntPtr>();
@@ -82,8 +86,28 @@ public class InstUI {
     return best;
   }
   public static void Click(IntPtr h) {
-    // BM_CLICK es el mismo aviso que produce un clic de ratón en un botón.
     SendMessage(h, 0x00F5, IntPtr.Zero, IntPtr.Zero);
+  }
+  public static void RealClick(IntPtr top, IntPtr h) {
+    RECT r; GetWindowRect(h, out r);
+    int x = (r.L + r.R) / 2;
+    int y = (r.T + r.B) / 2;
+    keybd_event(0x12, 0, 0, System.UIntPtr.Zero);
+    keybd_event(0x12, 0, 2, System.UIntPtr.Zero);
+    SetForegroundWindow(top);
+    SetCursorPos(x, y);
+    mouse_event(0x0002, 0, 0, 0, System.UIntPtr.Zero);
+    mouse_event(0x0004, 0, 0, 0, System.UIntPtr.Zero);
+  }
+  public static bool HasText(IntPtr root, string needle) {
+    bool found = false;
+    EnumChildWindows(root, (h, l) => {
+      var txt = new StringBuilder(256);
+      GetWindowTextW(h, txt, 256);
+      if (txt.ToString().IndexOf(needle, System.StringComparison.Ordinal) >= 0) found = true;
+      return true;
+    }, IntPtr.Zero);
+    return found;
   }
   public static void Shot(IntPtr h, string path) {
     RECT r; if (!GetWindowRect(h, out r)) return;
@@ -127,6 +151,50 @@ if ($Modo -eq 'silencioso') {
   Write-Output "SILENCIOSO $Exe -> $Dir"
   $p = Start-Process -FilePath $Exe -ArgumentList @('/S', "/D=$Dir") -Wait -PassThru
   Write-Output ("EXIT={0}" -f $p.ExitCode)
+} elseif ($Modo -eq 'flujo') {
+  Write-Output "FLUJO $Exe"
+  $p = Start-Process -FilePath $Exe -PassThru
+  $ventana = Esperar-Ventana $p 25
+  if ($ventana -eq [IntPtr]::Zero) { throw 'No aparecio la ventana del instalador' }
+  Start-Sleep -Milliseconds 800
+  if ($Captura) { [InstUI]::Shot($ventana, ($Captura -replace '\.png$', '-01-bienvenida.png')) }
+  $boton = [InstUI]::FindButton($ventana)
+  if ($boton -eq [IntPtr]::Zero) { throw 'No encontre Instalar' }
+  Write-Output ("CLIC_INSTALAR clase={0}" -f [InstUI]::ClassOf($boton))
+  [InstUI]::RealClick($ventana, $boton)
+  $fin = (Get-Date).AddSeconds($EsperaSeg)
+  $vioListo = $false
+  while ((Get-Date) -lt $fin) {
+    $tops = [InstUI]::Tops([uint32]$p.Id)
+    if ($tops.Count -gt 0 -and [InstUI]::HasText($tops[0], 'Listo')) { $vioListo = $true; $ventana = $tops[0]; break }
+    if ((Leer-Version $Dir) -eq $Version) { }
+    Start-Sleep -Milliseconds 400
+  }
+  if (-not $vioListo) { throw 'La barra termino pero no aparecio la pantalla Listo' }
+  if ($Captura) { [InstUI]::Shot($ventana, ($Captura -replace '\.png$', '-02-listo.png')) }
+  $abrir = [InstUI]::FindButton($ventana)
+  if ($abrir -eq [IntPtr]::Zero) { throw 'No encontre Abrir' }
+  Write-Output ("CLIC_ABRIR clase={0}" -f [InstUI]::ClassOf($abrir))
+  [InstUI]::RealClick($ventana, $abrir)
+  $fin = (Get-Date).AddSeconds(25)
+  $abrio = $false
+  while ((Get-Date) -lt $fin) {
+    $procs = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+      $_.CommandLine -match 'AI Profit|Abrir Granja|tradinglink|profito-estado'
+    })
+    if ($procs.Count -gt 0) { $abrio = $true; Write-Output ("PROFITO_PROCESOS={0}" -f $procs.Count); break }
+    Start-Sleep -Milliseconds 400
+  }
+  if ($Captura) {
+    $tops = [InstUI]::Tops([uint32]$p.Id)
+    if ($tops.Count -gt 0) { [InstUI]::Shot($tops[0], ($Captura -replace '\.png$', '-03-tras-abrir.png')) }
+  }
+  Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+    $_.CommandLine -match 'AI Profit|Abrir Granja|tradinglink|profito-estado|Profito-Setup'
+  } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+  if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
+  if (-not $abrio) { throw 'Abrir no arranco Profito' }
+  Write-Output 'ABRIO=OK'
 } else {
   Write-Output "CLIC $Exe"
   $p = Start-Process -FilePath $Exe -PassThru
@@ -173,7 +241,7 @@ if ($DebeFallar) {
 if (-not $ok) { throw "Esperaba $Version y lei '$leida'" }
 $wav1 = Join-Path $Dir 'motor\sonidos\clic-burbuja.wav'
 $wav2 = Join-Path $Dir 'motor\sonidos\despertar-wuhu.wav'
-if ($Modo -eq 'clic') {
+if ($Modo -eq 'clic' -or $Modo -eq 'flujo') {
   if (-not (Test-Path -LiteralPath $wav1)) { throw "Falta $wav1" }
   if (-not (Test-Path -LiteralPath $wav2)) { throw "Falta $wav2" }
 }

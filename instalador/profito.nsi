@@ -104,14 +104,6 @@ Function PrepararVentana
   Call PintarNoche
 FunctionEnd
 
-Function .onInstSuccess
-  ; Al terminar, pasa solo a la pantalla final.
-  GetDlgItem $0 $HWNDPARENT 1
-  EnableWindow $0 1
-  ShowWindow $0 ${SW_SHOW}
-  SendMessage $0 ${BM_CLICK} 0 0
-FunctionEnd
-
 ; Deja el área útil en 720x477: foto 720x405 y franja de 72.
 Function AjustarVentana
   System::Call '*(i 0, i 0, i ${CLI_W}, i ${CLI_H}) p.R0'
@@ -228,6 +220,9 @@ Function BienvenidaSalir
 FunctionEnd
 
 Function ProgresoMostrar
+  ; .onInstSuccess corre al cerrar el instalador, no al acabar la copia.
+  ; Con esto, al terminar la sección se pasa solo a la pantalla final.
+  SetAutoClose true
   FindWindow $Dialogo "#32770" "" $HWNDPARENT
   GetDlgItem $R1 $Dialogo 1006
   ShowWindow $R1 ${SW_HIDE}
@@ -308,6 +303,7 @@ Section "Profito" SecMain
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\AIProfit" "UninstallString" "$\"$INSTDIR\Desinstalar AI Profit.exe$\""
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\AIProfit" "NoModify" 1
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\AIProfit" "NoRepair" 1
+  SetAutoClose true
 SectionEnd
 
 Section "Uninstall"
