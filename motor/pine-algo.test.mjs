@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import {
-  ALGO_NOMBRE, ALGO_VERSION, FUENTE_PINE, PINE_DIR, crearAlgoTv, esElAlgo, estudiosAlgo, exprAlgo, exprMirar, exprOjos, leerFuente, planAlgo, textoAlgo,
+  ALGO_NOMBRE, ALGO_VERSION, FUENTE_PINE, PINE_DIR, crearAlgoTv, esElAlgo, estudiosAlgo, exprAlgo, exprMirar, exprOjos, formasEstudio, leerFuente, mismoEstudioId, planAlgo, textoAlgo, textoMotivo,
 } from './pine-algo.mjs';
 
 const fuente = leerFuente(FUENTE_PINE);
@@ -24,6 +24,16 @@ assert.equal(planAlgo({ enGrafico: 1, versionGuardada: '1' }), 'nada');
 assert.equal(planAlgo({ enGrafico: 1, versionGuardada: '' }), 'actualizar');
 assert.equal(planAlgo({ enGrafico: 0, versionGuardada: '1' }), 'instalar');
 assert.equal(planAlgo({ enGrafico: 2, versionGuardada: '1' }), 'deduplicar');
+const idCamp = 'script$user;4637f0d246f54b92a991cbfa83a7f992';
+const idSms = 'script$user;c372e364a273408e83cec7ca380539ca';
+assert.equal(formasEstudio(idCamp)[0], 'USER;4637f0d246f54b92a991cbfa83a7f992');
+assert.equal(formasEstudio(idSms)[0], 'USER;c372e364a273408e83cec7ca380539ca');
+assert.equal(mismoEstudioId(idCamp, 'USER;4637f0d246f54b92a991cbfa83a7f992'), true);
+assert.equal(mismoEstudioId('PUB;abc', 'script$pub;abc'), true);
+assert.equal(mismoEstudioId('STD;abc', 'Script$STD;abc'), true);
+assert.equal(formasEstudio('script$future;abc123')[0], 'FUTURE;abc123');
+assert.match(textoMotivo('unexpected study id:' + idCamp), /Lo reintento/);
+assert.match(textoMotivo('sin-broker'), /Lo reintento/);
 assert.equal(textoAlgo({ nombre: 'Ai Profit Camp Algo', estado: 'instalado', version: '1' }), 'Algo TradingView: Ai Profit Camp Algo instalado v1');
 assert.equal(textoAlgo({ nombre: 'Ai Profit Camp Algo', estado: 'pendiente' }), 'Algo TradingView: Ai Profit Camp Algo pendiente');
 assert.equal(textoAlgo({ nombre: 'Ai Profit Camp Algo', estado: 'instalando' }), 'Algo TradingView: Ai Profit Camp Algo instalando');
@@ -34,7 +44,9 @@ assert.match(expr, /getAllStudies/);
 assert.match(expr, /Ai Profit Camp Algo/);
 assert.match(expr, /pine-facade\/save\/new/);
 assert.match(expr, /pine-facade\/save\/next/);
-assert.doesNotMatch(expr, /placeOrder|modifyOrder|closePosition|editPositionBrackets|cancelOrder|setVisible|setCurrentAccount|setSymbol|activeBroker|paper_trading|positions\(|activeOrders|sin-broker|sin-posiciones/);
+assert.doesNotMatch(expr, /placeOrder|modifyOrder|closePosition|editPositionBrackets|cancelOrder|setCurrentAccount|setSymbol|activeBroker|paper_trading|positions\(|activeOrders|sin-broker|sin-posiciones/);
+assert.match(expr, /formasEstudio/);
+assert.match(exprAlgo({ source: 'x', nombre: 'Smart Money Algo', anterior: 'Smart Money Structure' }), /Smart Money Structure/);
 new vm.Script(expr);
 const mira = exprMirar({ nombre: ALGO_NOMBRE, studyId: 's1' });
 assert.match(mira, /"mirar":true/);
@@ -54,8 +66,8 @@ algo = crearAlgoTv({
   pineDir: PINE_DIR,
   evaluar: async (codigo) => {
     vistos.push(codigo);
-    if (codigo.includes('setVisible')) return { ok: true, visible: false, studyId: 's1' };
     if (codigo.includes('"mirar":true')) return { ok: true, mirar: true, enGrafico: 0, visible: null, studyId: '' };
+    if (codigo.includes('"accion":"fijar"')) return { ok: true, visible: false, studyId: 's1' };
     assert.equal(algo.estado().fase, 'instalando');
     assert.equal(algo.estado().algos.some(a => a.estado === 'instalando'), true);
     return { ok: true, estado: 'instalado', version: '1', enGrafico: 1, visible: true, studyId: 's1', scriptId: 'USER;1', plan: 'instalar' };
@@ -66,16 +78,18 @@ assert.match(algo.estado().texto, /Ai Profit Camp Algo pendiente/);
 const hecho = await algo.intentar();
 assert.match(hecho.texto, /Ai Profit Camp Algo instalado v1/);
 assert.equal(hecho.fase, 'listos');
-assert.match(hecho.texto, /Smart Money Structure instalado v1/);
+assert.match(hecho.texto, /Smart Money Algo instalado v1/);
 assert.equal(hecho.algos.length, 2);
 const estudios = vistos.filter(c => c.includes('pine-facade/save/new'));
 assert.equal(estudios.length, 2);
 assert.equal(estudios.filter(c => c.includes('"nombre":"Ai Profit Camp Algo"')).length, 1);
-assert.equal(estudios.filter(c => c.includes('"nombre":"Smart Money Structure"')).length, 1);
+assert.equal(estudios.filter(c => c.includes('"nombre":"Smart Money Algo"')).length, 1);
+assert.match(estudios.find(c => c.includes('Smart Money Algo')), /formasEstudio/);
 assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'algo-tv.json'), 'utf8')).algos['Ai Profit Camp Algo'].version, '1');
-assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'algo-tv.json'), 'utf8')).algos['Smart Money Structure'].version, '1');
-const sms = leerFuente(path.join(PINE_DIR, 'smart-money-structure.pine'));
-assert.match(sms, /indicator\("Smart Money Structure", "Smart Money Structure"/);
+assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'algo-tv.json'), 'utf8')).algos['Smart Money Algo'].version, '1');
+const sms = leerFuente(path.join(PINE_DIR, 'smart-money-algo.pine'));
+assert.match(sms, /indicator\("Smart Money Algo", "Smart Money Algo"/);
+assert.doesNotMatch(sms, /indicator\("Smart Money Structure"/);
 assert.match(sms, /\/\/@version=5/);
 assert.doesNotMatch(sms, /Findi/);
 assert.match(sms, /alertcondition\(eql_alert, 'Equal Lows', 'Equal lows detected'\)/);
@@ -122,7 +136,7 @@ assert.equal(mal.algos.every(a => a.estado === 'pendiente'), true);
 const dirYa = fs.mkdtempSync(path.join(os.tmpdir(), 'algo-ya-'));
 fs.writeFileSync(path.join(dirYa, 'algo-tv.json'), JSON.stringify({ algos: {
   'Ai Profit Camp Algo': { estado: 'instalado', version: '1', visible: true, studyId: 's1' },
-  'Smart Money Structure': { estado: 'instalado', version: '1', visible: false, studyId: 's2' },
+  'Smart Money Algo': { estado: 'instalado', version: '1', visible: false, studyId: idSms },
 } }));
 const vistosYa = [];
 const ya = crearAlgoTv({
@@ -131,14 +145,56 @@ const ya = crearAlgoTv({
   evaluar: async (codigo) => {
     vistosYa.push(codigo);
     if (!codigo.includes('"mirar":true')) throw new Error('no debía guardar');
-    const oculto = codigo.includes('Smart Money Structure');
+    const oculto = codigo.includes('Smart Money Algo');
     return { ok: true, mirar: true, enGrafico: 1, visible: !oculto, studyId: oculto ? 's2' : 's1' };
   },
 });
 const quieto = await ya.intentar();
 assert.equal(quieto.fase, null);
 assert.equal(vistosYa.some(c => c.includes('pine-facade')), false);
-assert.equal(quieto.algos.find(a => a.nombre === 'Smart Money Structure').visible, false);
+assert.equal(quieto.algos.find(a => a.nombre === 'Smart Money Algo').visible, false);
+
+const migraDir = fs.mkdtempSync(path.join(os.tmpdir(), 'algo-migra-'));
+fs.writeFileSync(path.join(migraDir, 'algo-tv.json'), JSON.stringify({ algos: {
+  'Ai Profit Camp Algo': { estado: 'instalado', version: '1', visible: true, studyId: idCamp },
+} }));
+let migra;
+const vistosMigra = [];
+migra = crearAlgoTv({
+  dir: migraDir,
+  pineDir: PINE_DIR,
+  evaluar: async (codigo) => {
+    vistosMigra.push(codigo);
+    if (codigo.includes('"mirar":true')) {
+      if (codigo.includes('Smart Money Algo')) return { ok: true, mirar: true, enGrafico: 0, visible: null, studyId: '', viejos: 1, visibleViejo: false };
+      return { ok: true, mirar: true, enGrafico: 1, visible: true, studyId: idCamp, viejos: 0, visibleViejo: null };
+    }
+    assert.equal(migra.estado().fase, 'instalando');
+    assert.match(codigo, /Smart Money Structure/);
+    assert.match(codigo, /USER;c372e364a273408e83cec7ca380539ca|formasEstudio/);
+    return { ok: true, estado: 'instalado', visible: false, studyId: idSms, scriptId: idSms, plan: 'migrar' };
+  },
+});
+const migrado = await migra.intentar();
+assert.equal(migrado.fase, 'listos');
+assert.equal(migrado.algos.find(a => a.nombre === 'Smart Money Algo').visible, false);
+assert.equal(migrado.algos.every(a => a.estado === 'instalado'), true);
+
+let rechazo;
+rechazo = crearAlgoTv({
+  dir: fs.mkdtempSync(path.join(os.tmpdir(), 'algo-id-')),
+  pineDir: PINE_DIR,
+  evaluar: async (codigo) => {
+    if (codigo.includes('"mirar":true')) return { ok: true, mirar: true, enGrafico: 0, visible: null, studyId: '', viejos: 0 };
+    assert.equal(rechazo.estado().fase, 'instalando');
+    return { ok: false, estado: 'error', motivo: 'unexpected study id:' + idCamp };
+  },
+});
+const malId = await rechazo.intentar();
+assert.equal(malId.fase, null);
+assert.match(malId.texto, /pendiente/);
+assert.match(malId.texto, /no aceptó el id del estudio/);
+assert.match(malId.algos[0].motivo, /unexpected study id:script\$user;4637f0d246f54b92a991cbfa83a7f992/);
 
 const html = fs.readFileSync(new URL('./Granja-de-Cuentas-v2.html', import.meta.url), 'utf8');
 const server = fs.readFileSync(new URL('./tradinglink.mjs', import.meta.url), 'utf8');

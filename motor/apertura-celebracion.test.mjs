@@ -38,7 +38,7 @@ assert.equal(html.includes('tocar("wuhu")'), false);
 assert.equal(html.includes('__tlClic'), false);
 assert.ok(html.includes('function play(big){if(muted||!ac||ac.state!=="running")return false;'));
 assert.ok(html.includes('function playPerdida(){'));
-assert.ok(html.includes('>v0.10.15</div>'));
+assert.ok(html.includes('>v0.10.16</div>'));
 
 assert.ok(bat.includes('--autoplay-policy=no-user-gesture-required'), 'el acceso pide autoplay');
 assert.ok(bat.includes('--app="http://localhost:8787/Granja-de-Cuentas-v2.html"'), 'abre en modo app');

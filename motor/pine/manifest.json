@@ -5,8 +5,9 @@
     "archivo": "ai-profit-camp-algo.pine"
   },
   {
-    "nombre": "Smart Money Structure",
+    "nombre": "Smart Money Algo",
     "version": "1",
-    "archivo": "smart-money-structure.pine"
+    "archivo": "smart-money-algo.pine",
+    "anterior": "Smart Money Structure"
   }
 ]

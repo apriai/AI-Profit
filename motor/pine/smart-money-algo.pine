@@ -1,7 +1,7 @@
 // Ai Profit Camp (Copyright)
 
 //@version=5
-indicator("Smart Money Structure", "Smart Money Structure"
+indicator("Smart Money Algo", "Smart Money Algo"
   , overlay = true
   , max_labels_count = 500
   , max_lines_count = 500

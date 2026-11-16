@@ -49,7 +49,8 @@ assert.ok(bat.includes('--no-first-run'));
 assert.ok(bat.includes('--no-default-browser-check'));
 assert.ok(bat.includes('start "" "http://localhost:8787/Granja-de-Cuentas-v2.html"'), 'último recurso: la dirección');
 const eleccion = bat.indexOf('navegador-granja.mjs');
+const respaldo = bat.indexOf('msedge.exe');
 const reserva = bat.indexOf('start "" "http://localhost:8787/Granja-de-Cuentas-v2.html"');
-assert.ok(eleccion > 0 && eleccion < reserva, 'primero el predeterminado, al final la dirección');
+assert.ok(eleccion > 0 && respaldo > eleccion && respaldo < reserva, 'si falta el ayudante, igual abre Chrome o Edge en ventana');
 
 console.log('navegador-granja ok');

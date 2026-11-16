@@ -22,6 +22,43 @@ export function estudiosAlgo(lista) {
 
 // nada: ya está y la versión coincide. actualizar: está, hay que reescribir el script sin duplicarlo.
 // instalar: no está en el gráfico. deduplicar: hay más de uno y la versión ya es la buena.
+// script$user;<hash> (Desktop 3.5.0), USER;<hash>, PUB;, STD; y Script$KIND;<hash> son el mismo estudio.
+export function formasEstudio(id) {
+  const raw = String(id || '').trim();
+  if (!raw) return [];
+  const out = [];
+  const add = (x) => { const s = String(x || '').trim(); if (s && !out.includes(s)) out.push(s); };
+  let kind = '';
+  let hash = '';
+  let m = /^script\$([A-Za-z0-9]+)[;:]([A-Za-z0-9]+)$/i.exec(raw);
+  if (!m) m = /^Script\$([A-Za-z0-9]+)[;:]([A-Za-z0-9]+)$/.exec(raw);
+  if (!m) m = /^([A-Za-z0-9]+)[;:]([A-Za-z0-9]+)$/.exec(raw);
+  if (m) { kind = m[1].toUpperCase(); hash = m[2]; }
+  if (kind && hash) {
+    add(`${kind};${hash}`);
+    add(`Script$${kind};${hash}`);
+    add(`script$${kind.toLowerCase()};${hash}`);
+    if (raw !== `${kind};${hash}` && raw !== `Script$${kind};${hash}` && raw !== `script$${kind.toLowerCase()};${hash}`) add(raw);
+  } else add(raw);
+  return out;
+}
+
+export function mismoEstudioId(a, b) {
+  if (a == null || b == null || a === '' || b === '') return false;
+  if (String(a) === String(b)) return true;
+  const formas = new Set(formasEstudio(a));
+  return formasEstudio(b).some(x => formas.has(x));
+}
+
+export function textoMotivo(motivo) {
+  const m = String(motivo || '').trim();
+  if (!m) return '';
+  if (m === 'sin-tv' || /9222|ECONN|fetch failed|No encuentro/i.test(m)) return 'TradingView no está abierto con el puerto 9222. Lo reintento.';
+  if (/unexpected study id/i.test(m)) return 'TradingView no aceptó el id del estudio. Lo reintento.';
+  if (/sin-broker/i.test(m)) return 'No pude leer el gráfico. Lo reintento.';
+  return m.length > 180 ? m.slice(0, 180) : m;
+}
+
 export function planAlgo({ enGrafico = 0, versionGuardada = '', version = ALGO_VERSION } = {}) {
   const n = Number(enGrafico) || 0;
   if (n > 1 && versionGuardada === version) return 'deduplicar';
@@ -35,7 +72,8 @@ export function textoAlgo(item) {
   if (item && item.estado === 'instalado') return `Algo TradingView: ${nombre} instalado v${item.version || ''}`;
   if (item && item.estado === 'instalando') return `Algo TradingView: ${nombre} instalando`;
   if (item && item.estado === 'error') return `Algo TradingView: ${nombre} error`;
-  return `Algo TradingView: ${nombre} pendiente`;
+  const por = textoMotivo(item && item.motivo);
+  return por ? `Algo TradingView: ${nombre} pendiente. ${por}` : `Algo TradingView: ${nombre} pendiente`;
 }
 
 export function textoLista(algos) {
@@ -49,9 +87,10 @@ export function cargarManifiesto(dir) {
     const nombre = String(item && item.nombre || '').trim();
     const version = String(item && item.version || '').trim();
     const archivo = String(item && item.archivo || '').trim();
+    const anterior = String(item && item.anterior || '').trim();
     if (!nombre || !version || !archivo) throw new Error('entrada incompleta en el manifiesto');
     if (archivo.includes('..') || path.isAbsolute(archivo)) throw new Error('ruta de indicador no permitida');
-    return { nombre, version, archivo };
+    return { nombre, version, archivo, anterior };
   });
 }
 
@@ -103,33 +142,39 @@ function todos(){
   return out;
 }
 function lista(){
-  return todos().filter(function(s){return mismo(s.name) || (D.studyId && s.id===D.studyId)});
+  return todos().filter(function(s){return mismo(s.name) || (D.studyId && (s.id===D.studyId || (typeof mismoEstudioId==='function' && mismoEstudioId(s.id, D.studyId))))});
 }
 `;
 
+const IDS_JS = `${formasEstudio.toString()}\n${mismoEstudioId.toString()}\n`;
+
 // Solo lee el gráfico. No guarda, no añade y no abre el editor.
-export function exprMirar({ nombre = ALGO_NOMBRE, studyId = '' } = {}) {
-  const datos = JSON.stringify({ nombre, studyId: String(studyId || ''), mirar: true });
+export function exprMirar({ nombre = ALGO_NOMBRE, studyId = '', anterior = '' } = {}) {
+  const datos = JSON.stringify({ nombre, studyId: String(studyId || ''), mirar: true, anterior: String(anterior || '') });
   return `(async function(){
 var D=${datos};
 ${ESCANEO}
+${IDS_JS}
+function porNombre(n){return todos().filter(function(s){return String(s.name||'').trim().toLowerCase()===String(n||'').toLowerCase()});}
 var estudios=lista();
 var primero=estudios[0];
-return {ok:true, mirar:true, enGrafico:estudios.length, visible:estudios.length?(primero.oculto?false:true):null, studyId:primero&&primero.id||''};
+var viejos=D.anterior?porNombre(D.anterior).filter(function(s){return !mismo(s.name);}):[];
+return {ok:true, mirar:true, enGrafico:estudios.length, visible:estudios.length?(primero.oculto?false:true):null, studyId:primero&&primero.id||'', viejos:viejos.length, visibleViejo:viejos.length?!viejos[0].oculto:null};
 })()`;
 }
 
-export function exprAlgo({ source, nombre = ALGO_NOMBRE, version = ALGO_VERSION, versionGuardada = '', studyIdGuardado = '' } = {}) {
-  const datos = JSON.stringify({ source: String(source || ''), nombre, version, versionGuardada: String(versionGuardada || ''), studyId: String(studyIdGuardado || '') });
+export function exprAlgo({ source, nombre = ALGO_NOMBRE, version = ALGO_VERSION, versionGuardada = '', studyIdGuardado = '', anterior = '' } = {}) {
+  const datos = JSON.stringify({ source: String(source || ''), nombre, version, versionGuardada: String(versionGuardada || ''), studyId: String(studyIdGuardado || ''), anterior: String(anterior || '') });
   return `(async function(){
 var D=${datos};
 ${ESCANEO}
-async function scripts(){
+${IDS_JS}
+async function scriptsDe(nombre){
   var r=await fetch(${JSON.stringify(FACADE + '/list?filter=saved')},{credentials:'include'});
   if(!r.ok) throw new Error('lista '+r.status);
   var j=await r.json();
   var arr=Array.isArray(j)?j:(j&&(j.results||j.data))||[];
-  return arr.filter(function(s){return mismo(s&&(s.scriptName||s.scriptTitle||s.name||s.title))});
+  return arr.filter(function(s){return String(s&&(s.scriptName||s.scriptTitle||s.name||s.title)||'').trim().toLowerCase()===String(nombre||'').toLowerCase()});
 }
 function idDe(s){return s&&(s.scriptIdPart||s.id)&&String(s.scriptIdPart||s.id)||''}
 async function guardar(id){
@@ -146,18 +191,27 @@ async function guardar(id){
 async function poner(id){
   var c=chart(); if(!c||typeof c.createStudy!=='function') throw new Error('sin gráfico');
   var nombres=[D.nombre];
-  if(id) nombres.push(id, 'Script$'+id);
+  var formas=[]; try{ formas=formasEstudio(id)||[]; }catch(e){ formas=[]; }
+  for(var i=0;i<formas.length;i++) if(nombres.indexOf(formas[i])<0) nombres.push(formas[i]);
   var ultimo=null;
-  for(var i=0;i<nombres.length;i++){
-    try{ var sid=await c.createStudy(nombres[i], true, false); if(sid!=null) return String(sid); }catch(e){ultimo=e}
+  for(var j=0;j<nombres.length;j++){
+    try{ var sid=await c.createStudy(nombres[j], true, false); if(sid!=null) return String(sid); }catch(e){ ultimo=e; }
   }
   throw ultimo||new Error('no se pudo añadir al gráfico');
 }
+function quitarIds(items){
+  var c=chart(); if(!c||typeof c.removeEntity!=='function') return;
+  for(var i=0;i<items.length;i++){ try{ if(items[i].id) c.removeEntity(items[i].id); }catch(e){} }
+}
 function quitarExtras(items){
-  var c=chart(); if(!c||typeof c.removeEntity!=='function') return items.length;
-  for(var i=1;i<items.length;i++){ try{ if(items[i].id) c.removeEntity(items[i].id); }catch(e){} }
+  quitarIds(items.slice(1));
   return lista().length;
 }
+function ocultarEstudio(id){
+  if(!id) return;
+  try{ var c=chart(); var st=c&&c.getStudyById&&c.getStudyById(id); if(st&&typeof st.setVisible==='function') st.setVisible(false); }catch(e){}
+}
+function porNombre(n){return todos().filter(function(s){return String(s.name||'').trim().toLowerCase()===String(n||'').toLowerCase()});}
 function abrirEditor(){
   var bar=window.TradingView&&window.TradingView.bottomWidgetBar;
   var claves=['pine-editor','pine_editor','scriptEditor','script-editor','pine'];
@@ -186,14 +240,20 @@ function escribirEditor(){
   return false;
 }
 return (async function(){
+  var viejos=D.anterior?porNombre(D.anterior).filter(function(s){return !mismo(s.name);}):[];
   var estudios=lista();
-  if(estudios.length>0 && D.versionGuardada===D.version && estudios.length<2) return {ok:true, estado:'instalado', version:D.version, enGrafico:estudios.length, plan:'nada', visible:!estudios[0].oculto, studyId:estudios[0].id||''};
-  if(estudios.length>1 && D.versionGuardada===D.version){
+  if(estudios.length>0 && D.versionGuardada===D.version && estudios.length<2 && !viejos.length) return {ok:true, estado:'instalado', version:D.version, enGrafico:estudios.length, plan:'nada', visible:!estudios[0].oculto, studyId:estudios[0].id||''};
+  if(estudios.length>1 && D.versionGuardada===D.version && !viejos.length){
     var quedan=quitarExtras(estudios);
     return {ok:quedan<=1, estado:quedan<=1?'instalado':'error', version:D.version, enGrafico:quedan, plan:'deduplicar'};
   }
   var id='';
-  try{ var ya=await scripts(); if(ya[0]) id=idDe(ya[0]); }catch(e){ id=''; }
+  try{
+    var ya=await scriptsDe(D.nombre);
+    var viejosGuardados=D.anterior?await scriptsDe(D.anterior):[];
+    if(ya[0]) id=idDe(ya[0]);
+    else if(viejosGuardados[0]) id=idDe(viejosGuardados[0]);
+  }catch(e){ id=''; }
   var guardado='';
   try{ guardado=await guardar(id); }catch(eGuardar){
     abrirEditor();
@@ -213,8 +273,15 @@ return (async function(){
     quitarExtras(tras);
     tras=lista();
   }
+  if(viejos.length) quitarIds(viejos);
+  tras=lista();
+  if(viejos.length && viejos[0].oculto && tras[0] && tras[0].id) ocultarEstudio(tras[0].id);
+  tras=lista();
+  if(!tras.length && studyId) tras=[{id:String(studyId), name:D.nombre, oculto:!!(viejos[0]&&viejos[0].oculto)}];
   if(!tras.length) return {ok:false, estado:'error', motivo:'no quedó en el gráfico', enGrafico:0, scriptId:guardado||id};
-  return {ok:true, estado:'instalado', version:D.version, enGrafico:1, visible:tras[0].oculto?false:true, studyId:tras[0].id||studyId, scriptId:guardado||id, plan:estudios.length?'actualizar':'instalar'};
+  var visibleFinal=!tras[0].oculto;
+  if(viejos.length && viejos[0].oculto) visibleFinal=false;
+  return {ok:true, estado:'instalado', version:D.version, enGrafico:1, visible:visibleFinal, studyId:tras[0].id||studyId, scriptId:guardado||id, plan:viejos.length?'migrar':(estudios.length?'actualizar':'instalar')};
 })();
 })()`;
 }
@@ -394,18 +461,19 @@ export function crearAlgoTv({
   }
   async function uno(m) {
     const prev = memoria.algos[m.nombre] || {};
-    const sondeo = await evaluar(exprMirar({ nombre: m.nombre, studyId: prev.studyId || '' }));
+    const sondeo = await evaluar(exprMirar({ nombre: m.nombre, studyId: prev.studyId || '', anterior: m.anterior || '' }));
     if (!sondeo || sondeo.mirar !== true) {
       publicar(m.nombre, { estado: 'pendiente', motivo: (sondeo && sondeo.motivo) || 'sin-tv' }, m.version);
       return { trabajo: false, fallo: false, sinTv: true };
     }
     const plan = planAlgo({ enGrafico: sondeo.enGrafico, versionGuardada: prev.version || '', version: m.version });
-    if (plan === 'nada') {
+    const migrar = (sondeo.viejos || 0) > 0;
+    if (plan === 'nada' && !migrar) {
       const visible = sondeo.visible === true ? true : sondeo.visible === false ? false : null;
       publicar(m.nombre, { estado: 'instalado', motivo: '', visible, studyId: sondeo.studyId || prev.studyId || '' }, m.version);
       return { trabajo: false, fallo: false };
     }
-    const anuncia = plan === 'instalar' || plan === 'actualizar';
+    const anuncia = plan === 'instalar' || plan === 'actualizar' || migrar;
     if (anuncia) {
       memoria.fase = 'instalando';
       memoria.faseHasta = 0;
@@ -417,6 +485,7 @@ export function crearAlgoTv({
       r = await evaluar(exprAlgo({
         source, nombre: m.nombre, version: m.version,
         versionGuardada: prev.version || '', studyIdGuardado: prev.studyId || sondeo.studyId || '',
+        anterior: m.anterior || '',
       }));
     } catch (e) {
       const msg = String(e && e.message || e);
