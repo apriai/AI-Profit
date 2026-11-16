@@ -19,8 +19,9 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cualquier cuenta Lucid (LFE o LFF) se puede operar** aunque no exista `real-allowlist.json`, esté vacío o no se pueda leer. Siguen la confirmación, la cuenta activa, el tope de contratos, la pérdida del día y no operar con una posición abierta. Una cuenta que no sea Lucid ni Paper sigue bloqueada.
 - **El pico del max loss usa el cierre de las 16:00 ET.** Sube con el saldo leído de las 16:00 a las 18:00, que es el hueco en que la sesión ya terminó. Un saldo de las 18:00 a las 15:59 no lo sube. Si la granja estaba apagada en ese hueco, al volver se usa el último saldo guardado.
 - **`orders.mjs` sigue apagado y en simulación.** Su reloj usa el mismo corte: de las 16:00 a las 18:00 no abre y pide estar plano, y el conteo de «un trade hoy» usa el día de la sesión. No coloca órdenes.
+- **La granja ya no cierra sola por la hora.** Se quitó el corte de las 4:45 PM ET. La posición se queda con su stop y su objetivo, y el colchón sigue vigilándola. El botón Detener sigue cerrando a mano.
 ### Notas
-- No abre, no mueve y no cierra órdenes. El cierre automático del colchón en marcha sigue a las 4:45 PM ET.
+- No abre, no mueve y no cierra órdenes por su cuenta. `orders.mjs` sigue apagado y en simulación.
 
 ## [0.10.12] — 2026-11-16
 ### Corregido

@@ -5757,7 +5757,7 @@ async function informe(t){const my=informe.n=(informe.n||0)+1;v.classList.add("d
   DU=s=>{s=Math.round(+s);if(!(s>=0))return"—";const h=Math.floor(s/3600),m=Math.floor(s%3600/60),r=s%60;return h?h+" h "+m+" min":m?m+" min "+r+" s":r+" s"},
   TT=x=>x?new Date(x).toLocaleString("es",{timeZone:"America/New_York",day:"numeric",month:"short",hour:"numeric",minute:"2-digit",second:"2-digit"})+" ET":"—",
   AC=c=>{c=String(c??"");const m=c.match(/^(.{4})[.…](.{3})$/);return m?m[1]+"…"+m[2]:mk(c)},
-  WHY={"Stop loss":"Salió por el stop","Take profit":"Llegó al objetivo (take profit)","Detenido manualmente":"Lo detuviste a mano","Posición cerrada":"Se cerró la posición","Cierre 4:45 PM ET":"Cierre automático de las 4:45 PM ET","Error":"Terminó por un error"};
+  WHY={"Stop loss":"Salió por el stop","Take profit":"Llegó al objetivo (take profit)","Detenido manualmente":"Lo detuviste a mano","Posición cerrada":"Se cerró la posición","Cierre 4:45 PM ET":"Cierre por hora de una versión anterior. La granja ya no cierra sola.","Error":"Terminó por un error"};
  const bindTop=()=>{v.querySelector(".close").onclick=()=>{v.classList.remove("open");v.classList.remove("det")};v.querySelector(".back").onclick=list};
  const draw=D=>{const ok=!!(D&&D.ok),f=ok?D.fin:null,aj=f&&f.ajusteFill||null,movs=ok?(D.movs||[]).filter(x=>x.ok!==false):[],pasos=f&&f.pasos||[],lt=f&&f.latencia||{};
   const en=t.entrada??(f&&f.entrada),sa=t.salida,op=t.abierta||(f&&f.abiertaEn),cl=t.at||(f&&f.cerradaEn),sg=op&&cl?(Date.parse(cl)-Date.parse(op))/1e3:(f&&f.duracionSeg);

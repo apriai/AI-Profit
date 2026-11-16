@@ -106,7 +106,7 @@ Parámetros comunes: `SL_USD`, `TP_USD` (bracket en $), `STEPS` (escalones `{tri
    Si el precio ya está puesto (`ya:true`), no envía nada: así es idempotente. Nunca cancela ni recrea.
 10. **Guarda de flat.** Se declara flat con 3 lecturas vacías seguidas, al menos 1 s desde la primera y **sin órdenes hijas SL/TP activas**. Si siguen activas más de 30 s, salta un aviso. Una lectura vacía aislada queda como `anomalia lectura_vacia_transitoria`.
 11. **Cambio de cuenta en medio de la prueba.** Si la cuenta activa cambia, el motor deja de vigilar **sin cerrar nada** y muestra una alerta.
-12. **4:45 PM ET** (FLAT_BY_MIN): cierra con `flatten` (`closePosition`) en paper y en real.
+12. **La hora no cierra el trade.** El bucle no aplana por reloj. La posición se queda con su stop y su objetivo, y el colchón sigue vigilándola. Cerrar a mano es el botón Detener.
 13. **Fin.** `summarize()` escribe `colchon-resumen.json`, el evento `fin_trade` y `reportes\<día>.md`.
 
 ## 7. Paper frente a Tradovate
@@ -133,7 +133,7 @@ Parámetros comunes: `SL_USD`, `TP_USD` (bracket en $), `STEPS` (escalones `{tri
 - **Lucid:** LFE = evaluación, LFF = fondeada (`/^LF[EF]\d+$/`).
 - **`real-allowlist.json`:** si no existe, está vacío o no se puede leer, todas las cuentas Lucid (LFE/LFF) quedan permitidas. Una lista escrita en el archivo ya no las bloquea.
 - **Para operar en real** hace falta `confirmReal:true` (la UI lo pide), la cuenta activa visible y que no haya posición ni órdenes. La UI muestra la insignia roja «CUENTA REAL». Una cuenta que no sea Lucid ni Paper sigue bloqueada.
-- El cierre de las 4:45 PM se aplica también a las cuentas reales.
+- La hora no cierra una cuenta real ni una de paper. El stop, el objetivo y el colchón siguen hasta el botón Detener.
 
 ## 11. Pitfalls conocidos
 - **TradingView abierto desde la barra de tareas o el menú Inicio arranca SIN 9222.** El motor y las lecturas fallan con `ECONNREFUSED 127.0.0.1:9222`. Solución: cerrar todos los procesos de TradingView y usar el acceso **AI Profit** o `abrir-tradingview.bat`.
