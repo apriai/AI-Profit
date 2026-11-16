@@ -10,6 +10,8 @@ import { estrategiasPropias } from './estrategias-propias.mjs';
 import { execFile } from 'node:child_process';
 import { dataDir, ROOT, HTML, TV_CLI } from './rutas.mjs';
 import { rulesFor, maxQtyFor } from './account-size.mjs';
+import { textoVersion } from './version-api.mjs';
+import { cerrarSesion } from './pnl-sesion.mjs';
 const DIR = dataDir();
 const TV = TV_CLI;
 const PORT = 8787, EVERY_MS = 5 * 60 * 1000;
@@ -32,7 +34,7 @@ function applyPlan(a) {
 
 const num = s => +String(s).replace(/[^0-9.-]/g, '');
 let state = { updated: null, accounts: {}, error: null, daily: {} };
-// Dia de trading (ET): el dia termina a las 16:00 ET (fin de las sesiones de Nueva York) -> desde las 16:00 cuenta como el dia siguiente; sabado/domingo -> lunes. Una sola regla para todo: diaFarm() en colchon.mjs.
+// Dia de trading (ET): sesión 18:00 → 16:00 del día siguiente, etiquetada con la fecha de las 16:00. De 16:00 a 18:00 pasa a la sesión siguiente. Una sola regla: diaFarm() en colchon.mjs.
 const SOD_FILE = path.join(DIR, 'sod.json');
 let sod = { accounts: {}, daily: {} }; try { sod = { accounts: {}, daily: {}, ...JSON.parse(fs.readFileSync(SOD_FILE, 'utf8')) }; } catch {}
 // Semilla: al reiniciar, las cuentas no activas no se releen (p.ej. con pausa-lectura.flag); se publica su ÚLTIMO saldo real conocido (sod.lastBal) marcado stale para que la granja pueda marcar quemada una fondeada.
@@ -57,12 +59,12 @@ function save(c) {
     // cambio de día: se conservan peak y breachedAt (quema pegajosa; −$600 + −$600 en 2 días = −$1,200 → quemada)
     // cuenta de EVALUACION vista por primera vez en una granja que ya tenia cuentas: empieza el dia en el saldo inicial (25,000), no en la primera lectura (que puede traer una posicion abierta con P&L flotante). Instalacion nueva (sod vacio): se mantiene la primera lectura.
     const nuevaEval = !s && /^LFE/.test(c.id) && Object.keys(sod.accounts).length > 0;
-    if (!s || s.day !== day) sod.accounts[c.id] = nuevaEval ? { day, bal: rulesOf(c.id).start, inicio: rulesOf(c.id).start, lastBal: a.balance } : { ...(s || {}), ...(s && s.lastBal != null && ![16, 17].includes(horaET()) ? { peak: Math.max(rulesOf(c.id).start, s.peak ?? 0, s.lastBal) } : {}), day, bal: s && s.lastBal != null ? s.lastBal : a.balance, lastBal: a.balance, ...(s && s.day && s.lastBal != null && s.bal != null ? { prev: { day: s.day, pnl: Math.round((s.lastBal - s.bal) * 100) / 100 } } : {}) };
+    if (!s || s.day !== day) sod.accounts[c.id] = nuevaEval ? { day, bal: rulesOf(c.id).start, inicio: rulesOf(c.id).start, lastBal: a.balance } : { ...(s || {}), ...(s && s.lastBal != null && ![16, 17].includes(horaET()) ? { peak: Math.max(rulesOf(c.id).start, s.peak ?? 0, s.lastBal) } : {}), day, bal: s && s.lastBal != null ? s.lastBal : a.balance, lastBal: a.balance, ...(s && s.day && s.lastBal != null && s.bal != null ? { prev: { day: s.day, pnl: netoSesionGuardado(s.day, c.id) ?? Math.round((s.lastBal - s.bal) * 100) / 100 } } : {}) };
     else s.lastBal = a.balance;
     sod.accounts[c.id].readAt = a.readAt;
     sod.accounts[c.id].lastAt = a.readAt;
-    a.startOfDay = sod.accounts[c.id].bal; a.dayPnl = Math.round((a.balance - a.startOfDay) * 100) / 100; a.tradingDay = day; applyPlan(a);
-    sod.daily[day] = Object.values(state.accounts).filter(x => x.tradingDay === day && x.dayPnl != null).reduce((t, x) => t + x.dayPnl, 0);
+    a.startOfDay = sod.accounts[c.id].bal; a.dayPnl = pnlDelDia(c.id, a.balance, a.startOfDay); a.tradingDay = day; applyPlan(a);
+    sod.daily[day] = Math.round(Object.values(state.accounts).filter(x => x.tradingDay === day && x.dayPnl != null).reduce((t, x) => t + x.dayPnl, 0) * 100) / 100;
     try { fs.writeFileSync(SOD_FILE, JSON.stringify(sod, null, 2)); } catch {}
     state.daily = sod.daily;
   }
@@ -84,7 +86,7 @@ function riesgo(a) { if (!a || a.balance == null) return; applyPlan(a); const R 
 // Cuentas vivas que no se leyeron en este ciclo (p. ej. pausa-lectura.flag activo o servidor reiniciado): usar el último saldo leído (sod.json)
 function rellenar(live) { for (const a of Object.values(state.accounts)) if (a.floor == null) riesgo(a); for (const id of live || []) { if (state.accounts[id] || !/^LF[EF]/.test(id)) continue; const s = sod.accounts[id]; if (!s || s.lastBal == null) continue;
   const a = state.accounts[id] = { id, type: typeOf(id), balance: s.lastBal, equity: s.lastBal, profit: 0, readAt: s.lastAt || null, stale: true, tradingDay: s.day };
-  if (s.day === tradingDay()) { a.startOfDay = s.bal; a.dayPnl = Math.round((s.lastBal - s.bal) * 100) / 100; } applyPlan(a); riesgo(a); } }
+  if (s.day === tradingDay()) { a.startOfDay = s.bal; a.dayPnl = pnlDelDia(id, s.lastBal, s.bal); } applyPlan(a); riesgo(a); } }
 let cycling = false;
 async function cycle() {
   if (cycling) return; cycling = true;
@@ -147,6 +149,38 @@ function tradesFarm(dia) { let L = []; try { L = fs.readFileSync(path.join(DIR, 
 const HDIR = path.join(DIR, 'historial');
 const hKey = t => `${t.at}|${t.direccion}|${t.tamano}`;
 function histLeer(dia) { try { return JSON.parse(fs.readFileSync(path.join(HDIR, `${dia}.json`), 'utf8')); } catch { return null; } }
+function netoSesionGuardado(dia, id) {
+  const h = histLeer(dia); if (!h || !h.cuentas) return null;
+  const keys = Object.keys(h.cuentas); if (!keys.length) return null;
+  let elegidas = keys;
+  if (id) { const m = maskId(id); const hit = keys.filter(k => k === id || k === m); if (hit.length) elegidas = hit; else if (keys.length !== 1) return null; }
+  const trades = elegidas.flatMap(k => (h.cuentas[k] && h.cuentas[k].trades) || []); if (!trades.length) return null;
+  const ses = cerrarSesion(trades, {}); return typeof ses.neto === 'number' ? ses.neto : null;
+}
+function pnlDelDia(id, balance, inicioLectura) {
+  const n = netoSesionGuardado(tradingDay(), id);
+  if (n != null) return n;
+  if (typeof balance === 'number' && typeof inicioLectura === 'number') return Math.round((balance - inicioLectura) * 100) / 100;
+  return null;
+}
+function publicarDia(dia, id, neto) {
+  if (typeof neto !== 'number') return;
+  for (const a of Object.values(state.accounts)) if (a.id === id || maskId(a.id) === id) { a.dayPnl = neto; a.tradingDay = dia; }
+  sod.daily[dia] = Math.round(Object.values(state.accounts).filter(x => x.tradingDay === dia && x.dayPnl != null).reduce((t, x) => t + x.dayPnl, 0) * 100) / 100;
+  state.daily = sod.daily;
+}
+function conNeto(r, id) {
+  if (!r || !Array.isArray(r.trades)) return r;
+  const ses = cerrarSesion(r.trades, {});
+  const base = String(r.fuente || '').replace(/ · neto \([^)]*\)$/, '');
+  publicarDia(r.dia, id, ses.neto);
+  return { ...r, trades: ses.trades, bruto: ses.bruto, total: ses.neto, totalNeto: true, saldoDia: ses.neto, resumen: ses.resumen, ganados: ses.resumen.ganados, n: ses.resumen.n, fuente: base ? `${base} · neto (${ses.fuente})` : `neto (${ses.fuente})` };
+}
+function aplicarNetoGuardado() {
+  const day = tradingDay(); let cambio = false;
+  for (const a of Object.values(state.accounts)) { const n = netoSesionGuardado(day, a.id); if (n == null) continue; a.dayPnl = n; a.tradingDay = day; cambio = true; }
+  if (cambio) { sod.daily[day] = Math.round(Object.values(state.accounts).filter(x => x.tradingDay === day && x.dayPnl != null).reduce((t, x) => t + x.dayPnl, 0) * 100) / 100; state.daily = sod.daily; }
+}
 function histGuardar(r) { if (!r || !r.cuenta || !Array.isArray(r.trades)) return; try { fs.mkdirSync(HDIR, { recursive: true });
   const h = histLeer(r.dia) || { dia: r.dia, cuentas: {} }; const c = h.cuentas[r.cuenta] ||= { trades: [] }; const m = new Map(c.trades.map(t => [hKey(t), t]));
   for (const t of r.trades) if (t.fuente === 'broker') m.set(hKey(t), { ...(m.get(hKey(t)) || {}), ...t, cuenta: r.cuenta });
@@ -160,15 +194,14 @@ function histDia(dia, f) { const h = histLeer(dia); if (!h) return null; const c
 const diaVivo = d => d === diaFarm() || d === diaFarm(Date.now() - 36e5);
 async function tradesDe(dia) { const r = await tradesDe0(dia); if (diaVivo(dia) && r.fuente && /bróker/.test(r.fuente) && !/^historial/.test(r.fuente)) histGuardar(r); return r; }
 async function tradesDe0(dia) { const f = tradesFarm(dia); const b = diaVivo(dia) ? await brokerExecs() : null;
-  if (!b || !b.ex) { const h = histDia(dia, f); if (h) return h; f.fuente = 'informes de la granja (estimado; sin ejecuciones del bróker)'; return f; }
+  if (!b || !b.ex) { const h = histDia(dia, f); if (h) return conNeto(h, h.cuenta); f.fuente = 'informes de la granja (estimado; sin ejecuciones del bróker)'; return conNeto(f); }
   const rt = roundTrips(b.ex).filter(t => diaFarm(Date.parse(t.at)) === dia);
   const farm = [...f.trades]; const out = rt.map(t => { const k = farm.findIndex(x => Math.abs(Date.parse(x.at) - Date.parse(t.at)) < 15000 && x.direccion === t.direccion);
     const m = k >= 0 ? farm.splice(k, 1)[0] : null; return { ...t, aprox: t.fuente === 'broker' ? false : !t.neto, cuenta: maskId(b.cuenta), modo: m ? m.modo : null, estrategia: m ? m.estrategia : 'Manual / fuera de la granja', motivo: m ? m.motivo : null, stopMovido: m ? m.stopMovido : null, informe: m ? m.informe : null, granja: !!m, pnlGranja: m ? m.pnl : null }; });
   for (const m of farm) out.push({ ...m, fuente: 'granja', granja: true });
   out.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)); const v = out.filter(t => typeof t.pnl === 'number');
-  const acc = Object.values(state.accounts).find(a => a.id === b.cuenta);
-  return { dia, total: Math.round(v.reduce((a, t) => a + t.pnl, 0) * 100) / 100, totalNeto: v.every(t => t.neto !== false), saldoDia: acc && acc.tradingDay === dia ? acc.dayPnl : (acc && sod.accounts[acc.id] && sod.accounts[acc.id].prev && sod.accounts[acc.id].prev.day === dia ? sod.accounts[acc.id].prev.pnl : null), n: out.length, ganados: v.filter(t => t.pnl > 0).length, trades: out, dias: f.dias, cuenta: maskId(b.cuenta),
-    fuente: 'ejecuciones reales del bróker (TradingView)' + (v.every(t => t.neto !== false) ? ', netas de comisiones' : ', P&L bruto sin comisiones') }; }
+  return conNeto({ dia, total: Math.round(v.reduce((a, t) => a + t.pnl, 0) * 100) / 100, n: out.length, ganados: v.filter(t => t.pnl > 0).length, trades: out, dias: f.dias, cuenta: maskId(b.cuenta),
+    fuente: 'ejecuciones reales del bróker (TradingView)' }, b.cuenta); }
 function diasHist() { try { return fs.readdirSync(HDIR).filter(f => /^\d{4}-\d{2}-\d{2}\.json$/.test(f)).map(f => f.slice(0, 10)); } catch { return []; } }
 function diasConTrades() { try { return [...new Set(fs.readdirSync(path.join(DIR, 'reportes')).map(f => (f.match(/(\d{4}-\d{2}-\d{2})\.md$/) || [])[1]).filter(Boolean))].sort().reverse(); } catch { return []; } }
 
@@ -285,6 +318,7 @@ async function conexion() { if (conn.v && Date.now() - conn.at < 10000) return c
   conn = { at: Date.now(), v: { servidor: true, tradingview: cdp, tradovate: tdv, broker, real, cuenta, lecturaOk: !state.error, actualizado: state.updated } }; return conn.v; }
 const negocioH = negocio({ dir: DIR, port: PORT, day: () => diaFarm() }); // /api/negocio: copia del historial del Negocio (negocio.json)
 const propiasH = estrategiasPropias({ port: PORT }); // /api/estrategias-propias: estrategias de esta computadora (raíz, no se sube)
+aplicarNetoGuardado();
 http.createServer((q, r) => {
   if (propiasH(q, r)) return;
   if (negocioH(q, r)) return;
@@ -322,6 +356,12 @@ http.createServer((q, r) => {
     else if (q.url==='/cancel') out={ok: orders.cancel(j.id)};
     else out={ok:false,err:['ruta desconocida']};
     console.log(new Date().toLocaleTimeString(), q.url, JSON.stringify(out)); r.writeHead(200,{'content-type':'application/json'}); r.end(JSON.stringify(out)); }); return; }
+  if (q.method === 'GET' && (q.url === '/api/version' || q.url.startsWith('/api/version?'))) {
+    const t = textoVersion(path.join(ROOT, 'VERSION'));
+    if (!t) { r.writeHead(204, { 'cache-control': 'no-store' }); return r.end(); }
+    r.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+    return r.end(t);
+  }
   if (q.method === 'GET' && q.url.startsWith('/sonidos/')) {
     const nombre = path.basename(q.url.split('?')[0]);
     if (nombre === 'clic-burbuja.wav' || nombre === 'despertar-wuhu.wav') {

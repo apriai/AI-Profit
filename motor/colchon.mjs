@@ -1,5 +1,5 @@
 import { getStrategy, listStrategies, DEFAULT_STRATEGY, paramsForAccount, accountPlanSize, rulesFor, maxQtyFor } from './strategies.mjs';
-// TradingLink - "Colchón" (stop-to-profit). Paper/Demo, y cuentas reales Lucid (LFE/LFF) SOLO si están en real-allowlist.json, con confirmReal (el motor puede activarla con setCurrentAccount si no hay trades/órdenes abiertas).
+// TradingLink - "Colchón" (stop-to-profit). Paper/Demo, y cuentas Lucid (LFE/LFF) con confirmReal (el motor puede activarla con setCurrentAccount si no hay trades/órdenes abiertas). Sin real-allowlist.json no se bloquean.
 // La IA nunca coloca/modifica/cierra órdenes: solo el usuario arranca una prueba desde la Granja.
 // Servidor: import { colchon } from './colchon.mjs'  -> colchon.start({side,symbol,qty}), colchon.stop(), colchon.status()
 // CLI:      node colchon.mjs [--paper] [--short] [--mnq]   |   node colchon.mjs --selftest
@@ -39,9 +39,21 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // ---- Gate de seguridad ----
 // cuenta elegible para la prueba: tipo demo/paper, nunca live, nunca Lucid (LFE/LFF/lucid)
 export function accountAllowed(a, broker = '') { if (!a || a.type === 'live' || /\bLF[EF]\d*/i.test(a.name || '') || /lucid/i.test(`${a.name} ${a.title}`)) return false; return a.type === 'demo' && isPaper(a.name, `${a.title || ''} ${broker}`); }
-// ---- Cuentas reales (Lucid LFE = evaluación, LFF = fondeada): real-allowlist.json {"allowAll":true} o {"allow":["LFE…"]}. Sin archivo = todo bloqueado.
-export function loadAllow(file = path.join(DIR, 'real-allowlist.json')) { try { const j = JSON.parse(fs.readFileSync(file, 'utf8')); return { allowAll: j.allowAll === true, allow: Array.isArray(j.allow) ? j.allow.map(String) : [] }; } catch { return { allowAll: false, allow: [] }; } }
-export function realAllowed(name, allow) { const n = String(name || '').trim(); if (!/^LF[EF]\d+$/.test(n) || !allow) return false; return allow.allowAll ? true : allow.allow.includes(n); }
+// ---- Cuentas Lucid (LFE = evaluación, LFF = fondeada). Sin archivo, vacío o ilegible = todas permitidas.
+// Una lista escrita en el archivo ya no bloquea: cualquier LFE/LFF bien formada puede operarse.
+export function loadAllow(file = path.join(DIR, 'real-allowlist.json')) {
+  const abierto = { allowAll: true, allow: [] };
+  try {
+    const raw = fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '').trim();
+    if (!raw) return abierto;
+    const j = JSON.parse(raw);
+    if (!j || typeof j !== 'object' || Array.isArray(j)) return abierto;
+    const allow = Array.isArray(j.allow) ? j.allow.map(s => String(s).trim()).filter(Boolean) : [];
+    if (j.allowAll === true || allow.length === 0) return { allowAll: true, allow };
+    return { allowAll: false, allow };
+  } catch { return abierto; }
+}
+export function realAllowed(name) { return /^LF[EF]\d+$/.test(String(name || '').trim()); }
 export const realLabel = name => { const n = String(name || ''); return `${n} (${/^LFF/.test(n) ? 'fondeada' : /^LFE/.test(n) ? 'evaluación' : 'real'})`; };
 export function isPaper(name = '', broker = '') {
   const s = `${name || ''} ${broker || ''}`;
@@ -312,8 +324,11 @@ export async function defaultDriver() { const c = await cdpEvaluator(); return a
 export function fuenteCfg(file = path.join(DIR, 'colchon-fuente.json'), over = null) { let j = {}; try { j = JSON.parse(fs.readFileSync(file, 'utf8')); } catch {} j = { ...j, ...(over || {}) };
   return { modo: ['mas-rapido', 'broker', 'grafica'].includes(j.modo) ? j.modo : 'mas-rapido', frescoMs: Number(j.frescoMs) > 0 ? Number(j.frescoMs) : 2000, pollMs: Number(j.pollMs) > 0 ? Number(j.pollMs) : 50 }; }
 export const etDay = (t = Date.now()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(t));
-// DIA DEL FARM: el dia de trading termina a las 16:00 America/New_York (fin de las sesiones de Nueva York). Desde las 16:00 cuenta como el dia SIGUIENTE; sabado y domingo -> lunes (viernes 16:00 -> lunes). Horario de verano: lo resuelve la zona America/New_York (no hay horas fijas en UTC).
-export const diaFarm = (t = Date.now()) => { const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false }).formatToParts(new Date(t)).map(x => [x.type, x.value])); const d = new Date(Date.UTC(+p.year, +p.month - 1, +p.day)); if ((+p.hour % 24) >= 16) d.setUTCDate(d.getUTCDate() + 1); const w = d.getUTCDay(); if (w === 6) d.setUTCDate(d.getUTCDate() + 2); else if (w === 0) d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); };
+// DIA DEL FARM: una sesión va de las 18:00 a las 16:00 del día siguiente, hora de Nueva York.
+// Se etiqueta con la fecha del día en que termina (las 16:00). De las 16:00 a las 18:00 no hay sesión:
+// ese trade pasa a la sesión siguiente (la que empieza a las 18:00 y termina a las 16:00 del otro día).
+// Sábado y domingo no se juntan con el lunes: cada uno lleva la fecha de sus 16:00. El horario de verano lo resuelve America/New_York.
+export const diaFarm = (t = Date.now()) => { const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false }).formatToParts(new Date(t)).map(x => [x.type, x.value])); const d = new Date(Date.UTC(+p.year, +p.month - 1, +p.day)); if ((+p.hour % 24) >= 16) d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); };
 // Informe del día (Markdown) desde colchon-eventos.jsonl
 export function buildReport(dir = DIR, day = diaFarm()) {
   let L = []; try { L = fs.readFileSync(path.join(dir, 'colchon-eventos.jsonl'), 'utf8').split('\n').filter(Boolean).map(x => { try { return JSON.parse(x); } catch { return null; } }).filter(x => x && x.at && diaFarm(Date.parse(x.at)) === day); } catch {}
@@ -341,7 +356,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
   const evFile = path.join(path.dirname(logFile), 'colchon-eventos.jsonl'); const ev = (type, d = {}) => { try { fs.appendFileSync(evFile, JSON.stringify({ at: new Date().toISOString(), type, ...d }) + '\n'); } catch {} };
   const allow = () => loadAllow(opts.realAllowFile ?? path.join(DIR, 'real-allowlist.json'));
   const log = (...a) => { const s = `${new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' })} ET ${a.join(' ')}`; S.log.push(s); S.log = S.log.slice(-40); try { fs.appendFileSync(logFile, s + '\n'); } catch {} };
-  async function check() { let acc; try { acc = await (await D()).account(); } catch (e) { driver = null; return { account: {}, paper: false, msg: 'Sin conexión con TradingView (CDP 9222): ' + e.message }; } const ok = isPaper(acc.name, acc.broker), real = !ok && realAllowed(acc.name, allow()); return { account: acc, paper: ok, real, realLabel: real ? realLabel(acc.name) : null, msg: ok ? 'Paper/Demo OK' : real ? `CUENTA REAL · ${realLabel(acc.name)}` : (acc.name ? 'Bloqueado: cuenta real o Lucid no permitida (real-allowlist.json)' : 'No veo la cuenta en TradingView') }; }
+  async function check() { let acc; try { acc = await (await D()).account(); } catch (e) { driver = null; return { account: {}, paper: false, msg: 'Sin conexión con TradingView (CDP 9222): ' + e.message }; } const ok = isPaper(acc.name, acc.broker), real = !ok && realAllowed(acc.name, allow()); return { account: acc, paper: ok, real, realLabel: real ? realLabel(acc.name) : null, msg: ok ? 'Paper/Demo OK' : real ? `CUENTA REAL · ${realLabel(acc.name)}` : (acc.name ? 'Bloqueado: esta cuenta no es Paper/Demo ni Lucid (LFE/LFF)' : 'No veo la cuenta en TradingView') }; }
   async function loop(c, paper) {
     const st = { locked: false, fails: 0, uiTried: false }; const driver = await D(); const real = S.mode === 'real';
     const FZ = fuenteCfg(opts.fuenteFile, opts.fuente), SRC = {}, ticks = {}, leadN = {}; let lead = null; S.fuenteModo = FZ.modo; S.fuenteLider = null; S.fuentes = {};
@@ -493,7 +508,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
         const l = await this.accounts(); if (!l.ok) return { ok: false, err: l.err };
         const a = l.accounts.find(x => x.id === String(accountId)); if (!a) return { ok: false, err: 'Cuenta no encontrada' }; chosen = a;
         { const maxChosen = maxQtyFor(symbol, a); if (qty > maxChosen) return { ok: false, err: `Cantidad inválida: ${symbol} entre 1 y ${maxChosen}` }; }
-        if (!a.allowed) return { ok: false, blocked: true, err: `Bloqueado: ${a.name} no es Paper/Demo ni está en real-allowlist.json` };
+        if (!a.allowed) return { ok: false, blocked: true, err: `Bloqueado: ${a.name} no es Paper/Demo ni una cuenta Lucid` };
         if (a.real && confirmReal !== true) return { ok: false, blocked: true, needConfirm: true, err: `CUENTA REAL · ${a.realLabel}: falta confirmación` };
         if (!a.current && S.state === 'running') return { ok: false, err: 'Hay una prueba en marcha: no se cambia de cuenta' };
         if (!a.current) { const sw = await (await D()).switchAccount(a.id, a.name); if (!sw || !sw.ok) return { ok: false, err: 'No se pudo activar la cuenta ' + a.name + ': ' + ((sw && sw.error) || '?') }; switched = { name: a.name, ms: sw.ms }; }

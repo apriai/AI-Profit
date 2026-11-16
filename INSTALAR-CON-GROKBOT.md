@@ -34,7 +34,7 @@ Reglas:
 - No ejecutes npm ci ni npm install. El zip ya trae chrome-remote-interface, ws y commander, que es lo que el motor carga.
 - Si la carpeta de destino ya existe y no tiene profito-guia.json con guia INSTALAR-CON-GROKBOT, DETENTE. No la sobrescribas.
 - No copies accounts.json, sod.json, negocio.json, real-allowlist.json ni ningún dato de otra PC.
-- No crees real-allowlist.json y no pongas allowAll. Sin ese archivo el motor no opera cuentas reales: déjalo así.
+- No crees real-allowlist.json. Sin ese archivo las cuentas Lucid (LFE y LFF) se pueden operar igual. Una cuenta que no sea Lucid ni Paper sigue bloqueada. No hace falta una lista para probar.
 - No ejecutes taskkill. No abras, modifiques ni canceles órdenes. No hagas clic dentro de TradingView.
 - No me pidas contraseñas, cookies ni tokens en el chat. Eso se escribe solo en las ventanas de TradingView, Tradovate y Lucid.
 - No me pidas confirmación ni me avises por TradingView. Si no está conectado con la granja, acceso\Abrir Granja.bat (el acceso AI Profit) lo cierra y lo vuelve a abrir conectado, solo. Antes de abrirlo haz tú, sin preguntarme, la comprobación interna de operación en curso de «Notas técnicas internas» (`docs/instalacion/notas-internas.md`): si hay una operación en curso, espera a que termine.

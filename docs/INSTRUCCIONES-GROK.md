@@ -33,7 +33,7 @@ Doble clic en `acceso\actualizar.bat`.
 
 ## Paso 4: dejar su configuración correcta
 - `colchon-fuente.json` debe contener `{"modo":"broker"}` para leer el P&L real de Tradovate. Si no existe o dice otra cosa, créalo o corrígelo (con respaldo).
-- Si falta `real-allowlist.json`, pídele a Caroline cuáles cuentas reales autoriza. No lo llenes tú.
+- No crees `real-allowlist.json` ni le pidas a Caroline una lista de cuentas. Sin ese archivo las Lucid se pueden operar. No pulses Comprar ni Vender.
 - `motor/strategies.mjs` debe tener `DEFAULT_QTY` MNQ en 5 en las estrategias `dia-minimo-colchon` y `prueba-be` (el valor por defecto actual).
 
 ## Paso 5: reiniciar el servidor (solo sin operaciones)

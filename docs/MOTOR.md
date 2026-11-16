@@ -28,7 +28,7 @@ Carpeta: `C:\Users\<usuario>\OneDrive\Escritorio\TradingLink` en HERO.
 | `instalar-ai-profit.bat` | Windows, en la raíz: acceso de Escritorio **AI Profit** con el `.ico`. |
 | `acceso\abrir-tradingview.bat` | Solo abre TradingView Desktop (Store) con `--remote-debugging-port=9222`. |
 | `acceso\iniciar-tradinglink.bat` | Arranca `motor\tradinglink.mjs` en una ventana visible y abre el navegador. |
-| `real-allowlist.json` | Lista de cuentas reales permitidas (sección 10). |
+| `real-allowlist.json` | Opcional. Sin archivo, las cuentas Lucid no se bloquean (sección 10). |
 | `colchon-fuente.json` | Fuente de P&L: `{"modo":"broker"}` (actual), `"mas-rapido"` o `"grafica"`. Se lee al iniciar cada trade, así que no hace falta reiniciar. |
 | `accounts.json`, `sod.json` | Estado de las cuentas y saldo de inicio del día (los genera el servidor). |
 | `pausa-lectura.flag` | Si existe, la lectura completa en segundo plano no cambia de cuenta. |
@@ -131,8 +131,8 @@ Parámetros comunes: `SL_USD`, `TP_USD` (bracket en $), `STEPS` (escalones `{tri
 
 ## 10. Cuentas reales
 - **Lucid:** LFE = evaluación, LFF = fondeada (`/^LF[EF]\d+$/`).
-- **`real-allowlist.json`:** `{"allowAll":true}` (actual) o `{"allow":["<nombre>"]}`. Sin el archivo, todo lo real queda bloqueado.
-- **Para operar en real** hacen falta la cuenta en la allowlist y `confirmReal:true` (la UI lo pide). La UI muestra la insignia roja «CUENTA REAL».
+- **`real-allowlist.json`:** si no existe, está vacío o no se puede leer, todas las cuentas Lucid (LFE/LFF) quedan permitidas. Una lista escrita en el archivo ya no las bloquea.
+- **Para operar en real** hace falta `confirmReal:true` (la UI lo pide), la cuenta activa visible y que no haya posición ni órdenes. La UI muestra la insignia roja «CUENTA REAL». Una cuenta que no sea Lucid ni Paper sigue bloqueada.
 - El cierre de las 4:45 PM se aplica también a las cuentas reales.
 
 ## 11. Pitfalls conocidos

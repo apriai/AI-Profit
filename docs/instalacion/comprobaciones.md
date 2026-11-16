@@ -16,7 +16,7 @@ Cada línea es un sí o un no. No abras un trade para comprobar.
 | En la granja se ven **tus** cuentas después de ese inicio de sesión, y al cerrar y volver a abrir siguen en el JSON de esta carpeta | Los datos son de esta PC | Si la carpeta no tiene `profito-guia.json`, no la reutilices |
 | Botón Demo del Negocio, sin pulsar Comprar ni Vender | Prueba sin órdenes | Un trade real no es parte de la instalación |
 | Acceso `AI Profit` en el Escritorio | El día a día es ese doble clic | `instalar-ai-profit.bat` no abre el mercado; el acceso sí cierra y reabre TradingView si no está conectado |
-| No existe `real-allowlist.json` creado por el bot | Las cuentas reales siguen bloqueadas por el motor | No lo crees para «probar» |
+| No existe `real-allowlist.json` creado por el bot | Las cuentas Lucid no necesitan ese archivo | No lo crees para «probar» |
 
 `archivoCuentas: true` en el comprobador solo dice que el archivo existe. No debe imprimir su contenido.
 
