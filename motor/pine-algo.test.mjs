@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import {
-  ALGO_NOMBRE, ALGO_VERSION, FUENTE_PINE, PINE_DIR, crearAlgoTv, esElAlgo, estudiosAlgo, exprAlgo, exprMirar, exprOjos, formasEstudio, leerFuente, mismoEstudioId, planAlgo, textoAlgo, textoMotivo,
+  ALGO_NOMBRE, ALGO_VERSION, FUENTE_PINE, PINE_DIR, crearAlgoTv, esElAlgo, estudiosAlgo, exprAlgo, exprMirar, exprOjos, formasEstudio, insertarEstudio, leerFuente, mismoEstudioId, planAlgo, textoAlgo, textoMotivo,
 } from './pine-algo.mjs';
 
 const fuente = leerFuente(FUENTE_PINE);
@@ -32,6 +32,41 @@ assert.equal(mismoEstudioId(idCamp, 'USER;4637f0d246f54b92a991cbfa83a7f992'), tr
 assert.equal(mismoEstudioId('PUB;abc', 'script$pub;abc'), true);
 assert.equal(mismoEstudioId('STD;abc', 'Script$STD;abc'), true);
 assert.equal(formasEstudio('script$future;abc123')[0], 'FUTURE;abc123');
+function grafico35(javaStudies) {
+  const llamadas = [];
+  const chart = {
+    async createStudy(e) {
+      llamadas.push(e);
+      if (typeof e !== 'string') return this._createStudy(e);
+      const nombre = String(e).toLowerCase();
+      const o = javaStudies.find(s => String(s.description || '').toLowerCase() === nombre || s.id === e);
+      if (!o) throw new Error('unexpected study id:' + e);
+      return this._javaInserter({ type: 'java', studyId: o.id });
+    },
+    async _createStudy(meta) {
+      llamadas.push({ via: '_createStudy', id: meta.id });
+      return 'id-desde-metainfo';
+    },
+    async _javaInserter(spec) {
+      if (String(spec.studyId).includes('script$')) throw new Error('unexpected study id:' + spec.studyId);
+      return 'java-' + spec.studyId;
+    },
+  };
+  return { chart, llamadas };
+}
+const metaCamp = { id: idCamp, description: 'Ai Profit Camp Algo', shortDescription: 'Ai Profit Camp Algo' };
+const roto = grafico35([{ id: idCamp, description: 'ai profit camp algo' }]);
+await assert.rejects(() => roto.chart.createStudy('Ai Profit Camp Algo'), /unexpected study id:script\$user;4637f0d246f54b92a991cbfa83a7f992/);
+await assert.rejects(() => roto.chart.createStudy(idCamp), /unexpected study id/);
+await assert.rejects(() => roto.chart.createStudy('USER;4637f0d246f54b92a991cbfa83a7f992'), /unexpected study id/);
+const bueno = grafico35([{ id: idCamp, description: 'ai profit camp algo' }]);
+assert.equal(await insertarEstudio(bueno.chart, metaCamp, idCamp, 'Ai Profit Camp Algo'), 'id-desde-metainfo');
+assert.equal(bueno.llamadas.some(x => typeof x === 'string'), false);
+const sinMeta = grafico35([{ id: idSms, description: 'smart money algo' }]);
+await assert.rejects(() => insertarEstudio(sinMeta.chart, null, idSms, 'Smart Money Algo'), /no se pudo añadir al gráfico/);
+assert.equal(sinMeta.llamadas.length, 0);
+const bandas = grafico35([{ id: 'STD;BB', description: 'bollinger bands' }]);
+assert.equal(await insertarEstudio(bandas.chart, null, 'STD;BB', 'Bollinger Bands'), 'java-STD;BB');
 assert.match(textoMotivo('unexpected study id:' + idCamp), /Lo reintento/);
 assert.match(textoMotivo('sin-broker'), /Lo reintento/);
 assert.equal(textoAlgo({ nombre: 'Ai Profit Camp Algo', estado: 'instalado', version: '1' }), 'Algo TradingView: Ai Profit Camp Algo instalado v1');
@@ -46,6 +81,8 @@ assert.match(expr, /pine-facade\/save\/new/);
 assert.match(expr, /pine-facade\/save\/next/);
 assert.doesNotMatch(expr, /placeOrder|modifyOrder|closePosition|editPositionBrackets|cancelOrder|setCurrentAccount|setSymbol|activeBroker|paper_trading|positions\(|activeOrders|sin-broker|sin-posiciones/);
 assert.match(expr, /formasEstudio/);
+assert.match(expr, /insertarEstudio/);
+assert.match(expr, /pine-facade\/translate\//);
 assert.match(exprAlgo({ source: 'x', nombre: 'Smart Money Algo', anterior: 'Smart Money Structure' }), /Smart Money Structure/);
 new vm.Script(expr);
 const mira = exprMirar({ nombre: ALGO_NOMBRE, studyId: 's1' });

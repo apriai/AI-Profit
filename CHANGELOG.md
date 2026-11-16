@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.17] — 2026-11-16
+### Corregido
+- **El estudio de Pine se añade con el objeto metaInfo, no con un texto.** En TradingView Desktop 3.5.0, `createStudy` con cualquier texto arma un inserter de tipo java y rechaza `script$user;<hash>`. El guardado ya devolvía el metaInfo; ahora ese objeto se pasa a `createStudy`, que entra a `insertStudy`, igual que el editor de Pine. El texto queda solo para estudios estándar, como Bollinger. Si el guardado no trae el objeto, se pide a `pine-facade/translate`.
+### Notas
+- No abre, no mueve y no cierra órdenes. `orders.mjs` sigue apagado.
+
 ## [0.10.16] — 2026-11-16
 ### Corregido
 - **Los algoritmos sí se añaden al gráfico en TradingView Desktop 3.5.0.** Al guardar, el id vuelve como `script$user;<hash>` y el gráfico lo rechazaba («unexpected study id»). Ahora se acepta ese formato y también `USER;`, `PUB;`, `STD;`, `Script$…` y variantes nuevas. Si falla, la granja dice el motivo y lo reintenta sola, en vez de quedarse en «pendiente» sin explicación.
