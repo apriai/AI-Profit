@@ -115,7 +115,9 @@ function tvChartPx(){try{return window.TradingViewApi._activeChartWidgetWV.value
 `;
 export const js = {
   account: `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t),n=document.querySelector('[class*=accountName]');var meta={};try{meta=ab&&ab._brokerMetainfo||{}}catch(e){}
-    return {api:!!ab,brokerId:tvBrokerId(ab),broker:meta.title||meta.name||tvBrokerId(ab),name:n?n.innerText.trim():null}})()`,
+    var name=n&&n.innerText?String(n.innerText).trim():'';
+    if(!name&&ab&&typeof ab.accountsMetainfo==='function'&&typeof ab.currentAccount==='function'){try{var cur=String(tvWv(ab.currentAccount())),l=await ab.accountsMetainfo(),hit=(l||[]).find(function(a){return a&&String(a.id)===cur});if(hit&&hit.name)name=String(hit.name).trim()}catch(e){}}
+    return {api:!!ab,brokerId:tvBrokerId(ab),broker:meta.title||meta.name||tvBrokerId(ab),name:name||null}})()`,
   accounts: `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t);if(!ab||!ab.accountsMetainfo)return {error:'no-accounts-api'};var meta={};try{meta=ab._brokerMetainfo||{}}catch(e){}
     var cur=String(tvWv(ab.currentAccount())),l=await ab.accountsMetainfo();return {brokerId:tvBrokerId(ab),broker:meta.title||tvBrokerId(ab),current:cur,canSwitch:typeof ab.setCurrentAccount==='function',
       accounts:(l||[]).map(function(a){return {id:String(a.id),name:a.name,type:a.type,title:a.title,current:String(a.id)===cur}})}})()`,

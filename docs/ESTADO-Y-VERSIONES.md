@@ -10,7 +10,7 @@ Documento de relevo para cualquier agente (Grok) que trabaje en este repositorio
 ## Lo que cambió
 | Versión | Qué cambió |
 |---|---|
-| 0.10.11 | Al abrir, la fanfarria de un trade ganado suena junto con el salto, la casa y el confeti. El acceso abre Edge o Chrome en ventana propia con permiso de autoplay. Los clics de la interfaz usan sonidos sintetizados (carta, selección, interruptor, toque). Despertar a Profito suena «DJ Inicio». Fanfarria de trade, pérdida y BUY/SELL no cambian. El silencio se respeta. 0.10.10 queda para el instalador en revisión. |
+| 0.10.11 | Al abrir, la fanfarria de un trade ganado suena junto con el salto, la casa y el confeti. El acceso abre Edge o Chrome en ventana propia con permiso de autoplay. Los clics de la interfaz usan sonidos sintetizados. Despertar a Profito suena «DJ Inicio». Si el panel de TradingView está cerrado, el nombre de la cuenta se lee de la API del bróker para la luz de Tradovate. La allowlist y el cambio de cuenta antes de operar no se aflojan. 0.10.10 queda para el instalador en revisión. |
 | 0.10.9 | El botón Instalar del instalador vuelve a pasar a la copia. Antes el clic en la pastilla verde no hacía nada. Aún no publicado. |
 | 0.10.8 | Al abrir la granja, una sola vez, la misma celebración visual de un trade ganado (casa, confeti y el resto), con `window.__tlCelebrate`. No anota ganancia ni cambia saldos, historial, métricas ni sonidos. |
 | 0.10.7 | Clic de burbuja al dormir al agente, abrir Historial, Métrica, Negocio, una planta o Trade. Al despertar suena un wuhu en lugar del clic. BUY y SELL no suenan. |
