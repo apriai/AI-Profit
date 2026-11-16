@@ -77,12 +77,19 @@ ping -n 2 127.0.0.1 >nul
 goto wait_srv
 
 :browser
-set "CHROME="
-if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" set "CHROME=%ProgramFiles%\Google\Chrome\Application\chrome.exe"
-if not defined CHROME if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" set "CHROME=%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
-if not defined CHROME if exist "%LocalAppData%\Google\Chrome\Application\chrome.exe" set "CHROME=%LocalAppData%\Google\Chrome\Application\chrome.exe"
-if defined CHROME (
-  start "" "%CHROME%" "http://localhost:8787/Granja-de-Cuentas-v2.html"
+rem Ventana propia de Edge o Chrome. El perfil aparte hace que el permiso de
+rem autoplay se aplique aunque el navegador de cada dia ya este abierto.
+set "NAV="
+set "PERFIL=%LOCALAPPDATA%\Profito\navegador"
+if not defined LOCALAPPDATA set "PERFIL=%TEMP%\Profito-navegador"
+if exist "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" set "NAV=%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"
+if not defined NAV if exist "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" set "NAV=%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"
+if not defined NAV if exist "%LocalAppData%\Microsoft\Edge\Application\msedge.exe" set "NAV=%LocalAppData%\Microsoft\Edge\Application\msedge.exe"
+if not defined NAV if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" set "NAV=%ProgramFiles%\Google\Chrome\Application\chrome.exe"
+if not defined NAV if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" set "NAV=%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
+if not defined NAV if exist "%LocalAppData%\Google\Chrome\Application\chrome.exe" set "NAV=%LocalAppData%\Google\Chrome\Application\chrome.exe"
+if defined NAV (
+  start "" "%NAV%" --autoplay-policy=no-user-gesture-required --app="http://localhost:8787/Granja-de-Cuentas-v2.html" --user-data-dir="%PERFIL%" --no-first-run --no-default-browser-check
 ) else (
   start "" "http://localhost:8787/Granja-de-Cuentas-v2.html"
 )

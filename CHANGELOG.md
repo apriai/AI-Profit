@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.11] — 2026-11-16
+### Cambiado
+- **La fanfarria suena al abrir, junto con la celebración.** El acceso AI Profit abre la granja en una ventana de Edge o Chrome, con permiso para sonar sin un clic previo. En ese momento salen juntos el salto, la casa, el confeti y la fanfarria de un trade ganado (`window.__tlCelebrate`). Si el audio siguiera bloqueado, se ven los efectos y el sonido no queda para un clic posterior. El botón de silencio se respeta. No anota una ganancia.
+### Notas
+- No abre, no mueve y no cierra órdenes. La versión 0.10.10 queda para el arreglo del instalador que está en revisión. Esta no se publica todavía.
+
 ## [0.10.9] — 2026-11-16
 ### Corregido
 - **El botón Instalar del instalador ya avanza.** El botón verde era una imagen estática con identificador 0, y el clic no llegaba. Aunque llegara, llamaba al botón Siguiente, que está oculto, y la página no cambiaba. Ahora es un botón de verdad y el avance se envía al asistente. La instalación puede empezar.

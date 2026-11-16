@@ -5921,7 +5921,7 @@ function hook(){const G=window.__granja&&window.__granja.pet;if(!G||!G.renderer|
  if(cfg.kind!=="perro"||cfg.body!==A.perro.b||cfg.accent!==A.perro.a){try{applyPet(G,cfg)}catch(err){console.warn("mascota",err)}}
  (function lab(){const p=window.__pet.screen();if(p&&cfg.name){tag.textContent=cfg.name;tag.style.left=p.x+"px";tag.style.top=(p.y-8)+"px";tag.style.display="block"}else tag.style.display="none";requestAnimationFrame(lab)})()}
 setTimeout(hook,600);})();</script>
-<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.9</div>
+<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.11</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/VERSION",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
 <script>/* 0.7.0: Profito duerme al abrir (granja en pausa), riega con laptop durante un trade, y etiquetas de cuentas con saldo y etapa. Solo visual: no toca el motor de trading. */
 (function(){
@@ -6271,23 +6271,36 @@ window.__tlProbarCelebracion=function(){try{unlock()}catch(e){}const sm={pnlFina
 const B=document.getElementById("tlMute");function set(v){muted=!!v;try{localStorage.setItem(KM,muted?"1":"0")}catch(e){}B.innerHTML=muted?"\u{1F507}":"\u{1F50A}";B.setAttribute("aria-pressed",String(muted))}
 B.addEventListener("click",e=>{e.stopPropagation();unlock();set(!muted);if(!muted)play(false)});["pointerdown","mousedown"].forEach(t=>B.addEventListener(t,e=>e.stopPropagation()));
 window.__tlMuted=()=>muted;set(muted);
-/* Al abrir: una sola vez, la misma celebración de un trade ganado (casa, confeti y el resto).
-   No muestra el resumen ni escribe historial, saldos ni métricas. Los sonidos no se tocan. */
+/* Al abrir: una sola vez, la fanfarria y los efectos de un trade ganado, juntos.
+   Si el audio sigue bloqueado, se ven los efectos y el sonido no queda para después.
+   El botón de silencio se respeta. No abre el resumen ni escribe historial. */
 let tlApertura=false,tlAperturaN=0;
 (function tlCelebrarAlAbrir(){
   if(tlApertura)return;
   const g=window.__gx;
   if(!g||!g.ci){if(++tlAperturaN<40)setTimeout(tlCelebrarAlAbrir,200);return}
   tlApertura=true;
-  try{window.__tlCelebrate({pnlFinalUSD:1,motivo:"Take profit",pnlFinalAprox:false,soloVisual:true})}catch(e){}
-  (function volver(){
+  function volver(){
     if(typeof window.__tlWinTick==="function"){setTimeout(volver,200);return}
     try{
       if(window.__tlWaterForce??(window.__prueba&&window.__prueba().phase==="running"))return;
       const s=g.Wu&&g.Wu.state;if(!s)return;
       g.ci.position.set(1.75,0,-3);s.mode="sit";s.sit=1;s.route=[];s.after=null;
     }catch(e){}
-  })();
+  }
+  function disparar(listo){
+    var r=null;
+    try{r=window.__tlCelebrate({pnlFinalUSD:1,motivo:"Take profit",pnlFinalAprox:false,soloVisual:!listo})}catch(e){}
+    window.__tlAperturaInfo={ac:ac?ac.state:"sin",sonido:!!(r&&r.sonido),salto:!!(r&&r.salto),junto:true,listo:!!listo,muted:!!muted,t:Math.round(performance.now())};
+    volver();
+  }
+  if(muted){disparar(false);return}
+  try{unlock()}catch(e){}
+  if(ac&&ac.state==="running"){disparar(true);return}
+  var ya=false;
+  function fin(){if(ya)return;ya=true;disparar(!!(ac&&ac.state==="running"))}
+  try{if(ac&&ac.resume){var p=ac.resume();if(p&&p.then)p.then(fin).catch(fin);else fin()}else fin()}catch(e){fin()}
+  setTimeout(fin,1200);
 })();})();
 </script>
 <script>/* 0.7.3: Estrategia propia. Se guarda solo en esta computadora. No cambia las estrategias de serie. */
