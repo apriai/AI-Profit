@@ -128,7 +128,7 @@ En la ventana de TradingView entra a TradingView, Tradovate y Lucid. Las contras
 
 La granja lee las cuentas de **esa** sesión y las guarda en esta PC (`accounts.json` y `sod.json` en la raíz o en `datos\`, según `motor/rutas.mjs`). Al abrir otro día, las vuelve a cargar. No se copia el archivo de otra persona.
 
-No crees `real-allowlist.json`. Sin ese archivo, `motor/colchon.mjs` bloquea toda cuenta real. Dejarlo así es la instalación correcta. Activar dinero real es un paso aparte, decidido por quien opera, no por el bot.
+No crees `real-allowlist.json`. Sin ese archivo las cuentas Lucid (LFE y LFF) se pueden operar. Una cuenta que no sea Lucid ni Paper sigue bloqueada. Operar sigue pidiendo confirmación. No pulses Comprar ni Vender durante la instalación.
 
 Prueba sin órdenes: en la granja, panel Negocio, botón **Demo**. Son datos inventados de esa carga de página. No pulses Comprar ni Vender. No hagas clic dentro de TradingView.
 

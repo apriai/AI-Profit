@@ -33,8 +33,9 @@ assert.equal(sinDom.name, 'LFE02500000000001');
 assert.equal(sinDom.broker, 'Tradovate TRADOVATE');
 assert.equal(luz(sinDom), true, 'la luz de Tradovate usa el nombre de la API');
 assert.equal(isPaper(sinDom.name, sinDom.broker), false);
-assert.equal(realAllowed(sinDom.name, { allowAll: false, allow: [] }), false, 'sin allowlist sigue bloqueada');
-assert.equal(realAllowed(sinDom.name, { allowAll: false, allow: ['LFE02500000000001'] }), true);
+assert.equal(realAllowed(sinDom.name, { allowAll: false, allow: [] }), true, 'sin lista, una Lucid no se bloquea');
+assert.equal(realAllowed(sinDom.name, { allowAll: false, allow: ['OTRA'] }), true, 'una Lucid bien formada no depende de la lista');
+assert.equal(realAllowed('DEMO123', { allowAll: true, allow: [] }), false);
 
 const domVacio = await run({ querySelector: () => ({ innerText: '   ' }) }, broker('D-TEST-002', lista));
 assert.equal(domVacio.name, 'Demo Account');

@@ -37,6 +37,6 @@ El puente entre TradingView Desktop y la granja:
 ## 6. Reglas de trading (Lucid Flex 25K)
 - Objetivo: **+$1,250**.
 - Drawdown: **$1,000 trailing end-of-day**.
-- Estar **flat antes de 4:45 PM ET**.
+- La granja no cierra el trade por la hora. Siguen el stop, el objetivo y el colchón.
 - Noticias rojas: no abrir trades desde **40 min antes hasta 5 min después**; los trades ya abiertos siguen.
 - Nunca operar sin confirmación del usuario.

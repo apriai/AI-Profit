@@ -35,7 +35,7 @@ The edge is **not a price-prediction signal**. It comes from the **structure of 
 - Eval target **$1,250**, **EOD trailing drawdown $1,000**, daily loss limit **$600**, **50% consistency** in eval, min 2 days.
 - Funded: EOD trail $1,000 locks at **$26,100** (the buffer). Withdrawable = only balance above $26,100. **$26,600+ needed for the $500 min payout**; max payout **$1,000**; **5 green days** (≥$100) required; **90% split** → $900 net.
 - After the 1st payout the cushion is **~$1,100** (balance ~$26,100, MLL locked at $25,100). No rebuild needed, just new green days + profit.
-- Session opens **6:00 PM ET Sun–Thu**; **must be flat by 4:45 PM ET** (holidays earlier).
+- Session opens **6:00 PM ET Sun–Thu**. The farm does not flatten a trade by the clock: the stop, the target and the cushion stay until the person presses Stop.
 - Max 10 accounts / 5 funded. No microscalping (>50% of profit from <5 s holds), no HFT, no hedging. News allowed on Flex (but see red calendar).
 
 **The plan (one trade per day, TP/SL set and never moved):**

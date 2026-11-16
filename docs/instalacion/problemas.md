@@ -34,7 +34,7 @@ Hasta que entres en tu TradingView / Tradovate / Lucid, la lista puede ir vacía
 
 ## Quiero operar en real
 
-Eso no es parte de instalar. `motor/colchon.mjs` deja bloqueada toda cuenta real si no existe `real-allowlist.json`. No lo crees durante la instalación y no pongas `allowAll`. Quien opera lo decide después, fuera de este recorrido.
+Eso no es parte de instalar. Las cuentas Lucid se pueden elegir sin crear `real-allowlist.json`. La granja pide confirmación antes de un trade real. No lo hagas durante este recorrido y no pulses Comprar ni Vender.
 
 ## Deshacer
 

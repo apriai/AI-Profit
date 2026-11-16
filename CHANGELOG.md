@@ -10,6 +10,19 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.13] — 2026-11-16
+### Agregado
+- **La versión en el panel Negocio.** Abajo, a la derecha de Demo, se lee «Versión x.y.z». Sale del archivo `VERSION` de esta instalación (`/api/version`). Si no se puede leer, no aparece nada.
+- **La barra «Hoy» se puede pulsar.** Rota entre el conteo, el P&L neto del día y las rachas de hoy. Recuerda la última vista en este navegador y suena como los demás botones. BUY y SELL siguen en silencio, y el botón de silencio se respeta.
+### Corregido
+- **El P&L del día es el de toda la sesión.** La sesión va de las 18:00 a las 16:00 del día siguiente, hora de Nueva York, y se nombra con la fecha de esas 16:00. Un trade entre las 16:00 y las 18:00 (fuera de sesión) pasa a la sesión siguiente. El sábado y el domingo no se juntan con el lunes. El mismo corte vale para el encabezado, las rachas, el historial, las métricas, el Negocio, la pérdida diaria y «Listo por hoy». Antes, si la granja se abría tarde, el día empezaba en esa primera lectura y se perdían los trades de la sesión (en un caso, 534.5 en la granja y 610 en Lucid). Si el bróker manda la comisión, se usa. Si manda el saldo de inicio de sesión, se usa. Si no, se resta la comisión conocida (MNQ $1 y NQ $3.50 por contrato). La primera lectura tardía no cuenta como inicio.
+- **Cualquier cuenta Lucid (LFE o LFF) se puede operar** aunque no exista `real-allowlist.json`, esté vacío o no se pueda leer. Siguen la confirmación, la cuenta activa, el tope de contratos, la pérdida del día y no operar con una posición abierta. Una cuenta que no sea Lucid ni Paper sigue bloqueada.
+- **El pico del max loss usa el cierre de las 16:00 ET.** Sube con el saldo leído de las 16:00 a las 18:00, que es el hueco en que la sesión ya terminó. Un saldo de las 18:00 a las 15:59 no lo sube. Si la granja estaba apagada en ese hueco, al volver se usa el último saldo guardado.
+- **`orders.mjs` sigue apagado y en simulación.** Su reloj usa el mismo corte: de las 16:00 a las 18:00 no abre y pide estar plano, y el conteo de «un trade hoy» usa el día de la sesión. No coloca órdenes.
+- **La granja ya no cierra sola por la hora.** Se quitó el corte de las 4:45 PM ET. La posición se queda con su stop y su objetivo, y el colchón sigue vigilándola. El botón Detener sigue cerrando a mano.
+### Notas
+- No abre, no mueve y no cierra órdenes por su cuenta. `orders.mjs` sigue apagado y en simulación.
+
 ## [0.10.12] — 2026-11-16
 ### Corregido
 - **La granja abre en el navegador de cada persona.** El acceso lee el navegador predeterminado. Si es Chrome, Edge o Brave, lo usa, con el mismo permiso para que la fanfarria suene al abrir. Si no es uno de esos, o no se puede leer, prueba Chrome y después Edge. Si no hay ninguno, abre la dirección con el programa que Windows tenga. No cambia la fanfarria.
