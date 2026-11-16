@@ -6238,10 +6238,10 @@ function init(){const g=window.__gx;if(!g||!g.ci||!g.Wu||!g.Jr||!(g.Yn||g.bn)||!
  window.__tlProfito={can,lap,running}}
 init()})();
 </script>
-<style>#tlEye{position:fixed;right:14px;bottom:14px;z-index:2147483000;width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(20,18,30,.35);backdrop-filter:blur(6px);color:#fff;opacity:.55;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:opacity .2s}#tlEye:hover{opacity:.95}#tlEye svg{width:24px;height:24px}#tlEye .sl{display:none}body.tl-privado #tlEye .sl{display:inline}body.tl-privado #tlEye{opacity:.8}
+<style>#tlEye{position:fixed;right:14px;bottom:14px;z-index:2147483000;width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(20,18,30,.35);backdrop-filter:blur(6px);color:#fff;opacity:.55;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:opacity .2s}#tlEye:hover{opacity:.95}#tlEye svg{width:24px;height:24px}#tlEye .cerrado{display:none}body.tl-privado #tlEye .abierto{display:none}body.tl-privado #tlEye .cerrado{display:inline}body.tl-privado #tlEye{opacity:.8}
 body.tl-privado .tlPv{filter:blur(7px)!important;user-select:none}</style>
-<button id=tlEye title="Ocultar/mostrar datos privados" aria-label="Ocultar/mostrar datos privados" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5.5 4.8 12 4.8 22.5 12 22.5 12 18.5 19.2 12 19.2 1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/><path class=sl d="M3.5 3.5l17 17"/></svg></button>
-<script>/* 0.7.0: ojito de privacidad. Solo visual: difumina importes en toda la pagina; los % y marcadores siguen visibles. */
+<button id=tlEye title="Ocultar/mostrar números" aria-label="Ocultar/mostrar números" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class="abierto"><rect x="6" y="11" width="12" height="9" rx="1.6"/><path d="M8 11.2V8a4 4 0 0 1 8 0"/></g><g class="cerrado"><rect x="6" y="11" width="12" height="9" rx="1.6"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></g></svg></button>
+<script>/* Candado de privacidad. Cerrado: números ocultos. Abierto: números a la vista. Solo visual: difumina importes; los % y marcadores siguen visibles. */
 (function(){const K="tl_privado",RX=/\$\s?\d|\d{1,3}(,\d{3})+(\.\d+)?|\b\d+\.\d{2}\b/,B=document.getElementById("tlEye");
 let on=false;try{on=localStorage.getItem(K)==="1"}catch(e){}
 window.__tlPrivado=()=>on;

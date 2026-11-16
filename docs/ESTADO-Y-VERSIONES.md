@@ -10,7 +10,7 @@ Documento de relevo para cualquier agente (Grok) que trabaje en este repositorio
 ## Lo que cambió
 | Versión | Qué cambió |
 |---|---|
-| 0.10.15 | Los algoritmos se instalan y se muestran o se ocultan aunque haya un trade y aunque la luz de Tradovate esté roja. Ya no se quedan en «sin-broker». Un estudio oculto por la persona sigue oculto. |
+| 0.10.15 | Los algoritmos se instalan y se muestran o se ocultan aunque haya un trade y aunque la luz de Tradovate esté roja. Ya no se quedan en «sin-broker». Un estudio oculto por la persona sigue oculto. Abajo a la derecha, el botón que tapa los números es un candado: cerrado los oculta y abierto los muestra. |
 | 0.10.14 | Ai Profit Camp Algo y Smart Money Structure se instalan como estudios aparte si faltan en el gráfico. Un ojo en la barra, junto a Hoy, lista cada uno y lo muestra o lo oculta. Si la persona lo ocultó en TradingView, no se vuelve a poner. |
 | 0.10.13 | El panel Negocio muestra la versión junto a Demo. La barra «Hoy» rota conteo, P&L neto y rachas. La sesión va de las 18:00 a las 16:00 del día siguiente (hora de Nueva York) y se etiqueta con esa fecha; de 16:00 a 18:00 pasa a la sesión siguiente. El P&L del día es el neto de toda esa sesión. Sin `real-allowlist.json` las cuentas Lucid no se bloquean. |
 | 0.10.12 | El acceso abre el navegador predeterminado si es Chrome, Edge o Brave, con permiso para la fanfarria. Si no, Chrome y después Edge. |
