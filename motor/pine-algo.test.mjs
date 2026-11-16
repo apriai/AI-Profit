@@ -32,41 +32,48 @@ assert.equal(mismoEstudioId(idCamp, 'USER;4637f0d246f54b92a991cbfa83a7f992'), tr
 assert.equal(mismoEstudioId('PUB;abc', 'script$pub;abc'), true);
 assert.equal(mismoEstudioId('STD;abc', 'Script$STD;abc'), true);
 assert.equal(formasEstudio('script$future;abc123')[0], 'FUTURE;abc123');
-function grafico35(javaStudies) {
+function grafico35() {
   const llamadas = [];
   const chart = {
+    _chartWidget: {
+      model() {
+        return {
+          createStudyInserter(desc) {
+            llamadas.push(desc);
+            return {
+              async insert(fn) {
+                await fn({ inputs: {} });
+                if (desc.type !== 'pine' || desc.pineVersion !== 'last' || desc.pineId !== 'USER;4637f0d246f54b92a991cbfa83a7f992') {
+                  throw new Error('bad descriptor ' + JSON.stringify(desc));
+                }
+                return { id: () => 'd9IHvG' };
+              },
+            };
+          },
+        };
+      },
+    },
     async createStudy(e) {
       llamadas.push(e);
-      if (typeof e !== 'string') return this._createStudy(e);
-      const nombre = String(e).toLowerCase();
-      const o = javaStudies.find(s => String(s.description || '').toLowerCase() === nombre || s.id === e);
-      if (!o) throw new Error('unexpected study id:' + e);
-      return this._javaInserter({ type: 'java', studyId: o.id });
-    },
-    async _createStudy(meta) {
-      llamadas.push({ via: '_createStudy', id: meta.id });
-      return 'id-desde-metainfo';
-    },
-    async _javaInserter(spec) {
-      if (String(spec.studyId).includes('script$')) throw new Error('unexpected study id:' + spec.studyId);
-      return 'java-' + spec.studyId;
+      if (typeof e !== 'string') throw new Error('Failed to create study');
+      if (String(e).toLowerCase() === 'bollinger bands') return 'bb-id';
+      throw new Error('unexpected study id:' + e);
     },
   };
   return { chart, llamadas };
 }
-const metaCamp = { id: idCamp, description: 'Ai Profit Camp Algo', shortDescription: 'Ai Profit Camp Algo' };
-const roto = grafico35([{ id: idCamp, description: 'ai profit camp algo' }]);
-await assert.rejects(() => roto.chart.createStudy('Ai Profit Camp Algo'), /unexpected study id:script\$user;4637f0d246f54b92a991cbfa83a7f992/);
+const metaJson = { id: 'Script$USER;4637f0d246f54b92a991cbfa83a7f992@tv-scripting-101', description: 'Ai Profit Camp Algo' };
+const roto = grafico35();
+await assert.rejects(() => roto.chart.createStudy(metaJson), /Failed to create study/);
+await assert.rejects(() => roto.chart.createStudy('Ai Profit Camp Algo'), /unexpected study id/);
 await assert.rejects(() => roto.chart.createStudy(idCamp), /unexpected study id/);
-await assert.rejects(() => roto.chart.createStudy('USER;4637f0d246f54b92a991cbfa83a7f992'), /unexpected study id/);
-const bueno = grafico35([{ id: idCamp, description: 'ai profit camp algo' }]);
-assert.equal(await insertarEstudio(bueno.chart, metaCamp, idCamp, 'Ai Profit Camp Algo'), 'id-desde-metainfo');
-assert.equal(bueno.llamadas.some(x => typeof x === 'string'), false);
-const sinMeta = grafico35([{ id: idSms, description: 'smart money algo' }]);
-await assert.rejects(() => insertarEstudio(sinMeta.chart, null, idSms, 'Smart Money Algo'), /no se pudo añadir al gráfico/);
-assert.equal(sinMeta.llamadas.length, 0);
-const bandas = grafico35([{ id: 'STD;BB', description: 'bollinger bands' }]);
-assert.equal(await insertarEstudio(bandas.chart, null, 'STD;BB', 'Bollinger Bands'), 'java-STD;BB');
+const bueno = grafico35();
+assert.equal(await insertarEstudio(bueno.chart, idCamp, 'Ai Profit Camp Algo'), 'd9IHvG');
+assert.deepEqual(bueno.llamadas[0], { type: 'pine', pineId: 'USER;4637f0d246f54b92a991cbfa83a7f992', pineVersion: 'last' });
+assert.equal(bueno.llamadas.some(x => typeof x === 'string' || (x && x.description)), false);
+assert.equal(await insertarEstudio(grafico35().chart, metaJson.id, 'Ai Profit Camp Algo'), 'd9IHvG');
+const bandas = grafico35();
+assert.equal(await insertarEstudio(bandas.chart, 'STD;BB', 'Bollinger Bands'), 'bb-id');
 assert.match(textoMotivo('unexpected study id:' + idCamp), /Lo reintento/);
 assert.match(textoMotivo('sin-broker'), /Lo reintento/);
 assert.equal(textoAlgo({ nombre: 'Ai Profit Camp Algo', estado: 'instalado', version: '1' }), 'Algo TradingView: Ai Profit Camp Algo instalado v1');
@@ -81,8 +88,10 @@ assert.match(expr, /pine-facade\/save\/new/);
 assert.match(expr, /pine-facade\/save\/next/);
 assert.doesNotMatch(expr, /placeOrder|modifyOrder|closePosition|editPositionBrackets|cancelOrder|setCurrentAccount|setSymbol|activeBroker|paper_trading|positions\(|activeOrders|sin-broker|sin-posiciones/);
 assert.match(expr, /formasEstudio/);
-assert.match(expr, /insertarEstudio/);
-assert.match(expr, /pine-facade\/translate\//);
+assert.match(expr, /createStudyInserter/);
+assert.match(expr, /type: 'pine'/);
+assert.match(expr, /function pineIdDe/);
+assert.doesNotMatch(expr, /insertStudy\(/);
 assert.match(exprAlgo({ source: 'x', nombre: 'Smart Money Algo', anterior: 'Smart Money Structure' }), /Smart Money Structure/);
 new vm.Script(expr);
 const mira = exprMirar({ nombre: ALGO_NOMBRE, studyId: 's1' });
@@ -190,6 +199,27 @@ const quieto = await ya.intentar();
 assert.equal(quieto.fase, null);
 assert.equal(vistosYa.some(c => c.includes('pine-facade')), false);
 assert.equal(quieto.algos.find(a => a.nombre === 'Smart Money Algo').visible, false);
+
+const dirVisto = fs.mkdtempSync(path.join(os.tmpdir(), 'algo-visto-'));
+const vistosVisto = [];
+const visto = crearAlgoTv({
+  dir: dirVisto,
+  pineDir: PINE_DIR,
+  evaluar: async (codigo) => {
+    vistosVisto.push(codigo);
+    if (codigo.includes('"mirar":true')) {
+      const camp = codigo.includes('Ai Profit Camp Algo');
+      return { ok: true, mirar: true, enGrafico: camp ? 1 : 0, visible: camp ? true : null, studyId: camp ? 'd9IHvG' : '', viejos: 0 };
+    }
+    assert.match(codigo, /Smart Money Algo/);
+    assert.doesNotMatch(codigo, /"nombre":"Ai Profit Camp Algo"/);
+    return { ok: true, estado: 'instalado', visible: true, studyId: idSms, scriptId: idSms, plan: 'instalar' };
+  },
+});
+const vistoHecho = await visto.intentar();
+assert.equal(vistoHecho.algos.find(a => a.nombre === 'Ai Profit Camp Algo').estado, 'instalado');
+assert.equal(JSON.parse(fs.readFileSync(path.join(dirVisto, 'algo-tv.json'), 'utf8')).algos['Ai Profit Camp Algo'].studyId, 'd9IHvG');
+assert.equal(vistosVisto.filter(c => c.includes('createStudyInserter') && c.includes('"nombre":"Ai Profit Camp Algo"')).length, 0);
 
 const migraDir = fs.mkdtempSync(path.join(os.tmpdir(), 'algo-migra-'));
 fs.writeFileSync(path.join(migraDir, 'algo-tv.json'), JSON.stringify({ algos: {

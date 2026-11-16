@@ -10,7 +10,7 @@ Documento de relevo para cualquier agente (Grok) que trabaje en este repositorio
 ## Lo que cambió
 | Versión | Qué cambió |
 |---|---|
-| 0.10.17 | En TradingView Desktop 3.5.0 el estudio de Pine se añade con el objeto metaInfo del guardado. Un texto, sea el nombre o `script$user;…`, lo rechaza el inserter java. |
+| 0.10.17 | En TradingView Desktop 3.5.0 el estudio de Pine se añade con `createStudyInserter({type:'pine', pineId:'USER;<hash>', pineVersion:'last'})`. Un texto o un metaInfo JSON no sirve. Si ya está en el gráfico, no se duplica. |
 | 0.10.16 | Smart Money Structure se llama Smart Money Algo y, si el estudio viejo ya estaba, se reemplaza sin duplicarlo y conserva si estaba oculto. El id `script$user;…` de TradingView Desktop 3.5.0 ya se acepta. Si la instalación falla, se ve el motivo y se reintenta. La granja abre otra vez en ventana propia aunque falte el ayudante del navegador. |
 | 0.10.15 | Los algoritmos se instalan y se muestran o se ocultan aunque haya un trade y aunque la luz de Tradovate esté roja. Ya no se quedan en «sin-broker». Un estudio oculto por la persona sigue oculto. Mientras se instalan, la granja avisa y al terminar dice «Algoritmos listos». Abajo a la derecha, el botón que tapa los números es un candado. |
 | 0.10.14 | Ai Profit Camp Algo y Smart Money Structure se instalan como estudios aparte si faltan en el gráfico. Un ojo en la barra, junto a Hoy, lista cada uno y lo muestra o lo oculta. Si la persona lo ocultó en TradingView, no se vuelve a poner. |
