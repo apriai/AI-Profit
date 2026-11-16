@@ -82,12 +82,8 @@ public class InstUI {
     return best;
   }
   public static void Click(IntPtr h) {
-    RECT r; GetWindowRect(h, out r);
-    int x = Math.Max(1, (r.R - r.L) / 2);
-    int y = Math.Max(1, (r.B - r.T) / 2);
-    int packed = (y << 16) | (x & 0xFFFF);
-    SendMessage(h, 0x0201, (IntPtr)1, (IntPtr)packed);
-    SendMessage(h, 0x0202, IntPtr.Zero, (IntPtr)packed);
+    // BM_CLICK es el mismo aviso que produce un clic de ratón en un botón.
+    SendMessage(h, 0x00F5, IntPtr.Zero, IntPtr.Zero);
   }
   public static void Shot(IntPtr h, string path) {
     RECT r; if (!GetWindowRect(h, out r)) return;

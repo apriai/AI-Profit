@@ -210,9 +210,9 @@ Function PulsarSiguiente
   Pop $0
   GetDlgItem $0 $HWNDPARENT 1
   EnableWindow $0 1
-  ; El botón 1 sigue oculto. PostMessage entrega el comando al asistente
-  ; cuando este clic ya terminó, sin reentrar en el cuadro.
-  System::Call 'user32::PostMessage(p $HWNDPARENT, i ${WM_COMMAND}, i 1, i 0)'
+  ; OcultarCromo lo dejó invisible: BM_CLICK no cambia de página si está oculto.
+  ShowWindow $0 ${SW_SHOW}
+  SendMessage $0 ${BM_CLICK} 0 0
 FunctionEnd
 
 Function PulsarAbrir
