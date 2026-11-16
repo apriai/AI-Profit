@@ -13,6 +13,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 ## [0.10.17] — 2026-11-16
 ### Corregido
 - **El estudio de Pine se añade con el objeto metaInfo, no con un texto.** En TradingView Desktop 3.5.0, `createStudy` con cualquier texto arma un inserter de tipo java y rechaza `script$user;<hash>`. El guardado ya devolvía el metaInfo; ahora ese objeto se pasa a `createStudy`, que entra a `insertStudy`, igual que el editor de Pine. El texto queda solo para estudios estándar, como Bollinger. Si el guardado no trae el objeto, se pide a `pine-facade/translate`.
+### Cambiado
+- **Los avisos de los algoritmos salen del ojo de la barra.** «Instalando…», «Algoritmos listos» y el motivo si quedó pendiente son una burbuja debajo de ese ojo, con una punta que lo señala. Se acomoda si cambia el tamaño de la ventana y no tapa los números de Hoy.
 ### Notas
 - No abre, no mueve y no cierra órdenes. `orders.mjs` sigue apagado.
 
