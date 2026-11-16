@@ -114,7 +114,14 @@ function Esperar-Ventana([System.Diagnostics.Process]$Proc, [int]$Seg) {
   return [IntPtr]::Zero
 }
 
+Remove-Item -LiteralPath 'HKCU:\Software\AI Profit' -Recurse -Force -ErrorAction SilentlyContinue
 if (Test-Path -LiteralPath $Dir) { Remove-Item -LiteralPath $Dir -Recurse -Force }
+
+function Leer-Version([string]$Carpeta) {
+  $marca = Join-Path $Carpeta 'VERSION'
+  if (Test-Path -LiteralPath $marca) { return (Get-Content -LiteralPath $marca -Raw).Trim() }
+  return ''
+}
 
 if ($Modo -eq 'silencioso') {
   Write-Output "SILENCIOSO $Exe -> $Dir"
@@ -134,13 +141,11 @@ if ($Modo -eq 'silencioso') {
   Write-Output ("CLIC_EN clase={0} texto={1}" -f [InstUI]::ClassOf($boton), [InstUI]::TextOf($boton))
   [InstUI]::Click($boton)
   $fin = (Get-Date).AddSeconds($EsperaSeg)
-  $marca = Join-Path $Dir 'VERSION'
-  $wav1 = Join-Path $Dir 'motor\sonidos\clic-burbuja.wav'
-  $wav2 = Join-Path $Dir 'motor\sonidos\despertar-wuhu.wav'
   while ((Get-Date) -lt $fin) {
-    $lista = ''
-    if (Test-Path -LiteralPath $marca) { $lista = (Get-Content -LiteralPath $marca -Raw).Trim() }
-    if ($lista -eq $Version -and (Test-Path -LiteralPath $wav1) -and (Test-Path -LiteralPath $wav2)) { break }
+    if ((Leer-Version $Dir) -eq $Version) { break }
+    $reg = ''
+    try { $reg = (Get-ItemProperty -LiteralPath 'HKCU:\Software\AI Profit' -ErrorAction Stop).InstallDir } catch {}
+    if ($reg -and (Leer-Version $reg) -eq $Version) { $script:Dir = $reg; break }
     Start-Sleep -Milliseconds 400
   }
   if ($Captura) {
@@ -152,9 +157,12 @@ if ($Modo -eq 'silencioso') {
   }
 }
 
-$marca = Join-Path $Dir 'VERSION'
-$leida = ''
-if (Test-Path -LiteralPath $marca) { $leida = (Get-Content -LiteralPath $marca -Raw).Trim() }
+$leida = Leer-Version $Dir
+$regDir = ''
+try { $regDir = (Get-ItemProperty -LiteralPath 'HKCU:\Software\AI Profit' -ErrorAction Stop).InstallDir } catch {}
+if (-not $leida -and $regDir) { $leida = Leer-Version $regDir; if ($leida) { $Dir = $regDir } }
+Write-Output ("DIR={0}" -f $Dir)
+Write-Output ("REGISTRO={0}" -f $regDir)
 Write-Output ("VERSION_LEIDA={0}" -f $leida)
 $ok = $leida -eq $Version
 if ($DebeFallar) {
