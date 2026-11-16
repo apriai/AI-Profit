@@ -5,7 +5,8 @@ import path from 'node:path';
 const MOTOR = [
   'tradinglink.mjs', 'colchon.mjs', 'account-size.mjs', 'busy.mjs',
   'estrategias-propias.mjs', 'negocio.mjs', 'orders.mjs', 'rutas.mjs', 'strategies.mjs',
-  'tv-reporte.mjs', 'tv-vista-previa.mjs', 'Granja-de-Cuentas-v2.html',
+  'tv-reporte.mjs', 'tv-vista-previa.mjs', 'version-api.mjs', 'pnl-sesion.mjs',
+  'pine-algo.mjs', 'pine/manifest.json', 'pine/ai-profit-camp-algo.pine', 'pine/smart-money-structure.pine', 'Granja-de-Cuentas-v2.html',
   'sonidos/clic-burbuja.wav', 'sonidos/despertar-wuhu.wav',
 ];
 const TV_MODULOS = ['chrome-remote-interface', 'ws', 'commander'];
