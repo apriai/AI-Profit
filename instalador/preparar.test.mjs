@@ -18,7 +18,8 @@ const debe = [
   'motor/pnl-sesion.mjs',
   'motor/pine-algo.mjs',
   'motor/pine/ai-profit-camp-algo.pine',
-  'motor/pine/smart-money-structure.pine',
+  'motor/pine/smart-money-algo.pine',
+  'acceso/navegador-granja.mjs',
   'motor/pine/manifest.json',
   'motor/sonidos/clic-burbuja.wav',
   'motor/sonidos/despertar-wuhu.wav',
@@ -41,4 +42,25 @@ assert.ok(!fs.existsSync(path.join(dest, 'acceso/profito-estado.test.mjs')));
 assert.ok(!fs.existsSync(path.join(dest, 'motor/test-cuentas-50k.mjs')));
 const version = fs.readFileSync(path.join(dest, 'VERSION'), 'utf8').trim();
 assert.match(version, /^\d+\.\d+\.\d+$/);
+
+function archivosCitados(texto) {
+  const out = new Set();
+  const add = (s) => {
+    const base = String(s || '').replace(/\\/g, '/').split('/').pop();
+    if (/^[A-Za-z0-9 ._-]+\.(mjs|js|bat|cmd|ps1)$/.test(base)) out.add(base);
+  };
+  for (const m of texto.matchAll(/%~dp0([^\s"%]+)/g)) add(m[1]);
+  for (const m of texto.matchAll(/path\.join\(AQUI,\s*'([^']+)'\)/g)) add(m[1]);
+  for (const m of texto.matchAll(/['"]([^'"\r\n]+\.(?:mjs|js|bat|cmd|ps1))['"]/g)) add(m[1]);
+  return [...out];
+}
+const accesoDir = path.join(root, 'acceso');
+for (const name of fs.readdirSync(accesoDir)) {
+  if (!/\.(mjs|js|bat|cmd|ps1)$/i.test(name) || /\.test\.mjs$/.test(name)) continue;
+  const texto = fs.readFileSync(path.join(accesoDir, name), 'utf8');
+  for (const citado of archivosCitados(texto)) {
+    if (citado === name || !fs.existsSync(path.join(accesoDir, citado))) continue;
+    assert.ok(fs.existsSync(path.join(dest, 'acceso', citado)), `${name} usa ${citado} y no está en el paquete`);
+  }
+}
 console.log('preparar ok', version);

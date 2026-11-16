@@ -3,13 +3,14 @@
 Documento de relevo para cualquier agente (Grok) que trabaje en este repositorio. Sin datos personales: no hay cuentas, saldos ni claves aquí.
 
 ## Versión actual
-- **Última versión: 0.10.15** (2026-11-16). Está en el archivo `VERSION` y se ve en la esquina inferior izquierda de la granja y, abajo a la derecha de Demo, dentro del panel Negocio. El ojo junto a Hoy lista Ai Profit Camp Algo y Smart Money Structure. Instalarlos o mostrarlos no depende del bróker ni de si hay un trade.
+- **Última versión: 0.10.16** (2026-11-16). Está en el archivo `VERSION` y se ve en la esquina inferior izquierda de la granja y, abajo a la derecha de Demo, dentro del panel Negocio. El ojo junto a Hoy lista Ai Profit Camp Algo y Smart Money Algo. Si un algoritmo no se instala, la granja dice por qué y lo reintenta. La granja abre en su propia ventana.
 - Historial completo y detallado: `CHANGELOG.md`. Cada versión tiene su release en GitHub (`v0.5.1`, etc.).
 - **Al terminar un cambio, actualiza este documento** (versión, fecha y la lista de abajo).
 
 ## Lo que cambió
 | Versión | Qué cambió |
 |---|---|
+| 0.10.16 | Smart Money Structure se llama Smart Money Algo y, si el estudio viejo ya estaba, se reemplaza sin duplicarlo y conserva si estaba oculto. El id `script$user;…` de TradingView Desktop 3.5.0 ya se acepta. Si la instalación falla, se ve el motivo y se reintenta. La granja abre otra vez en ventana propia aunque falte el ayudante del navegador. |
 | 0.10.15 | Los algoritmos se instalan y se muestran o se ocultan aunque haya un trade y aunque la luz de Tradovate esté roja. Ya no se quedan en «sin-broker». Un estudio oculto por la persona sigue oculto. Mientras se instalan, la granja avisa y al terminar dice «Algoritmos listos». Abajo a la derecha, el botón que tapa los números es un candado. |
 | 0.10.14 | Ai Profit Camp Algo y Smart Money Structure se instalan como estudios aparte si faltan en el gráfico. Un ojo en la barra, junto a Hoy, lista cada uno y lo muestra o lo oculta. Si la persona lo ocultó en TradingView, no se vuelve a poner. |
 | 0.10.13 | El panel Negocio muestra la versión junto a Demo. La barra «Hoy» rota conteo, P&L neto y rachas. La sesión va de las 18:00 a las 16:00 del día siguiente (hora de Nueva York) y se etiqueta con esa fecha; de 16:00 a 18:00 pasa a la sesión siguiente. El P&L del día es el neto de toda esa sesión. Sin `real-allowlist.json` las cuentas Lucid no se bloquean. |

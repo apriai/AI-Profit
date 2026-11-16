@@ -10,6 +10,15 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.16] — 2026-11-16
+### Corregido
+- **Los algoritmos sí se añaden al gráfico en TradingView Desktop 3.5.0.** Al guardar, el id vuelve como `script$user;<hash>` y el gráfico lo rechazaba («unexpected study id»). Ahora se acepta ese formato y también `USER;`, `PUB;`, `STD;`, `Script$…` y variantes nuevas. Si falla, la granja dice el motivo y lo reintenta sola, en vez de quedarse en «pendiente» sin explicación.
+- **La granja vuelve a abrir en su propia ventana.** Desde la 0.10.12 el acceso depende de `navegador-granja.mjs`. Si ese archivo no está en la instalación, el acceso abría una pestaña normal. Si falta, ahora prueba Brave, Edge y Chrome con `--app`, igual que antes. El instalador incluye el archivo.
+### Cambiado
+- **Smart Money Structure pasa a llamarse Smart Money Algo.** El indicador, el script guardado y el ojo de la barra usan ese nombre. Si ya estaba el estudio viejo, se reemplaza sin duplicarlo y se conserva si estaba oculto o visible. Durante ese cambio sale el aviso de instalación.
+### Notas
+- No abre, no mueve y no cierra órdenes. `orders.mjs` sigue apagado.
+
 ## [0.10.15] — 2026-11-16
 ### Corregido
 - **Los indicadores se instalan aunque haya un trade y aunque la luz de Tradovate cambie.** Antes se quedaban en «pendiente» con el motivo «sin-broker» si el panel de órdenes de TradingView no devolvía el bróker, aunque las tres luces estuvieran verdes. Instalar o mostrar u ocultar un algoritmo ya no mira el bróker, la cuenta, el símbolo, las posiciones ni las órdenes. Un estudio que la persona ocultó sigue oculto.

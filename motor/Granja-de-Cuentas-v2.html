@@ -5229,11 +5229,20 @@ function qu(){dh.update();const n=Math.min(dh.getDelta(),jx);qo+=n;const e=qo;fo
     cerrar(e, !(e.target.closest && e.target.closest('button')));
   });
   function esc(s) { return String(s || '').replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function razon(m) {
+    m = String(m || '');
+    if (!m) return '';
+    if (m === 'sin-tv' || /9222|ECONN|fetch failed/i.test(m)) return 'TradingView no está abierto. Lo reintento.';
+    if (/unexpected study id/i.test(m)) return 'TradingView no aceptó el id del estudio. Lo reintento.';
+    if (/sin-broker/i.test(m)) return 'No pude leer el gráfico. Lo reintento.';
+    return m.length > 140 ? m.slice(0, 140) : m;
+  }
   function etiqueta(a) {
     if (a.estado === 'instalado') return 'instalado v' + (a.version || '');
     if (a.estado === 'instalando') return 'instalando';
-    if (a.estado === 'error') return 'error';
-    return 'pendiente';
+    var por = razon(a.motivo);
+    if (a.estado === 'error') return por ? 'error. ' + por : 'error';
+    return por ? 'pendiente. ' + por : 'pendiente';
   }
   var AVISO_INSTALANDO = 'Instalando los algoritmos en tu TradingView. Tarda de 1 a 2 minutos. Es normal que veas moverse el gráfico y el editor de Pine.';
   function aviso(j) {
@@ -5248,9 +5257,16 @@ function qu(){dh.update();const n=Math.min(dh.getDelta(),jx);qo+=n;const e=qo;fo
       el.classList.add('listo');
       el.textContent = 'Algoritmos listos';
     } else {
-      el.hidden = true;
-      el.textContent = '';
-      el.classList.remove('listo');
+      var pendientes = (j && j.algos || []).filter(function (a) { return a.estado !== 'instalado' && a.motivo; });
+      if (pendientes.length) {
+        el.hidden = false;
+        el.classList.remove('listo');
+        el.textContent = 'No pude dejar listos los algoritmos. ' + razon(pendientes[0].motivo);
+      } else {
+        el.hidden = true;
+        el.textContent = '';
+        el.classList.remove('listo');
+      }
     }
   }
   function pintar(j) {
@@ -6222,7 +6238,7 @@ function hook(){const G=window.__granja&&window.__granja.pet;if(!G||!G.renderer|
  if(cfg.kind!=="perro"||cfg.body!==A.perro.b||cfg.accent!==A.perro.a){try{applyPet(G,cfg)}catch(err){console.warn("mascota",err)}}
  (function lab(){const p=window.__pet.screen();if(p&&cfg.name){tag.textContent=cfg.name;tag.style.left=p.x+"px";tag.style.top=(p.y-8)+"px";tag.style.display="block"}else tag.style.display="none";requestAnimationFrame(lab)})()}
 setTimeout(hook,600);})();</script>
-<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.15</div>
+<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.16</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/api/version",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
 <script>/* 0.7.0: Profito duerme al abrir (granja en pausa), riega con laptop durante un trade, y etiquetas de cuentas con saldo y etapa. Solo visual: no toca el motor de trading. */
 (function(){

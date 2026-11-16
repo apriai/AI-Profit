@@ -412,7 +412,24 @@ try {
       finally { try { E.close(); } catch {} }
     },
   });
-  const pasarAlgo = () => algoTv.intentar().catch(e => console.log('algo:', e && e.message));
+  let algoEnCurso = false;
+  let algoReintento = null;
+  const pasarAlgo = async () => {
+    if (algoEnCurso) return;
+    algoEnCurso = true;
+    try {
+      const e = await algoTv.intentar();
+      const pendiente = (e.algos || []).some(a => a.estado !== 'instalado');
+      if (pendiente) {
+        clearTimeout(algoReintento);
+        algoReintento = setTimeout(() => { algoReintento = null; pasarAlgo(); }, 60 * 1000);
+      }
+    } catch (e) {
+      console.log('algo:', e && e.message);
+      clearTimeout(algoReintento);
+      algoReintento = setTimeout(() => { algoReintento = null; pasarAlgo(); }, 60 * 1000);
+    } finally { algoEnCurso = false; }
+  };
   const verOjos = () => algoTv.sincronizar().catch(e => console.log('algo:', e && e.message));
   setTimeout(pasarAlgo, 20000);
   setInterval(pasarAlgo, 10 * 60 * 1000);

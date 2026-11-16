@@ -8,6 +8,6 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-start "" http://localhost:8787/Granja-de-Cuentas-v2.html
+rem La ventana propia la abre Abrir Granja.bat. Este archivo solo deja el servidor.
 node "%~dp0..\motor\tradinglink.mjs"
 pause

@@ -90,7 +90,14 @@ if not defined NODE (
   )
 )
 set "NAV="
-if defined NODE for /f "usebackq delims=" %%P in (`"%NODE%" "%~dp0navegador-granja.mjs"`) do if not defined NAV set "NAV=%%P"
+if defined NODE if exist "%~dp0navegador-granja.mjs" for /f "usebackq delims=" %%P in (`"%NODE%" "%~dp0navegador-granja.mjs"`) do if not defined NAV set "NAV=%%P"
+if not defined NAV if exist "%ProgramFiles%\BraveSoftware\Brave-Browser\Application\brave.exe" set "NAV=%ProgramFiles%\BraveSoftware\Brave-Browser\Application\brave.exe"
+if not defined NAV if exist "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" set "NAV=%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"
+if not defined NAV if exist "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" set "NAV=%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"
+if not defined NAV if exist "%LocalAppData%\Microsoft\Edge\Application\msedge.exe" set "NAV=%LocalAppData%\Microsoft\Edge\Application\msedge.exe"
+if not defined NAV if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" set "NAV=%ProgramFiles%\Google\Chrome\Application\chrome.exe"
+if not defined NAV if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" set "NAV=%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
+if not defined NAV if exist "%LocalAppData%\Google\Chrome\Application\chrome.exe" set "NAV=%LocalAppData%\Google\Chrome\Application\chrome.exe"
 if defined NAV (
   start "" "%NAV%" --autoplay-policy=no-user-gesture-required --app="http://localhost:8787/Granja-de-Cuentas-v2.html" --user-data-dir="%PERFIL%" --no-first-run --no-default-browser-check
 ) else (
