@@ -57,6 +57,30 @@ public class InstUI {
     GetWindowText(h, s, s.Capacity);
     return s.ToString();
   }
+  public static string Ultimo = "";
+  public static IntPtr FindButton(IntPtr root) {
+    IntPtr best = IntPtr.Zero;
+    int bestX = -1;
+    var log = new StringBuilder();
+    EnumChildWindows(root, (h, l) => {
+      RECT r;
+      if (!GetWindowRect(h, out r)) return true;
+      int w = r.R - r.L, hh = r.B - r.T, area = w * hh;
+      var cls = new StringBuilder(128);
+      var txt = new StringBuilder(256);
+      GetClassName(h, cls, 128);
+      GetWindowText(h, txt, 256);
+      log.AppendLine(string.Format("HIJO clase={0} texto={1} {2}x{3} x={4}", cls, txt, w, hh, r.L));
+      string c = cls.ToString();
+      if (area >= 2500 && area <= 12000 && hh >= 24 && hh <= 80 && r.L > bestX && (c == "Button" || c == "Static")) {
+        best = h;
+        bestX = r.L;
+      }
+      return true;
+    }, IntPtr.Zero);
+    Ultimo = log.ToString();
+    return best;
+  }
   public static void Click(IntPtr h) {
     RECT r; GetWindowRect(h, out r);
     int x = Math.Max(1, (r.R - r.L) / 2);
@@ -94,32 +118,6 @@ function Esperar-Ventana([System.Diagnostics.Process]$Proc, [int]$Seg) {
   return [IntPtr]::Zero
 }
 
-function Elegir-Boton([IntPtr]$Raiz) {
-  $hijos = New-Object System.Collections.Generic.List[IntPtr]
-  [InstUI]::Children($Raiz, $hijos) | Out-Null
-  $mejor = [IntPtr]::Zero
-  $mejorX = -1
-  $n = $hijos.Count
-  for ($i = 0; $i -lt $n; $i++) {
-    $h = $hijos[$i]
-    $r = New-Object InstUI+RECT
-    if (-not [InstUI]::GetWindowRect($h, [ref]$r)) { continue }
-    $w = $r.R - $r.L
-    $hh = $r.B - $r.T
-    $area = $w * $hh
-    $clase = [InstUI]::ClassOf($h)
-    $texto = [InstUI]::TextOf($h)
-    Write-Output ("HIJO clase={0} texto={1} {2}x{3} x={4}" -f $clase, $texto, $w, $hh, $r.L)
-    if ($area -ge 2500 -and $area -le 12000 -and $hh -ge 24 -and $hh -le 80 -and $r.L -gt $mejorX) {
-      if ($clase -match 'Button|Static') {
-        $mejor = $h
-        $mejorX = $r.L
-      }
-    }
-  }
-  return $mejor
-}
-
 if (Test-Path -LiteralPath $Dir) { Remove-Item -LiteralPath $Dir -Recurse -Force }
 
 if ($Modo -eq 'silencioso') {
@@ -134,7 +132,8 @@ if ($Modo -eq 'silencioso') {
   [InstUI]::SetForegroundWindow($ventana) | Out-Null
   Start-Sleep -Milliseconds 800
   if ($Captura) { [InstUI]::Shot($ventana, ($Captura -replace '\.png$', '-antes.png')) }
-  $boton = Elegir-Boton $ventana
+  $boton = [InstUI]::FindButton($ventana)
+  Write-Output [InstUI]::Ultimo
   if ($boton -eq [IntPtr]::Zero) { throw 'No encontre el boton verde' }
   Write-Output ("CLIC_EN clase={0} texto={1}" -f [InstUI]::ClassOf($boton), [InstUI]::TextOf($boton))
   [InstUI]::Click($boton)
