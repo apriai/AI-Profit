@@ -105,9 +105,10 @@ Function PrepararVentana
 FunctionEnd
 
 Function .onInstSuccess
-  ; Al terminar, pasa solo a la pantalla final. El botón Siguiente está oculto.
+  ; Al terminar, pasa solo a la pantalla final.
   GetDlgItem $0 $HWNDPARENT 1
   EnableWindow $0 1
+  ShowWindow $0 ${SW_SHOW}
   SendMessage $0 ${BM_CLICK} 0 0
 FunctionEnd
 
@@ -188,37 +189,26 @@ Function PonerFrase
   Pop $R9
 FunctionEnd
 
-Function PonerBoton
+; El botón nativo Siguiente (id 1) es el que cambia de página.
+; Se coloca encima de la franja, con la pastilla verde. Ocultarlo rompe el clic.
+Function EstilarSiguiente
   Exch $R9
   StrCpy $R1 "Instalar"
-  StrCpy $R4 1200
   ${If} $R9 == "btn-abrir.bmp"
     StrCpy $R1 "Abrir"
-    StrCpy $R4 1201
   ${EndIf}
+  GetDlgItem $R8 $HWNDPARENT 1
+  EnableWindow $R8 1
+  ShowWindow $R8 ${SW_SHOW}
+  System::Call 'user32::SetWindowText(p $R8, t r1)'
   System::Call 'user32::LoadImage(p 0, t "$PLUGINSDIR\$R9", i ${IMAGE_BITMAP}, i 0, i 0, i ${LR_LOADFROMFILE}) p.R2'
   StrCpy $BmpBoton $R2
-  ; Botón real (id distinto de 0). Un STATIC con id 0 no entrega el clic,
-  ; y BM_CLICK sobre el Siguiente oculto no cambia de página.
-  System::Call 'user32::CreateWindowEx(i 0, t "BUTTON", t r1, i ${WS_CHILD}|${WS_VISIBLE}|${WS_TABSTOP}|${BS_BITMAP}|${BS_FLAT}, i 570, i 420, i 132, i 36, p $Dialogo, i r4, p 0, p 0) p.R8'
+  System::Call 'user32::SetWindowLong(p $R8, i -16, i ${WS_CHILD}|${WS_VISIBLE}|${WS_TABSTOP}|${BS_BITMAP}|${BS_FLAT})'
   System::Call 'uxtheme::SetWindowTheme(p $R8, p 0, p 0)'
   System::Call 'user32::SendMessage(p $R8, i ${BM_SETIMAGE}, i ${IMAGE_BITMAP}, p $R2)'
+  ; HWND_TOP y tamaño nuevo: queda encima del cuadro interior, en la franja.
+  System::Call 'user32::SetWindowPos(p $R8, p 0, i 570, i 420, i 132, i 36, i 0x30)'
   Pop $R9
-FunctionEnd
-
-Function PulsarSiguiente
-  Pop $0
-  GetDlgItem $0 $HWNDPARENT 1
-  EnableWindow $0 1
-  ; OcultarCromo lo dejó invisible: BM_CLICK no cambia de página si está oculto.
-  ShowWindow $0 ${SW_SHOW}
-  SendMessage $0 ${BM_CLICK} 0 0
-FunctionEnd
-
-Function PulsarAbrir
-  Pop $0
-  ExecShell "open" "$INSTDIR\acceso\AI Profit.cmd"
-  Quit
 FunctionEnd
 
 Function BienvenidaCrear
@@ -229,8 +219,7 @@ Function BienvenidaCrear
   Push "Instalar AI Profit"
   Call PonerFrase
   Push "btn-instalar.bmp"
-  Call PonerBoton
-  ${NSD_OnClick} $R8 PulsarSiguiente
+  Call EstilarSiguiente
   nsDialogs::Show
 FunctionEnd
 
@@ -270,13 +259,13 @@ Function ListoCrear
   Push "¡Listo!"
   Call PonerFrase
   Push "btn-abrir.bmp"
-  Call PonerBoton
-  ${NSD_OnClick} $R8 PulsarAbrir
+  Call EstilarSiguiente
   nsDialogs::Show
 FunctionEnd
 
 Function ListoSalir
   Call SoltarImagen
+  ExecShell "open" "$INSTDIR\acceso\AI Profit.cmd"
 FunctionEnd
 
 Section "Profito" SecMain
