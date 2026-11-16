@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.9] — 2026-11-16
+### Corregido
+- **El botón Instalar del instalador ya avanza.** El botón verde era una imagen estática con identificador 0, y el clic no llegaba. Aunque llegara, llamaba al botón Siguiente, que está oculto, y la página no cambiaba. Ahora es un botón de verdad y el avance se envía al asistente. La instalación puede empezar.
+### Notas
+- No abre, no mueve y no cierra órdenes. Esta versión aún no está publicada: el arreglo está en revisión.
+
 ## [0.10.8] — 2026-11-14
 ### Agregado
 - **Celebración al abrir.** En el momento en que la granja abre, una sola vez, salen los mismos efectos visuales de un trade ganado: la casa salta, el confeti explota y el resto de la celebración. Usa la función que ya existe (`window.__tlCelebrate`), con `soloVisual` para no disparar la fanfarria ni los efectos de sonido. No abre el resumen, no anota una ganancia y no cambia saldos, historial ni métricas. Los sonidos quedan como estaban.

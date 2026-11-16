@@ -1,0 +1,79 @@
+# Solo esta rama. No publica una release.
+name: Probar clic del instalador
+
+on:
+  push:
+    branches:
+      - cursor/instalador-clic-instalar-863a
+
+permissions:
+  contents: read
+
+jobs:
+  clic:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: NSIS 3.11
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $nsis = "C:\Program Files (x86)\NSIS"
+          $ok = $false
+          foreach ($i in 1..4) {
+            choco install nsis --version=3.11.0 -y --no-progress
+            if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath "$nsis\makensis.exe")) { $ok = $true; break }
+            Start-Sleep -Seconds 15
+          }
+          if (-not $ok) { throw "No se pudo instalar NSIS" }
+          Add-Content -Path $env:GITHUB_PATH -Value $nsis
+
+      - name: Plan B, instalador publicado en silencio
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path $env:RUNNER_TEMP 'Profito-Setup-0.10.8.exe'
+          Invoke-WebRequest -Uri 'https://github.com/apriai/AI-Profit/releases/download/v0.10.8/Profito-Setup.exe' -OutFile $exe
+          .\instalador\probar-clic.ps1 -Modo silencioso -Exe $exe -Dir 'C:\ProfitoSilent108' -Version '0.10.8'
+
+      - name: El 0.10.8 publicado no avanza con el clic
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path $env:RUNNER_TEMP 'Profito-Setup-0.10.8.exe'
+          New-Item -ItemType Directory -Force -Path capturas | Out-Null
+          .\instalador\probar-clic.ps1 -Modo clic -Exe $exe -Dir "$env:LOCALAPPDATA\Profito" -Version '0.10.8' -DebeFallar -EsperaSeg 12 -Captura capturas\viejo.png
+
+      - name: Construir 0.10.9
+        shell: pwsh
+        run: .\instalador\construir.ps1
+
+      - name: El clic de 0.10.9 instala
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\instalador\probar-clic.ps1 -Modo clic -Exe dist\Profito-Setup.exe -Dir "$env:LOCALAPPDATA\Profito" -Version '0.10.9' -EsperaSeg 90 -Captura capturas\nuevo.png
+
+      - name: El exe nuevo trae los dos sonidos
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          choco install 7zip -y --no-progress
+          $z = 'C:\Program Files\7-Zip\7z.exe'
+          if (-not (Test-Path $z)) { throw 'No esta 7z' }
+          & $z l 'dist\Profito-Setup.exe' | Select-String -Pattern 'clic-burbuja.wav|despertar-wuhu.wav|VERSION'
+          $texto = (& $z l 'dist\Profito-Setup.exe') -join "`n"
+          if ($texto -notmatch 'clic-burbuja\.wav') { throw 'El exe no trae clic-burbuja.wav' }
+          if ($texto -notmatch 'despertar-wuhu\.wav') { throw 'El exe no trae despertar-wuhu.wav' }
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: capturas-clic-instalador
+          path: capturas
+          if-no-files-found: ignore
