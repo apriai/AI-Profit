@@ -3,13 +3,14 @@
 Documento de relevo para cualquier agente (Grok) que trabaje en este repositorio. Sin datos personales: no hay cuentas, saldos ni claves aquí.
 
 ## Versión actual
-- **Última versión: 0.10.13** (2026-11-16). Está en el archivo `VERSION` y se ve en la esquina inferior izquierda de la granja y, abajo a la derecha de Demo, dentro del panel Negocio.
+- **Última versión: 0.10.14** (2026-11-16). Está en el archivo `VERSION` y se ve en la esquina inferior izquierda de la granja y, abajo a la derecha de Demo, dentro del panel Negocio. El ojo junto a Hoy lista Ai Profit Camp Algo y Smart Money Structure.
 - Historial completo y detallado: `CHANGELOG.md`. Cada versión tiene su release en GitHub (`v0.5.1`, etc.).
 - **Al terminar un cambio, actualiza este documento** (versión, fecha y la lista de abajo).
 
 ## Lo que cambió
 | Versión | Qué cambió |
 |---|---|
+| 0.10.14 | Ai Profit Camp Algo y Smart Money Structure se instalan como estudios aparte si faltan en el gráfico. Un ojo en la barra, junto a Hoy, lista cada uno y lo muestra o lo oculta. Si la persona lo ocultó en TradingView, no se vuelve a poner. |
 | 0.10.13 | El panel Negocio muestra la versión junto a Demo. La barra «Hoy» rota conteo, P&L neto y rachas. La sesión va de las 18:00 a las 16:00 del día siguiente (hora de Nueva York) y se etiqueta con esa fecha; de 16:00 a 18:00 pasa a la sesión siguiente. El P&L del día es el neto de toda esa sesión. Sin `real-allowlist.json` las cuentas Lucid no se bloquean. |
 | 0.10.12 | El acceso abre el navegador predeterminado si es Chrome, Edge o Brave, con permiso para la fanfarria. Si no, Chrome y después Edge. |
 | 0.10.11 | Al abrir, la fanfarria de un trade ganado suena junto con el salto, la casa y el confeti. El acceso abre Edge o Chrome en ventana propia con permiso de autoplay. Los clics de la interfaz usan sonidos sintetizados. Despertar a Profito suena «DJ Inicio». Si el panel de TradingView está cerrado, el nombre de la cuenta se lee de la API del bróker para la luz de Tradovate. La allowlist y el cambio de cuenta antes de operar no se aflojan. |

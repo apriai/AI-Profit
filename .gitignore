@@ -23,6 +23,9 @@ negocio.json.tmp-*
 estrategias-propias.json
 # Cierres ya atendidos por el reporte en TradingView (personal; no es una cola)
 tv-reporte.json
+# Versión del indicador ya instalada en el TradingView de esta PC
+algo-tv.json
+algo-tv.json.tmp-*
 tv-reporte.json.tmp-*
 estrategias-propias.json.tmp-*
 backups-negocio/

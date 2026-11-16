@@ -12,6 +12,7 @@ import { dataDir, ROOT, HTML, TV_CLI } from './rutas.mjs';
 import { rulesFor, maxQtyFor } from './account-size.mjs';
 import { textoVersion } from './version-api.mjs';
 import { cerrarSesion } from './pnl-sesion.mjs';
+import { crearAlgoTv } from './pine-algo.mjs';
 const DIR = dataDir();
 const TV = TV_CLI;
 const PORT = 8787, EVERY_MS = 5 * 60 * 1000;
@@ -362,6 +363,24 @@ http.createServer((q, r) => {
     r.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
     return r.end(t);
   }
+  if (q.url === '/api/algo-tv' || q.url.startsWith('/api/algo-tv?')) {
+    if (q.method === 'GET') {
+      let e = { conectado: false, algos: [], texto: '' };
+      try { e = algoTv.estado(); } catch {}
+      r.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      return r.end(JSON.stringify(e));
+    }
+    if (q.method === 'POST') {
+      let b = ''; q.on('data', c => b += c); q.on('end', async () => {
+        let j = {}; try { j = JSON.parse(b || '{}'); } catch {}
+        let out = { ok: false, conectado: false, algos: [], texto: '' };
+        try { out = await algoTv.fijar(j.nombre, j.visible); } catch (e) { out.motivo = String(e && e.message || e); }
+        r.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+        r.end(JSON.stringify(out));
+      });
+      return;
+    }
+  }
   if (q.method === 'GET' && q.url.startsWith('/sonidos/')) {
     const nombre = path.basename(q.url.split('?')[0]);
     if (nombre === 'clic-burbuja.wav' || nombre === 'despertar-wuhu.wav') {
@@ -381,3 +400,23 @@ cycle(); setInterval(cycle, 30 * 1000);
 const guardarHist = () => { for (const d of new Set([diaFarm(), diaFarm(Date.now() - 36e5)])) tradesDe(d).catch(() => {}); };
 setInterval(guardarHist, 3 * 60 * 1000);
 setTimeout(guardarHist, 15000);
+
+let algoTv = { estado: () => ({ conectado: false, algos: [], texto: '' }), intentar: async () => algoTv.estado(), sincronizar: async () => algoTv.estado(), fijar: async () => ({ ok: false, ...algoTv.estado() }) };
+try {
+  algoTv = crearAlgoTv({
+    dir: DIR,
+    ocupado: () => colchon.status().state === 'running' || acctGuard.testActive,
+    log: (...a) => console.log(...a),
+    evaluar: async (expr) => {
+      const E = await cdpEvaluator(9222);
+      try { return await Promise.race([E.evaluate(expr), sleep(20000).then(() => { throw new Error('algo: tiempo agotado'); })]); }
+      finally { try { E.close(); } catch {} }
+    },
+  });
+  const pasarAlgo = () => algoTv.intentar().catch(e => console.log('algo:', e && e.message));
+  const verOjos = () => algoTv.sincronizar().catch(e => console.log('algo:', e && e.message));
+  setTimeout(pasarAlgo, 20000);
+  setInterval(pasarAlgo, 10 * 60 * 1000);
+  setTimeout(verOjos, 25000);
+  setInterval(verOjos, 30000);
+} catch (e) { console.log('algo: no arrancó; el motor sigue.', e && e.message); }

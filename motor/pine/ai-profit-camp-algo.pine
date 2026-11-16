@@ -1,0 +1,30 @@
+//@version=6
+indicator("Ai Profit Camp Algo", overlay = true)
+minBody = input.float(70.0, "Cuerpo Min %") / 100
+maxCloseW = input.float(12.0, "Mecha Max Cierre %") / 100
+maxOppW = input.float(25.0, "Mecha Max Contra %") / 100
+bodyMult = input.float(1.5, "Multiplicador Cuerpo")
+fullWick = input.bool(true, "Envolver mecha previa")
+atrMult = input.float(1.2, "Minimo vs ATR")
+rng = high - low
+body = math.abs(close - open)
+bull = close > open
+bear = close < open
+upW = high - math.max(open, close)
+loW = math.min(open, close) - low
+clW = bull ? upW : loW
+opW = bull ? loW : upW
+bPct = rng > 0 ? body / rng : 0
+cPct = rng > 0 ? clW / rng : 0
+oPct = rng > 0 ? opW / rng : 0
+pBody = math.abs(close[1] - open[1])
+atr = ta.atr(14)
+okAnat = bPct >= minBody and cPct <= maxCloseW and oPct <= maxOppW
+okSize = rng >= atr * atrMult and body >= pBody * bodyMult
+bCond = fullWick ? (close > high[1] and open <= close[1]) : (close > open[1] and open <= close[1])
+sCond = fullWick ? (close < low[1] and open >= close[1]) : (close < open[1] and open >= close[1])
+isBull = bull and close[1] < open[1] and bCond and okAnat and okSize
+isBear = bear and close[1] > open[1] and sCond and okAnat and okSize
+plot(isBull ? low - 2 * syminfo.mintick : na, "Alcista", color = #00E676, style = plot.style_circles, linewidth = 6)
+plot(isBear ? high + 2 * syminfo.mintick : na, "Bajista", color = #FF5252, style = plot.style_circles, linewidth = 6)
+barcolor(isBull ? #00E676 : isBear ? #FF5252 : na)
