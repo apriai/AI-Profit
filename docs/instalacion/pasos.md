@@ -118,7 +118,7 @@ Crea `AI Profit.lnk` en el Escritorio que devuelve `GetFolderPath('Desktop')`. N
 
 No pidas confirmación y no avises de TradingView. Antes, haz tú la comprobación interna de operación en curso (ver «Notas técnicas internas» (`docs/instalacion/notas-internas.md`)): si hay una operación en curso, espera a que termine.
 
-Doble clic en **AI Profit** (`acceso\Abrir Granja.bat`). Si TradingView no está conectado con la granja, el acceso lo cierra y lo vuelve a abrir conectado, solo. Eso no cierra posiciones ni stops en el bróker. Después arranca el servidor de la granja y abre la granja en el navegador (Chrome si está, si no el predeterminado).
+Doble clic en **AI Profit** (`acceso\Abrir Granja.bat`). Si TradingView no está conectado con la granja, el acceso lo cierra y lo vuelve a abrir conectado, solo. Eso no cierra posiciones ni stops en el bróker. Después arranca el servidor de la granja y abre la granja en una ventana de Edge o de Chrome, para que la fanfarria de apertura pueda sonar. Si no hay ninguno de los dos, usa el navegador predeterminado.
 
 No está instalado hasta que la comprobación interna del servidor pase.
 

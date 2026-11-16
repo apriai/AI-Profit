@@ -10,6 +10,14 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.11] — 2026-11-16
+### Cambiado
+- **La fanfarria suena al abrir, junto con la celebración.** El acceso AI Profit abre la granja en una ventana de Edge o Chrome, con permiso para sonar sin un clic previo. En ese momento salen juntos el salto, la casa, el confeti y la fanfarria de un trade ganado (`window.__tlCelebrate`). Si el audio siguiera bloqueado, se ven los efectos y el sonido no queda para un clic posterior. El botón de silencio se respeta. No anota una ganancia.
+- **La luz de Tradovate ve la cuenta aunque el panel esté cerrado.** Si TradingView no muestra el nombre en la página, se toma de la API del bróker (cuenta actual y su ficha). La luz puede ponerse verde y la comprobación de cuenta deja de decir que no la ve. Cambiar de cuenta para operar sigue exigiendo el nombre visible, y la lista de cuentas reales permitidas no cambia.
+- **Sonidos de la interfaz, sintetizados.** Al abrir Historial, Métrica, Negocio o una planta suena abrir carta. Los botones suenan selección. Día/noche, silencio y el ojito suenan interruptor. Cerrar un panel suena un toque. Al despertar a Profito suena «DJ Inicio», en lugar del wuhu; si el agente ya está despierto, ese clic cierra el panel con un toque. La fanfarria de un trade, el sonido de pérdida y el silencio de BUY y SELL no cambian. Todo usa un solo AudioContext y respeta el silencio.
+### Notas
+- No abre, no mueve y no cierra órdenes. El arreglo del instalador está en 0.10.10, aquí abajo.
+
 ## [0.10.10] — 2026-11-16
 ### Corregido
 - **Al terminar de copiar, el instalador pasa a ¡Listo!** La barra se llenaba y los archivos quedaban en la carpeta, pero la pantalla se quedaba en «Instalando…». El avance estaba en `.onInstSuccess`, y eso solo corre al cerrar el instalador. Ahora, al acabar la sección, la página de progreso se cierra sola y aparece «Abrir».
