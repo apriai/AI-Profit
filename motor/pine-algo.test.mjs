@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import {
-  ALGO_NOMBRE, ALGO_VERSION, FUENTE_PINE, PINE_DIR, crearAlgoTv, esElAlgo, estudiosAlgo, exprAlgo, exprOjos, leerFuente, planAlgo, textoAlgo,
+  ALGO_NOMBRE, ALGO_VERSION, FUENTE_PINE, PINE_DIR, crearAlgoTv, esElAlgo, estudiosAlgo, exprAlgo, exprMirar, exprOjos, leerFuente, planAlgo, textoAlgo,
 } from './pine-algo.mjs';
 
 const fuente = leerFuente(FUENTE_PINE);
@@ -26,6 +26,7 @@ assert.equal(planAlgo({ enGrafico: 0, versionGuardada: '1' }), 'instalar');
 assert.equal(planAlgo({ enGrafico: 2, versionGuardada: '1' }), 'deduplicar');
 assert.equal(textoAlgo({ nombre: 'Ai Profit Camp Algo', estado: 'instalado', version: '1' }), 'Algo TradingView: Ai Profit Camp Algo instalado v1');
 assert.equal(textoAlgo({ nombre: 'Ai Profit Camp Algo', estado: 'pendiente' }), 'Algo TradingView: Ai Profit Camp Algo pendiente');
+assert.equal(textoAlgo({ nombre: 'Ai Profit Camp Algo', estado: 'instalando' }), 'Algo TradingView: Ai Profit Camp Algo instalando');
 assert.equal(textoAlgo({ nombre: 'Ai Profit Camp Algo', estado: 'error' }), 'Algo TradingView: Ai Profit Camp Algo error');
 
 const expr = exprAlgo({ source: fuente, versionGuardada: '', studyIdGuardado: '' });
@@ -35,6 +36,10 @@ assert.match(expr, /pine-facade\/save\/new/);
 assert.match(expr, /pine-facade\/save\/next/);
 assert.doesNotMatch(expr, /placeOrder|modifyOrder|closePosition|editPositionBrackets|cancelOrder|setVisible|setCurrentAccount|setSymbol|activeBroker|paper_trading|positions\(|activeOrders|sin-broker|sin-posiciones/);
 new vm.Script(expr);
+const mira = exprMirar({ nombre: ALGO_NOMBRE, studyId: 's1' });
+assert.match(mira, /"mirar":true/);
+assert.doesNotMatch(mira, /pine-facade|createStudy|setVisible|placeOrder|activeBroker|setSymbol|setCurrentAccount/);
+new vm.Script(mira);
 const ojos = exprOjos({ accion: 'fijar', nombre: ALGO_NOMBRE, visible: false });
 assert.match(ojos, /setVisible/);
 assert.doesNotMatch(ojos, /placeOrder|closePosition|activeBroker|positions\(|activeOrders|setCurrentAccount|setSymbol/);
@@ -43,12 +48,16 @@ assert.match(exprOjos({ nombres: [ALGO_NOMBRE], accion: 'leer' }), /accion==='le
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'algo-tv-'));
 const vistos = [];
-const algo = crearAlgoTv({
+let algo;
+algo = crearAlgoTv({
   dir,
   pineDir: PINE_DIR,
   evaluar: async (codigo) => {
     vistos.push(codigo);
     if (codigo.includes('setVisible')) return { ok: true, visible: false, studyId: 's1' };
+    if (codigo.includes('"mirar":true')) return { ok: true, mirar: true, enGrafico: 0, visible: null, studyId: '' };
+    assert.equal(algo.estado().fase, 'instalando');
+    assert.equal(algo.estado().algos.some(a => a.estado === 'instalando'), true);
     return { ok: true, estado: 'instalado', version: '1', enGrafico: 1, visible: true, studyId: 's1', scriptId: 'USER;1', plan: 'instalar' };
   },
   log: () => {},
@@ -56,6 +65,7 @@ const algo = crearAlgoTv({
 assert.match(algo.estado().texto, /Ai Profit Camp Algo pendiente/);
 const hecho = await algo.intentar();
 assert.match(hecho.texto, /Ai Profit Camp Algo instalado v1/);
+assert.equal(hecho.fase, 'listos');
 assert.match(hecho.texto, /Smart Money Structure instalado v1/);
 assert.equal(hecho.algos.length, 2);
 const estudios = vistos.filter(c => c.includes('pine-facade/save/new'));
@@ -72,12 +82,15 @@ assert.match(sms, /alertcondition\(eql_alert, 'Equal Lows', 'Equal lows detected
 const ojo = await algo.fijar('Ai Profit Camp Algo', false);
 assert.equal(ojo.ok, true);
 assert.equal(ojo.algos[0].visible, false);
+assert.notEqual(ojo.fase, 'instalando');
 assert.equal(vistos.some(c => c.includes('setVisible')), true);
 
 const enTrade = crearAlgoTv({
   dir: fs.mkdtempSync(path.join(os.tmpdir(), 'algo-trade-')),
   pineDir: PINE_DIR,
-  evaluar: async () => ({ ok: true, estado: 'instalado', version: '1', enGrafico: 1, visible: false, studyId: 's9', scriptId: 'USER;9', plan: 'instalar' }),
+  evaluar: async (codigo) => codigo.includes('"mirar":true')
+    ? { ok: true, mirar: true, enGrafico: 0, visible: null, studyId: '' }
+    : { ok: true, estado: 'instalado', version: '1', enGrafico: 1, visible: false, studyId: 's9', scriptId: 'USER;9', plan: 'instalar' },
 });
 const durante = await enTrade.intentar();
 assert.match(durante.texto, /Ai Profit Camp Algo instalado v1/);
@@ -91,12 +104,41 @@ const caido = crearAlgoTv({
 assert.match((await caido.intentar()).texto, /pendiente/);
 assert.equal((await caido.intentar()).conectado, false);
 
-const fallo = crearAlgoTv({
+let fallo;
+fallo = crearAlgoTv({
   dir: fs.mkdtempSync(path.join(os.tmpdir(), 'algo-fallo-')),
   pineDir: PINE_DIR,
-  evaluar: async () => ({ ok: false, estado: 'error', motivo: 'guardar 401' }),
+  evaluar: async (codigo) => {
+    if (codigo.includes('"mirar":true')) return { ok: true, mirar: true, enGrafico: 0, visible: null, studyId: '' };
+    assert.equal(fallo.estado().fase, 'instalando');
+    return { ok: false, estado: 'error', motivo: 'guardar 401' };
+  },
 });
-assert.match((await fallo.intentar()).texto, /error/);
+const mal = await fallo.intentar();
+assert.match(mal.texto, /pendiente/);
+assert.equal(mal.fase, null);
+assert.equal(mal.algos.every(a => a.estado === 'pendiente'), true);
+
+const dirYa = fs.mkdtempSync(path.join(os.tmpdir(), 'algo-ya-'));
+fs.writeFileSync(path.join(dirYa, 'algo-tv.json'), JSON.stringify({ algos: {
+  'Ai Profit Camp Algo': { estado: 'instalado', version: '1', visible: true, studyId: 's1' },
+  'Smart Money Structure': { estado: 'instalado', version: '1', visible: false, studyId: 's2' },
+} }));
+const vistosYa = [];
+const ya = crearAlgoTv({
+  dir: dirYa,
+  pineDir: PINE_DIR,
+  evaluar: async (codigo) => {
+    vistosYa.push(codigo);
+    if (!codigo.includes('"mirar":true')) throw new Error('no debía guardar');
+    const oculto = codigo.includes('Smart Money Structure');
+    return { ok: true, mirar: true, enGrafico: 1, visible: !oculto, studyId: oculto ? 's2' : 's1' };
+  },
+});
+const quieto = await ya.intentar();
+assert.equal(quieto.fase, null);
+assert.equal(vistosYa.some(c => c.includes('pine-facade')), false);
+assert.equal(quieto.algos.find(a => a.nombre === 'Smart Money Structure').visible, false);
 
 const html = fs.readFileSync(new URL('./Granja-de-Cuentas-v2.html', import.meta.url), 'utf8');
 const server = fs.readFileSync(new URL('./tradinglink.mjs', import.meta.url), 'utf8');
@@ -107,6 +149,10 @@ assert.match(html, /__tlCard/);
 assert.match(html, /__tlTap/);
 assert.match(html, /__tlToggle/);
 assert.match(html, /\/api\/algo-tv/);
+assert.match(html, /id="tlAlgoAviso"/);
+assert.match(html, /Instalando los algoritmos en tu TradingView\. Tarda de 1 a 2 minutos\. Es normal que veas moverse el gráfico y el editor de Pine\./);
+assert.match(html, /Algoritmos listos/);
+assert.match(html, /j\.fase === 'instalando'/);
 assert.match(server, /q\.method === 'POST'/);
 assert.match(server, /algoTv\.fijar/);
 assert.match(server, /algoTv\.sincronizar/);

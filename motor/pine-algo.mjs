@@ -33,6 +33,7 @@ export function planAlgo({ enGrafico = 0, versionGuardada = '', version = ALGO_V
 export function textoAlgo(item) {
   const nombre = item && item.nombre ? item.nombre : ALGO_NOMBRE;
   if (item && item.estado === 'instalado') return `Algo TradingView: ${nombre} instalado v${item.version || ''}`;
+  if (item && item.estado === 'instalando') return `Algo TradingView: ${nombre} instalando`;
   if (item && item.estado === 'error') return `Algo TradingView: ${nombre} error`;
   return `Algo TradingView: ${nombre} pendiente`;
 }
@@ -58,10 +59,7 @@ export function leerFuente(ruta) {
   return fs.readFileSync(ruta, 'utf8').replace(/^\uFEFF/, '').replace(/\s+$/, '') + '\n';
 }
 
-export function exprAlgo({ source, nombre = ALGO_NOMBRE, version = ALGO_VERSION, versionGuardada = '', studyIdGuardado = '' } = {}) {
-  const datos = JSON.stringify({ source: String(source || ''), nombre, version, versionGuardada: String(versionGuardada || ''), studyId: String(studyIdGuardado || '') });
-  return `(async function(){
-var D=${datos};
+const ESCANEO = `
 function mismo(n){return String(n||'').trim().toLowerCase()===String(D.nombre).toLowerCase()}
 function chart(){var api=window.TradingViewApi; if(!api||typeof api.activeChart!=='function') return null; try{return api.activeChart()}catch(e){return null}}
 function meter(mapa, s){
@@ -107,6 +105,25 @@ function todos(){
 function lista(){
   return todos().filter(function(s){return mismo(s.name) || (D.studyId && s.id===D.studyId)});
 }
+`;
+
+// Solo lee el gráfico. No guarda, no añade y no abre el editor.
+export function exprMirar({ nombre = ALGO_NOMBRE, studyId = '' } = {}) {
+  const datos = JSON.stringify({ nombre, studyId: String(studyId || ''), mirar: true });
+  return `(async function(){
+var D=${datos};
+${ESCANEO}
+var estudios=lista();
+var primero=estudios[0];
+return {ok:true, mirar:true, enGrafico:estudios.length, visible:estudios.length?(primero.oculto?false:true):null, studyId:primero&&primero.id||''};
+})()`;
+}
+
+export function exprAlgo({ source, nombre = ALGO_NOMBRE, version = ALGO_VERSION, versionGuardada = '', studyIdGuardado = '' } = {}) {
+  const datos = JSON.stringify({ source: String(source || ''), nombre, version, versionGuardada: String(versionGuardada || ''), studyId: String(studyIdGuardado || '') });
+  return `(async function(){
+var D=${datos};
+${ESCANEO}
 async function scripts(){
   var r=await fetch(${JSON.stringify(FACADE + '/list?filter=saved')},{credentials:'include'});
   if(!r.ok) throw new Error('lista '+r.status);
@@ -299,6 +316,7 @@ export function crearAlgoTv({
   const manifiesto = cargarManifiesto(pineDir);
   let memoria = leerEstado(archivo);
   if (!memoria.algos) memoria.algos = {};
+  if (memoria.fase === 'instalando') { memoria.fase = null; memoria.faseHasta = 0; }
   const vista = () => manifiesto.map(m => {
     const g = memoria.algos[m.nombre] || {};
     return {
@@ -322,9 +340,16 @@ export function crearAlgoTv({
     try { guardarEstado(archivo, memoria); } catch (e) { log('algo: no pude guardar el estado', e && e.message); }
     return estado();
   };
+  function faseActual() {
+    if (memoria.fase === 'listos' && memoria.faseHasta && Date.now() > memoria.faseHasta) {
+      memoria.fase = null;
+      memoria.faseHasta = 0;
+    }
+    return memoria.fase === 'instalando' || memoria.fase === 'listos' ? memoria.fase : null;
+  }
   function estado() {
     const algos = vista();
-    return { conectado: memoria.conectado === true, algos, texto: textoLista(algos) };
+    return { conectado: memoria.conectado === true, fase: faseActual(), algos, texto: textoLista(algos) };
   }
   async function sincronizar() {
     try {
@@ -362,41 +387,77 @@ export function crearAlgoTv({
       return { ok: false, motivo: String(e && e.message || e), ...estado() };
     }
   }
+  function cerrarAviso(listos) {
+    memoria.fase = listos ? 'listos' : null;
+    memoria.faseHasta = listos ? Date.now() + 12000 : 0;
+    try { guardarEstado(archivo, memoria); } catch (e) { log('algo: no pude guardar el estado', e && e.message); }
+  }
   async function uno(m) {
     const prev = memoria.algos[m.nombre] || {};
+    const sondeo = await evaluar(exprMirar({ nombre: m.nombre, studyId: prev.studyId || '' }));
+    if (!sondeo || sondeo.mirar !== true) {
+      publicar(m.nombre, { estado: 'pendiente', motivo: (sondeo && sondeo.motivo) || 'sin-tv' }, m.version);
+      return { trabajo: false, fallo: false, sinTv: true };
+    }
+    const plan = planAlgo({ enGrafico: sondeo.enGrafico, versionGuardada: prev.version || '', version: m.version });
+    if (plan === 'nada') {
+      const visible = sondeo.visible === true ? true : sondeo.visible === false ? false : null;
+      publicar(m.nombre, { estado: 'instalado', motivo: '', visible, studyId: sondeo.studyId || prev.studyId || '' }, m.version);
+      return { trabajo: false, fallo: false };
+    }
+    const anuncia = plan === 'instalar' || plan === 'actualizar';
+    if (anuncia) {
+      memoria.fase = 'instalando';
+      memoria.faseHasta = 0;
+      publicar(m.nombre, { estado: 'instalando', motivo: '' }, m.version);
+    }
     const source = leerFuente(path.join(pineDir, m.archivo));
-    const r = await evaluar(exprAlgo({
-      source, nombre: m.nombre, version: m.version,
-      versionGuardada: prev.version || '', studyIdGuardado: prev.studyId || '',
-    }));
-    if (!r || typeof r !== 'object') return publicar(m.nombre, { estado: 'error', motivo: 'respuesta vacía' }, m.version);
-    if (r.estado === 'instalado') {
-      log('algo:', m.nombre, 'instalado v' + m.version + (r.plan ? ' (' + r.plan + ')' : ''));
-      const visible = typeof r.visible === 'boolean' ? r.visible : prev.visible;
-      return publicar(m.nombre, { estado: 'instalado', motivo: '', visible, scriptId: r.scriptId || prev.scriptId || '', studyId: r.studyId || prev.studyId || '' }, m.version);
+    let r;
+    try {
+      r = await evaluar(exprAlgo({
+        source, nombre: m.nombre, version: m.version,
+        versionGuardada: prev.version || '', studyIdGuardado: prev.studyId || sondeo.studyId || '',
+      }));
+    } catch (e) {
+      const msg = String(e && e.message || e);
+      const sinTv = /ECONN|9222|chart|WebSocket|fetch failed|No encuentro/i.test(msg);
+      publicar(m.nombre, { estado: 'pendiente', motivo: sinTv ? 'sin-tv' : msg }, m.version);
+      return { trabajo: anuncia, fallo: true, sinTv };
     }
-    if (r.estado === 'pendiente') {
-      const seguir = prev.estado === 'instalado' && prev.version === m.version;
-      return publicar(m.nombre, { estado: seguir ? 'instalado' : 'pendiente', motivo: r.motivo || '' }, m.version);
+    if (!r || typeof r !== 'object' || r.estado !== 'instalado') {
+      log('algo:', m.nombre, (r && r.motivo) || 'error');
+      publicar(m.nombre, { estado: 'pendiente', motivo: String((r && r.motivo) || 'error') }, m.version);
+      return { trabajo: anuncia, fallo: true };
     }
-    log('algo:', m.nombre, r.motivo || 'error');
-    return publicar(m.nombre, { estado: 'error', motivo: String(r.motivo || 'error') }, m.version);
+    log('algo:', m.nombre, 'instalado v' + m.version + (r.plan ? ' (' + r.plan + ')' : ''));
+    const visible = typeof r.visible === 'boolean' ? r.visible : (sondeo.visible === true ? true : sondeo.visible === false ? false : prev.visible);
+    publicar(m.nombre, { estado: 'instalado', motivo: '', visible, scriptId: r.scriptId || prev.scriptId || '', studyId: r.studyId || sondeo.studyId || prev.studyId || '' }, m.version);
+    return { trabajo: anuncia, fallo: false };
   }
   async function intentar() {
+    let trabajo = false;
+    let fallo = false;
     try {
       for (const m of manifiesto) {
-        try { await uno(m); }
-        catch (e) {
+        try {
+          const r = await uno(m);
+          if (r && r.trabajo) trabajo = true;
+          if (r && r.fallo) fallo = true;
+          if (r && r.sinTv) break;
+        } catch (e) {
           const msg = String(e && e.message || e);
           const sinTv = /ECONN|9222|chart|WebSocket|fetch failed|No encuentro/i.test(msg);
           const prev = memoria.algos[m.nombre] || {};
           if (sinTv && prev.estado === 'instalado' && prev.version === m.version) continue;
-          publicar(m.nombre, { estado: sinTv ? 'pendiente' : 'error', motivo: sinTv ? 'sin-tv' : msg }, m.version);
+          fallo = true;
+          publicar(m.nombre, { estado: 'pendiente', motivo: sinTv ? 'sin-tv' : msg }, m.version);
           if (sinTv) break;
         }
       }
+      if (trabajo) cerrarAviso(!fallo);
       return estado();
     } catch (e) {
+      if (trabajo) cerrarAviso(false);
       log('algo: error', e && e.message);
       return estado();
     }

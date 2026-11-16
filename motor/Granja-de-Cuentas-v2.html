@@ -5178,7 +5178,7 @@ function qu(){dh.update();const n=Math.min(dh.getDelta(),jx);qo+=n;const e=qo;fo
 #tlAlgosPanel .ojo .sl{display:none}
 #tlAlgosPanel .ojo.oculto .sl{display:inline}
 #tlAlgosPanel.off{opacity:.4}
-#tlAlgosPanel.off .ojo{cursor:default}
+#tlAlgosPanel.off .ojo{cursor:default}#tlAlgoAviso{position:fixed;top:92px;left:50%;transform:translateX(-50%);z-index:40;width:min(520px,calc(100vw - 28px));padding:14px 18px;text-align:center;font-size:15px;line-height:1.45;color:#fff}#tlAlgoAviso[hidden]{display:none}#tlAlgoAviso.listo{font-weight:650}
 </style></head>
 <body>
 <div id="fatal"><div class="box"><h2>Algo salió mal</h2><p>Toma una captura de esta pantalla y envíamela. Si es un error de datos, prueba "Reiniciar datos".</p><pre></pre><button onclick="location.reload()">Recargar</button><button onclick="try{localStorage.removeItem('granja.v2')}catch(e){};location.reload()">Reiniciar datos</button></div></div>
@@ -5200,6 +5200,7 @@ function qu(){dh.update();const n=Math.min(dh.getDelta(),jx);qo+=n;const e=qo;fo
   <b id="rachaN" hidden></b>
   <span title="Cuentas"><svg width="24" height="24" viewBox="0 0 10 10" shape-rendering="crispEdges" style="vertical-align:-6px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))" aria-hidden="true"><rect x="4" y="0" width="1" height="1" fill="#ff5ea8"/><rect x="5" y="0" width="1" height="1" fill="#ff5ea8"/><rect x="3" y="1" width="1" height="1" fill="#ff5ea8"/><rect x="6" y="1" width="1" height="1" fill="#ff5ea8"/><rect x="3" y="2" width="1" height="1" fill="#ff5ea8"/><rect x="6" y="2" width="1" height="1" fill="#ff5ea8"/><rect x="4" y="3" width="1" height="1" fill="#ff5ea8"/><rect x="5" y="3" width="1" height="1" fill="#ff5ea8"/><rect x="4" y="1" width="1" height="1" fill="#ffd86b"/><rect x="5" y="1" width="1" height="1" fill="#ffd86b"/><rect x="4" y="2" width="1" height="1" fill="#ffd86b"/><rect x="5" y="2" width="1" height="1" fill="#ffd86b"/><rect x="2" y="1" width="1" height="1" fill="#ff8cc4"/><rect x="7" y="2" width="1" height="1" fill="#ff8cc4"/><rect x="4" y="4" width="1" height="4" fill="#3ddc6a"/><rect x="5" y="4" width="1" height="4" fill="#2fb457"/><rect x="2" y="5" width="2" height="1" fill="#7dff8a"/><rect x="3" y="6" width="1" height="1" fill="#3ddc6a"/><rect x="6" y="6" width="2" height="1" fill="#7dff8a"/><rect x="6" y="5" width="1" height="1" fill="#3ddc6a"/><rect x="1" y="8" width="8" height="1" fill="#8a5a2b"/><rect x="2" y="9" width="6" height="1" fill="#6b4220"/></svg> <b id="countN">5</b> cuentas</span>
 </header>
+<div id="tlAlgoAviso" class="glass" hidden role="status" aria-live="polite"></div>
 <script>/* Algos TradingView: ojo en la barra. Abrir suena como los paneles, el ojito de cada fila suena como el interruptor, cerrar suena el toque. BUY y SELL no entran aquí. */
 (function () {
   var btn = document.getElementById('tlAlgosBtn');
@@ -5230,10 +5231,30 @@ function qu(){dh.update();const n=Math.min(dh.getDelta(),jx);qo+=n;const e=qo;fo
   function esc(s) { return String(s || '').replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function etiqueta(a) {
     if (a.estado === 'instalado') return 'instalado v' + (a.version || '');
+    if (a.estado === 'instalando') return 'instalando';
     if (a.estado === 'error') return 'error';
     return 'pendiente';
   }
+  var AVISO_INSTALANDO = 'Instalando los algoritmos en tu TradingView. Tarda de 1 a 2 minutos. Es normal que veas moverse el gráfico y el editor de Pine.';
+  function aviso(j) {
+    var el = document.getElementById('tlAlgoAviso');
+    if (!el) return;
+    if (j && j.fase === 'instalando') {
+      el.hidden = false;
+      el.classList.remove('listo');
+      el.textContent = AVISO_INSTALANDO;
+    } else if (j && j.fase === 'listos') {
+      el.hidden = false;
+      el.classList.add('listo');
+      el.textContent = 'Algoritmos listos';
+    } else {
+      el.hidden = true;
+      el.textContent = '';
+      el.classList.remove('listo');
+    }
+  }
   function pintar(j) {
+    aviso(j);
     var algos = j && j.algos || [];
     var conectado = !!(j && j.conectado);
     panel.classList.toggle('off', !conectado);
@@ -5256,7 +5277,7 @@ function qu(){dh.update();const n=Math.min(dh.getDelta(),jx);qo+=n;const e=qo;fo
       .then(function (r) { return r.json(); }).then(pintar).catch(function () {});
   });
   leer();
-  setInterval(leer, 15000);
+  setInterval(leer, 3000);
 })();
 </script>
 <button id="histBtn" class="glass btn hist">Negocio</button>

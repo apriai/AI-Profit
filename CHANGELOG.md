@@ -13,6 +13,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 ## [0.10.15] — 2026-11-16
 ### Corregido
 - **Los indicadores se instalan aunque haya un trade y aunque la luz de Tradovate cambie.** Antes se quedaban en «pendiente» con el motivo «sin-broker» si el panel de órdenes de TradingView no devolvía el bróker, aunque las tres luces estuvieran verdes. Instalar o mostrar u ocultar un algoritmo ya no mira el bróker, la cuenta, el símbolo, las posiciones ni las órdenes. Un estudio que la persona ocultó sigue oculto.
+### Agregado
+- **Aviso mientras se instalan los algoritmos.** Cuando de verdad se guardan o se añaden al gráfico, la granja dice: «Instalando los algoritmos en tu TradingView. Tarda de 1 a 2 minutos. Es normal que veas moverse el gráfico y el editor de Pine.» Al terminar, un momento dice «Algoritmos listos». Si falla, vuelve a pendiente. No sale al mostrar u ocultar, ni si ya estaban instalados. `/api/algo-tv` marca `fase` y el estado `instalando`.
 ### Cambiado
 - **El botón de abajo a la derecha que tapa los números ahora es un candado.** Cerrado: números ocultos. Abierto: números a la vista. El clic y el sonido siguen igual. El ojo de los algoritmos, arriba junto a Hoy, sigue siendo un ojo.
 ### Notas
