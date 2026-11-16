@@ -405,7 +405,6 @@ let algoTv = { estado: () => ({ conectado: false, algos: [], texto: '' }), inten
 try {
   algoTv = crearAlgoTv({
     dir: DIR,
-    ocupado: () => colchon.status().state === 'running' || acctGuard.testActive,
     log: (...a) => console.log(...a),
     evaluar: async (expr) => {
       const E = await cdpEvaluator(9222);

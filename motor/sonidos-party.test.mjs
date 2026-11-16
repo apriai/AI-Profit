@@ -42,6 +42,8 @@ assert.equal(html.includes('tocar("wuhu")'), false, 'el despertar ya no usa el w
 assert.equal(html.includes('if(!muted)play(false)'), false, 'el silencio no dispara la fanfarria');
 assert.ok(html.includes('function play(big){if(muted||!ac||ac.state!=="running")return false;'), 'la fanfarria de un trade sigue igual');
 assert.ok(html.includes('function playPerdida(){'), 'el sonido de pérdida sigue');
+assert.ok(html.includes('id=tlEye') && html.includes('class="cerrado"') && html.includes('class="abierto"'), 'el botón de números es un candado');
+assert.ok(html.includes('id="tlAlgosBtn"') && html.includes('M1.5 12S5.5 4.8 12 4.8'), 'el ojo de los algoritmos sigue siendo un ojo');
 
 const buy = html.indexOf('data-s=long');
 assert.ok(buy > 0);
