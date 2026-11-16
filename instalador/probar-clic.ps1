@@ -99,7 +99,9 @@ function Elegir-Boton([IntPtr]$Raiz) {
   [InstUI]::Children($Raiz, $hijos) | Out-Null
   $mejor = [IntPtr]::Zero
   $mejorX = -1
-  foreach ($h in $hijos) {
+  $n = $hijos.Count
+  for ($i = 0; $i -lt $n; $i++) {
+    $h = $hijos[$i]
     $r = New-Object InstUI+RECT
     if (-not [InstUI]::GetWindowRect($h, [ref]$r)) { continue }
     $w = $r.R - $r.L
