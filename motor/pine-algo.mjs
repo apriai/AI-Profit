@@ -43,6 +43,47 @@ export function formasEstudio(id) {
   return out;
 }
 
+export function esEstudioPine(id) {
+  return /script\$/i.test(String(id || '')) || /^(USER|PUB);/i.test(String(id || ''));
+}
+
+// script$user;<hash> y Script$USER;<hash>@tv-scripting-101 → USER;<hash>
+export function pineIdDe(id) {
+  const limpio = String(id || '').trim().replace(/@.*$/, '');
+  return formasEstudio(limpio).find(f => /^(USER|PUB);/.test(f)) || '';
+}
+
+// Desktop 3.5.0: createStudy(texto) usa un inserter java y rechaza Pine.
+// createStudy(metaInfo JSON) hace insertStudy(null) y falla. El editor usa
+// createStudyInserter({type:'pine', pineId:'USER;<hash>', pineVersion:'last'}).
+export async function insertarEstudio(chart, id, nombre) {
+  if (!chart) throw new Error('sin gráfico');
+  const pineId = pineIdDe(id);
+  let ultimo = null;
+  if (pineId) {
+    try {
+      const model = chart._chartWidget && chart._chartWidget.model && chart._chartWidget.model();
+      if (!model || typeof model.createStudyInserter !== 'function') throw new Error('sin inserter pine');
+      const ins = model.createStudyInserter({ type: 'pine', pineId, pineVersion: 'last' }, []);
+      const st = await ins.insert(d => Promise.resolve({ inputs: d, parentSources: [] }));
+      if (st && typeof st.id === 'function') return String(st.id());
+      if (st && st.id != null) return String(st.id);
+      throw new Error('Failed to create study');
+    } catch (e) { ultimo = e; }
+  } else if (typeof chart.createStudy === 'function') {
+    const vistos = [];
+    for (const n of [nombre, ...formasEstudio(id)]) {
+      if (!n || vistos.includes(n)) continue;
+      vistos.push(n);
+      try {
+        const sid = await chart.createStudy(n, true, false);
+        if (sid != null) return String(sid);
+      } catch (e) { ultimo = e; }
+    }
+  }
+  throw ultimo || new Error('no se pudo añadir al gráfico');
+}
+
 export function mismoEstudioId(a, b) {
   if (a == null || b == null || a === '' || b === '') return false;
   if (String(a) === String(b)) return true;
@@ -147,6 +188,7 @@ function lista(){
 `;
 
 const IDS_JS = `${formasEstudio.toString()}\n${mismoEstudioId.toString()}\n`;
+const INSERTAR_JS = `${esEstudioPine.toString()}\n${pineIdDe.toString()}\n${insertarEstudio.toString()}\n`;
 
 // Solo lee el gráfico. No guarda, no añade y no abre el editor.
 export function exprMirar({ nombre = ALGO_NOMBRE, studyId = '', anterior = '' } = {}) {
@@ -169,6 +211,7 @@ export function exprAlgo({ source, nombre = ALGO_NOMBRE, version = ALGO_VERSION,
 var D=${datos};
 ${ESCANEO}
 ${IDS_JS}
+${INSERTAR_JS}
 async function scriptsDe(nombre){
   var r=await fetch(${JSON.stringify(FACADE + '/list?filter=saved')},{credentials:'include'});
   if(!r.ok) throw new Error('lista '+r.status);
@@ -185,19 +228,13 @@ async function guardar(id){
   var r=await fetch(url,{method:'POST',credentials:'include',body:fd});
   var j=null; try{j=await r.json()}catch(e){j=null}
   if(!r.ok|| (j&&j.success===false)) throw new Error((j&& (j.reason||j.error||j.message)) || ('guardar '+r.status));
-  var meta=j&&(j.result&&j.result.metaInfo||j.metaInfo)||{};
+  var meta=j&&(j.result&&j.result.metaInfo||j.metaInfo)||null;
   return idDe(meta)||idDe(j&&j.result)||id||'';
 }
 async function poner(id){
-  var c=chart(); if(!c||typeof c.createStudy!=='function') throw new Error('sin gráfico');
-  var nombres=[D.nombre];
-  var formas=[]; try{ formas=formasEstudio(id)||[]; }catch(e){ formas=[]; }
-  for(var i=0;i<formas.length;i++) if(nombres.indexOf(formas[i])<0) nombres.push(formas[i]);
-  var ultimo=null;
-  for(var j=0;j<nombres.length;j++){
-    try{ var sid=await c.createStudy(nombres[j], true, false); if(sid!=null) return String(sid); }catch(e){ ultimo=e; }
-  }
-  throw ultimo||new Error('no se pudo añadir al gráfico');
+  var ya=lista();
+  if(ya.length) return ya[0].id||'';
+  return insertarEstudio(chart(), id, D.nombre);
 }
 function quitarIds(items){
   var c=chart(); if(!c||typeof c.removeEntity!=='function') return;
@@ -254,8 +291,8 @@ return (async function(){
     if(ya[0]) id=idDe(ya[0]);
     else if(viejosGuardados[0]) id=idDe(viejosGuardados[0]);
   }catch(e){ id=''; }
-  var guardado='';
-  try{ guardado=await guardar(id); }catch(eGuardar){
+  var guardado=id;
+  try{ guardado=(await guardar(id))||id; }catch(eGuardar){
     abrirEditor();
     if(!escribirEditor()) return {ok:false, estado:'error', motivo:String(eGuardar&&eGuardar.message||eGuardar)};
     guardado=id;
@@ -468,7 +505,8 @@ export function crearAlgoTv({
     }
     const plan = planAlgo({ enGrafico: sondeo.enGrafico, versionGuardada: prev.version || '', version: m.version });
     const migrar = (sondeo.viejos || 0) > 0;
-    if (plan === 'nada' && !migrar) {
+    const yaEnGrafico = sondeo.enGrafico === 1 && !migrar && !prev.version;
+    if ((plan === 'nada' && !migrar) || yaEnGrafico) {
       const visible = sondeo.visible === true ? true : sondeo.visible === false ? false : null;
       publicar(m.nombre, { estado: 'instalado', motivo: '', visible, studyId: sondeo.studyId || prev.studyId || '' }, m.version);
       return { trabajo: false, fallo: false };
