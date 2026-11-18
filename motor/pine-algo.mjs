@@ -449,6 +449,130 @@ return {ok:true, visible:!!D.visible, studyId:uno[0].id};
 })()`;
 }
 
+// Una vez por vela y dirección. Si el círculo se apaga y vuelve en la misma vela, no se repite.
+export function decidirToque(vistos, lectura) {
+  const nada = { tocar: false, lado: null, barra: null };
+  if (!Array.isArray(vistos)) return nada;
+  if (!lectura || lectura.ok !== true) return nada;
+  if (lectura.visible === false || !lectura.enGrafico) return nada;
+  const barra = lectura.barra;
+  if (barra == null || barra === '') return nada;
+  const lados = [];
+  if (lectura.alcista) lados.push('alcista');
+  if (lectura.bajista) lados.push('bajista');
+  if (!lados.length) return { tocar: false, lado: null, barra };
+  let toco = false;
+  let lado = null;
+  for (const l of lados) {
+    const clave = String(barra) + '|' + l;
+    if (vistos.includes(clave)) continue;
+    vistos.push(clave);
+    if (vistos.length > 240) vistos.splice(0, vistos.length - 200);
+    if (!toco) { toco = true; lado = l; }
+  }
+  return { tocar: toco, lado, barra };
+}
+
+// Lee Alcista/Bajista en la última vela (la que se está formando). No toca órdenes ni la cuenta.
+export function exprSenal({ nombre = ALGO_NOMBRE } = {}) {
+  const datos = JSON.stringify({ nombre });
+  return `(function(){
+var D=${datos};
+function finito(v){return typeof v==='number'&&isFinite(v)}
+function chart(){var api=window.TradingViewApi; if(!api||typeof api.activeChart!=='function') return null; try{return api.activeChart()}catch(e){return null}}
+function mismo(n){return String(n||'').trim().toLowerCase()===String(D.nombre||'').trim().toLowerCase()}
+function idDe(src){try{var id=src&&src.id&&(typeof src.id==='function'?src.id():src.id); return id!=null?String(id):''}catch(e){return ''}}
+function nombreDe(src){
+  try{var mi=src.metaInfo&&src.metaInfo(); var n=mi&&(mi.description||mi.shortDescription); if(n) return String(n)}catch(e){}
+  try{if(src.title) return typeof src.title==='function'?String(src.title()):String(src.title)}catch(e2){}
+  return '';
+}
+function fuentes(){
+  var out=[];
+  try{
+    var api=window.TradingViewApi;
+    var w=api._activeChartWidgetWV.value()._chartWidget;
+    var model=w.model(); var inner=model.model?model.model():model;
+    var all=inner.dataSources?inner.dataSources():[];
+    for(var i=0;i<all.length;i++) if(all[i]) out.push(all[i]);
+  }catch(e){}
+  return out;
+}
+function oculto(c, src, id){
+  try{ if(c&&typeof c.getStudyById==='function'&&id){ var st=c.getStudyById(id); if(st&&typeof st.isVisible==='function'&&st.isVisible()===false) return true; } }catch(e){}
+  try{ if(src&&typeof src.isVisible==='function'&&src.isVisible()===false) return true; }catch(e2){}
+  try{ var vis=src&&src.properties&&src.properties().visible; if(vis&&typeof vis.value==='function'&&vis.value()===false) return true; }catch(e3){}
+  return false;
+}
+function indices(mi){
+  var plots=mi&&mi.plots||[], styles=mi&&mi.styles||{}, al=-1, ba=-1, lineas=[];
+  for(var i=0;i<plots.length;i++){
+    var id=plots[i]&&plots[i].id;
+    var st=styles[id]||{};
+    var t=String(st.title||st.text||'').toLowerCase();
+    var ty=String(plots[i]&&plots[i].type||'').toLowerCase();
+    if(t==='alcista') al=i;
+    if(t==='bajista') ba=i;
+    if(ty!=='bar_colorer'&&ty!=='bg_colorer'&&ty!=='text_colorer') lineas.push(i);
+  }
+  if(al<0&&lineas.length) al=lineas[0];
+  if(ba<0&&lineas.length>1) ba=lineas[1];
+  return {al:al, ba:ba};
+}
+function ultimo(src){
+  var data=null, bars=null, last=null;
+  try{ data=src.data&&src.data(); }catch(e){}
+  try{ bars=data&&typeof data.bars==='function'?data.bars():null; }catch(e2){}
+  if(!bars){ try{ bars=src._data&&typeof src._data.bars==='function'?src._data.bars():src._data; }catch(e3){} }
+  try{ if(bars&&typeof bars.last==='function') last=bars.last(); }catch(e4){}
+  if(!last&&bars&&bars._items&&bars._items.length) last=bars._items[bars._items.length-1];
+  if(!last) return null;
+  var value=last.value!=null?last.value:last;
+  var time=null;
+  try{ if(last.index!=null) time=last.index; }catch(e5){}
+  if(value&&finito(value[0])&&value[0]>1e8) time=value[0];
+  else if(time==null&&value&&finito(value[0])) time=value[0];
+  return {time:time, value:value};
+}
+function plotEn(info, idx){
+  if(!info||idx<0||!info.value) return false;
+  var value=info.value, base=0;
+  if(finito(value[0])&&(value[0]===info.time||value[0]>1e8)) base=1;
+  return finito(value[base+idx]);
+}
+try{
+  var c=chart();
+  var lista=[];
+  if(c&&typeof c.getAllStudies==='function'){
+    var raw=[]; try{raw=c.getAllStudies()||[]}catch(e){raw=[]}
+    for(var i=0;i<raw.length;i++){ var s=raw[i]||{}; if(mismo(s.name||s.title||s.description)) lista.push({id:s.id!=null?String(s.id):'', src:null}); }
+  }
+  var fuentesLista=fuentes();
+  for(var k=0;k<fuentesLista.length;k++){
+    var src=fuentesLista[k], nom=nombreDe(src), id=idDe(src);
+    if(!mismo(nom)) continue;
+    var ya=false;
+    for(var n=0;n<lista.length;n++){ if(lista[n].id&&id&&lista[n].id===id){ lista[n].src=src; ya=true; } }
+    if(!ya) lista.push({id:id, src:src});
+  }
+  if(!lista.length) return {ok:true, enGrafico:0, visible:false, barra:null, alcista:false, bajista:false};
+  var elegido=null;
+  for(var p=0;p<lista.length;p++){
+    var item=lista[p];
+    if(!item.src){ for(var q=0;q<fuentesLista.length;q++){ if(idDe(fuentesLista[q])&&item.id&&idDe(fuentesLista[q])===item.id) item.src=fuentesLista[q]; } }
+    if(oculto(c, item.src, item.id)) continue;
+    elegido=item; break;
+  }
+  if(!elegido) return {ok:true, enGrafico:lista.length, visible:false, barra:null, alcista:false, bajista:false};
+  var mi=null; try{ mi=elegido.src&&elegido.src.metaInfo&&elegido.src.metaInfo(); }catch(e6){}
+  var ix=indices(mi||{});
+  var info=elegido.src?ultimo(elegido.src):null;
+  if(!info||info.time==null) return {ok:true, enGrafico:lista.length, visible:true, barra:null, alcista:false, bajista:false};
+  return {ok:true, enGrafico:lista.length, visible:true, barra:info.time, alcista:plotEn(info, ix.al), bajista:plotEn(info, ix.ba)};
+}catch(e){ return {ok:false}; }
+})()`;
+}
+
 export function crearAlgoTv({
   dir,
   pineDir = PINE_DIR,
@@ -490,9 +614,23 @@ export function crearAlgoTv({
     }
     return memoria.fase === 'instalando' || memoria.fase === 'listos' ? memoria.fase : null;
   }
+  const vistosSenal = [];
+  let senal = { seq: 0, barra: null, lado: null };
+  let senalEnCurso = false;
   function estado() {
     const algos = vista();
-    return { conectado: memoria.conectado === true, fase: faseActual(), algos, texto: textoLista(algos) };
+    return { conectado: memoria.conectado === true, fase: faseActual(), algos, texto: textoLista(algos), senal: { seq: senal.seq, barra: senal.barra, lado: senal.lado } };
+  }
+  async function oirSenal() {
+    if (senalEnCurso) return estado();
+    senalEnCurso = true;
+    try {
+      const r = await evaluar(exprSenal({ nombre: ALGO_NOMBRE }));
+      const d = decidirToque(vistosSenal, r || {});
+      if (d.tocar) senal = { seq: senal.seq + 1, barra: d.barra, lado: d.lado };
+    } catch { /* el gráfico a veces no deja leer el estudio; no suena y no se cae */ }
+    finally { senalEnCurso = false; }
+    return estado();
   }
   async function sincronizar() {
     try {
@@ -648,5 +786,5 @@ export function crearAlgoTv({
       return estado();
     }
   }
-  return { intentar, sincronizar, fijar, estado, archivo, manifiesto };
+  return { intentar, sincronizar, fijar, estado, oirSenal, archivo, manifiesto };
 }

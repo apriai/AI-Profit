@@ -465,6 +465,38 @@
   window.__tlSelect=playSelect;
   window.__tlToggle=playToggle;
   window.__tlCard=playCardOpen;
+  function playSenalAlgo(){
+    var ctx=getAudioContext(); if(!ctx) return false;
+    var now=ctx.currentTime;
+    var b1=ctx.createOscillator(), g1=ctx.createGain();
+    b1.type="sine";
+    b1.frequency.setValueAtTime(700, now);
+    b1.frequency.exponentialRampToValueAtTime(1400, now+0.06);
+    g1.gain.setValueAtTime(0.14, now);
+    g1.gain.exponentialRampToValueAtTime(0.001, now+0.09);
+    b1.connect(g1); g1.connect(ctx.destination);
+    b1.start(now); b1.stop(now+0.09);
+    var b2=ctx.createOscillator(), g2=ctx.createGain();
+    b2.type="sine";
+    b2.frequency.setValueAtTime(900, now+0.11);
+    b2.frequency.exponentialRampToValueAtTime(1900, now+0.17);
+    b2.frequency.exponentialRampToValueAtTime(1700, now+0.22);
+    g2.gain.setValueAtTime(0.15, now+0.11);
+    g2.gain.exponentialRampToValueAtTime(0.001, now+0.24);
+    b2.connect(g2); g2.connect(ctx.destination);
+    b2.start(now+0.11); b2.stop(now+0.24);
+    var sp=ctx.createOscillator(), gs=ctx.createGain();
+    sp.type="sine";
+    sp.frequency.setValueAtTime(2600, now+0.15);
+    sp.frequency.exponentialRampToValueAtTime(2626, now+0.27);
+    gs.gain.setValueAtTime(0, now+0.15);
+    gs.gain.linearRampToValueAtTime(0.04, now+0.155);
+    gs.gain.exponentialRampToValueAtTime(0.001, now+0.27);
+    sp.connect(gs); gs.connect(ctx.destination);
+    sp.start(now+0.15); sp.stop(now+0.27);
+    return true;
+  }
+  window.playSenalAlgo=playSenalAlgo;
   window.__tlDespertar=playDJStart;
   document.addEventListener("click", function(e){
     if(e.__tlSon) return;
@@ -5172,6 +5204,8 @@ function qu(){dh.update();const n=Math.min(dh.getDelta(),jx);qo+=n;const e=qo;fo
 #tlAlgosPanel[hidden]{display:none}
 #tlAlgosPanel .tit{font-size:11px;letter-spacing:.4px;text-transform:uppercase;opacity:.55;margin:0 0 8px}
 #tlAlgosPanel .fila{display:flex;align-items:center;gap:8px;padding:4px 0}
+#tlAlgosPanel .senal button{border-radius:999px;border:1px solid rgba(255,255,255,.28);background:transparent;color:#fff;font:600 12px Inter,system-ui;padding:4px 10px;cursor:pointer}
+#tlAlgosPanel .senal button[aria-pressed="false"]{opacity:.45}
 #tlAlgosPanel .nom{flex:1;font-size:13px;white-space:nowrap}
 #tlAlgosPanel .ojo{width:28px;height:28px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:transparent;color:#fff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0}
 #tlAlgosPanel .ojo svg{width:16px;height:16px}
@@ -5190,7 +5224,7 @@ function qu(){dh.update();const n=Math.min(dh.getDelta(),jx);qo+=n;const e=qo;fo
   <button type="button" id="tlHudDia" title="Trades de la sesión, hasta las 4 PM ET. Clic para el P&amp;L."><span id="tlHudTxt">Hoy <b id="pnlHoy">0</b> trades · <b id="tradesPos" class="pos">0+</b> · <b id="tradesNeg" class="neg">0−</b></span> <small id="pnlEj">(ejemplo)</small></button>
   <span class="algoswrap">
     <button type="button" id="tlAlgosBtn" title="Profito Algoritmo" aria-label="Profito Algoritmo" aria-expanded="false" aria-haspopup="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 12S5.5 4.8 12 4.8 22.5 12 22.5 12 18.5 19.2 12 19.2 1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/></svg></button>
-    <div id="tlAlgosPanel" class="glass" hidden><div class="tit">Profito Algoritmo</div><div class="lista"></div></div>
+    <div id="tlAlgosPanel" class="glass" hidden><div class="tit">Profito Algoritmo</div><div class="fila senal"><span class="nom">Sonido de la señal</span><button type="button" id="tlSenalAlgo" aria-pressed="true">Sí</button></div><div class="lista"></div></div>
     <div id="tlAlgoAviso" class="glass" hidden role="status" aria-live="polite"><i class="cola" aria-hidden="true"></i><span class="txt"></span></div>
   </span>
   <span class="sep"></span>
@@ -5310,8 +5344,34 @@ function qu(){dh.update();const n=Math.min(dh.getDelta(),jx);qo+=n;const e=qo;fo
       return '<div class="fila"><button type="button" class="ojo' + (oculto ? ' oculto' : '') + '" data-nombre="' + esc(a.nombre) + '" data-visible="' + (oculto ? '0' : '1') + '"' + (listo ? '' : ' disabled') + ' aria-pressed="' + (oculto ? 'false' : 'true') + '" title="' + (oculto ? 'Mostrar en TradingView' : 'Ocultar en TradingView') + '">' + ojo + '</button><span class="nom">' + esc(a.nombre) + '</span><small>' + esc(etiqueta(a)) + '</small></div>';
     }).join('') || '<div class="fila"><span class="nom">Sin algoritmos</span></div>';
   }
+  var senalVista = { listo: false, seq: 0 };
+  var btnSenal = document.getElementById('tlSenalAlgo');
+  function sonidoAlgoOn() {
+    try { return localStorage.getItem('tl_sonido_algo') !== '0'; } catch (e) { return true; }
+  }
+  function pintarSenal() {
+    if (!btnSenal) return;
+    var on = sonidoAlgoOn();
+    btnSenal.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btnSenal.textContent = on ? 'Sí' : 'No';
+  }
+  function talVezSonar(j) {
+    var seq = j && j.senal && j.senal.seq || 0;
+    if (!senalVista.listo) { senalVista.listo = true; senalVista.seq = seq; return; }
+    if (!seq || seq === senalVista.seq) return;
+    senalVista.seq = seq;
+    if (!sonidoAlgoOn()) return;
+    try { window.playSenalAlgo && window.playSenalAlgo(); } catch (e) {}
+  }
+  if (btnSenal) btnSenal.addEventListener('click', function (e) {
+    e.stopPropagation();
+    son(e, window.__tlToggle);
+    try { localStorage.setItem('tl_sonido_algo', sonidoAlgoOn() ? '0' : '1'); } catch (err) {}
+    pintarSenal();
+  });
+  pintarSenal();
   function leer() {
-    fetch('/api/algo-tv', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(pintar).catch(function () { pintar({ conectado: false, algos: [] }); });
+    fetch('/api/algo-tv', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { pintar(j); talVezSonar(j); }).catch(function () { pintar({ conectado: false, algos: [] }); });
   }
   lista.addEventListener('click', function (e) {
     var b = e.target.closest && e.target.closest('.ojo');
@@ -5323,7 +5383,7 @@ function qu(){dh.update();const n=Math.min(dh.getDelta(),jx);qo+=n;const e=qo;fo
       .then(function (r) { return r.json(); }).then(pintar).catch(function () {});
   });
   leer();
-  setInterval(leer, 3000);
+  setInterval(leer, 1500);
 })();
 </script>
 <button id="histBtn" class="glass btn hist">Negocio</button>
@@ -6198,7 +6258,7 @@ function hook(){const G=window.__granja&&window.__granja.pet;if(!G||!G.renderer|
  if(cfg.kind!=="perro"||cfg.body!==A.perro.b||cfg.accent!==A.perro.a){try{applyPet(G,cfg)}catch(err){console.warn("mascota",err)}}
  (function lab(){const p=window.__pet.screen();if(p&&cfg.name){tag.textContent=cfg.name;tag.style.left=p.x+"px";tag.style.top=(p.y-8)+"px";tag.style.display="block"}else tag.style.display="none";requestAnimationFrame(lab)})()}
 setTimeout(hook,600);})();</script>
-<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.19</div>
+<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.20</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/api/version",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
 <script>/* 0.7.0: Profito duerme al abrir (granja en pausa), riega con laptop durante un trade, y etiquetas de cuentas con saldo y etapa. Solo visual: no toca el motor de trading. */
 (function(){
