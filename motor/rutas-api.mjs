@@ -20,6 +20,7 @@ export function manejar(q, r, deps) {
     });
     return;
   }
+  // logros.json ya no lo lee la granja. Se sigue sirviendo y no se borra del disco.
   if (/^\/(logros|metas)\.json/.test(q.url)) {
     let t = '{}';
     try { t = fs.readFileSync(path.join(deps.DIR, q.url.startsWith('/logros') ? 'logros.json' : 'metas.json'), 'utf8'); } catch {}

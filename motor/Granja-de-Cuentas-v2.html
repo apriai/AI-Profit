@@ -5998,7 +5998,7 @@ junto();addEventListener("resize",junto);addEventListener("load",junto);
 })();</script>
 
 <script>/* Prop Farm: trades del día (bróker/historial) para la barra superior. El neto de la sesión manda sobre el daily guardado. */(function(){async function p(){try{const [t,a]=await Promise.all([fetch("/api/colchon/trades",{cache:"no-store"}).then(r=>r.json()),fetch("/accounts.json",{cache:"no-store"}).then(r=>r.json())]);const d=t.dia,R=t.resumen||{},dn=a&&a.daily&&a.daily[d];const live=Array.isArray(a&&a.live)?a.live.length:null;const _tr=Array.isArray(t.trades)?t.trades:[];const neto=typeof t.saldoDia==="number"?t.saldoDia:(typeof R.pnl==="number"?R.pnl:(typeof dn==="number"?dn:null));window.__tlPnl={neto,bruto:typeof t.bruto==="number"?t.bruto:(t.total??0),n:typeof R.n==="number"?R.n:(t.n??_tr.length),ganados:typeof R.ganados==="number"?R.ganados:_tr.filter(x=>x&&x.pnl>0).length,perdidos:typeof R.perdidos==="number"?R.perdidos:_tr.filter(x=>x&&typeof x.pnl==="number"&&x.pnl<0).length,racha:R.racha||0,rachaTipo:R.rachaTipo||null,mejor:R.mejor||0,peor:R.peor||0,cuentas:live,dia:d};window.__zu&&window.__zu()}catch(e){}}setTimeout(p,1500);setInterval(p,30000)})();</script>
-<script>/* Prop Farm: Jardín de logros + barras de meta + verde lima (2026-10-23) */
+<script>/* Cerezo estático con manzanas, y barras de meta de las plantas. Sin certificados. */
 (function(){
 const LIME="#cdea1d";
 const st=document.createElement("style");st.textContent=`
@@ -6023,52 +6023,13 @@ const st=document.createElement("style");st.textContent=`
 .pfMetaRow{margin:10px 0 4px;font:12px Inter,system-ui;color:#ddd}
 .pfMetaRow .t{height:9px;border-radius:6px;background:rgba(255,255,255,.1);overflow:hidden;margin-top:5px}
 .pfMetaRow .t i{display:block;height:100%;background:linear-gradient(90deg,#9fbf12,${LIME})}
-.pfGTag{position:fixed;z-index:5;transform:translate(-50%,-100%);cursor:pointer;width:64px;height:84px;display:flex;align-items:flex-start;justify-content:center}
-.pfGTag span{font-size:15px;filter:drop-shadow(0 0 6px #fff8);animation:pfB 2.4s ease-in-out infinite}
-@keyframes pfB{50%{transform:translateY(-4px)}}
-#pfGardenSign{position:fixed;z-index:4;transform:translate(-50%,-100%);pointer-events:none;font:700 11px Inter,system-ui;color:#fff6d8;background:rgba(40,20,70,.55);border:1px solid rgba(255,230,160,.35);padding:3px 9px;border-radius:10px;white-space:nowrap;backdrop-filter:blur(4px)}
-#pfCert{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:rgba(12,6,28,.6);backdrop-filter:blur(6px)}
-#pfCert.open{display:flex}
-#pfCert .c{position:relative;width:min(460px,92vw);padding:28px 30px 24px;border-radius:18px;text-align:center;color:#2a2340;background:linear-gradient(160deg,#fffdf3,#f6f1ff);box-shadow:0 20px 60px #0008;border:3px double #d8b45a;font-family:Inter,system-ui}
-#pfCert img{width:84px;height:84px;object-fit:contain}
-#pfCert h3{margin:6px 0 2px;font:800 20px Georgia,serif;color:#3a2a6a}
-#pfCert .s{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#9a7a2a}
-#pfCert .b{margin:16px 0;font-size:14px;line-height:1.5}
-#pfCert .b b{font-family:ui-monospace,monospace;color:#3a2a6a}
-#pfCert .seal{display:inline-block;margin-top:4px;padding:5px 14px;border-radius:20px;background:${LIME};color:#141a05;font-weight:700;font-size:12px}
-#pfCert .x{position:absolute;top:8px;right:12px;border:0;background:none;font-size:22px;cursor:pointer;color:#7a6a9a}
-#pfGardenSign .addG{margin-left:8px;border:1px solid rgba(255,230,160,.4);background:rgba(255,216,107,.2);color:#fff6d8;border-radius:8px;width:26px;height:22px;font:700 14px Inter,system-ui;cursor:pointer;vertical-align:middle;line-height:1}
-#pfGardenSign .addG:hover{background:rgba(255,216,107,.35)}
-#pfAddG{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center}
-#pfAddG.open{display:flex}
-#pfAddG .c{width:min(360px,calc(100vw - 28px));padding:20px;border-radius:18px;background:rgba(12,8,24,.94);border:1px solid rgba(255,255,255,.1);color:#ececf3;font:13px Inter,system-ui;position:relative}
-#pfAddG h3{margin:0 0 14px;font:650 16px Inter,system-ui}
-#pfAddG label{display:block;font:500 11px Inter,system-ui;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.5px;margin:10px 0 4px}
-#pfAddG input{width:100%;box-sizing:border-box;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:#fff;padding:10px 12px;font:600 13px Inter,system-ui}
-#pfAddG .acts{display:flex;gap:8px;margin-top:16px}
-#pfAddG .acts button{flex:1;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#fff;border-radius:11px;padding:11px;font:600 13px Inter,system-ui;cursor:pointer}
-#pfAddG .acts .ok{background:linear-gradient(135deg,#ffd86b,#ffb300);color:#1a0f00;border:none}
-#pfAddG .x{position:absolute;right:12px;top:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:8px;width:28px;height:28px;color:#fff;cursor:pointer}
-.pfGTag{width:48px!important;height:48px!important}
-.pfGTag.pfApple{width:24px!important;height:24px!important;border-radius:50%}
-#pfGardenSign{pointer-events:auto!important;padding:3px 5px!important}#pfGardenSign .addG{margin-left:0!important}
-#pfCert img{width:auto!important;height:auto!important;max-width:100%;max-height:60vh!important;display:block;margin:12px auto 0;border-radius:10px}
-#pfCert .del{position:absolute;right:10px;bottom:8px;border:0;background:none;font-size:13px;opacity:.45;cursor:pointer}#pfCert .del:hover{opacity:.9}
-
-#pfAddG .sub{margin:0 0 14px;font:500 12px Inter,system-ui;color:rgba(255,255,255,.5)}
-#pfAddG .drop{display:block;border:1px dashed rgba(255,216,107,.45);border-radius:14px;padding:28px 16px;text-align:center;cursor:pointer;background:rgba(255,216,107,.06);color:#ffe7a3;font:650 13px Inter,system-ui;text-transform:none;letter-spacing:0}
-#pfAddG .drop input{display:none}
-#pfAddG .prev{margin-top:12px;text-align:center}#pfAddG .prev img{max-width:100%;max-height:180px;border-radius:12px;border:1px solid rgba(255,255,255,.1)}
-#pfAddG label:not(.drop){display:none}
 `;
 document.head.appendChild(st);
 const mask=s=>{s=String(s||"");return /^LF[EF]?\d|^[A-Z]{2,4}\d{5,}/.test(s)&&s.length>8?s.slice(0,4)+"…"+s.slice(-3):s.replace(/\b(LF[EF]\d{6,})\b/g,m=>m.slice(0,4)+"…"+m.slice(-3))};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);
-let metas={evaluacion:{meta:1250},fondeada:{metaRetiro:1000}},logros=[],liveFunded=[];
+let metas={evaluacion:{meta:1250},fondeada:{metaRetiro:1000}};
 const J=u=>fetch(u,{cache:"no-store"}).then(r=>r.ok?r.json():null).catch(()=>null);
-function load(){J("/metas.json").then(j=>{if(j&&j.evaluacion)metas=j});
- J("/logros.json").then(j=>{logros=(j&&j.logros)||[];build()});
- J("/accounts.json").then(j=>{liveFunded=((j&&j.live)||[]).filter(id=>/^LFF/.test(id));build()});}
+function load(){J("/metas.json").then(j=>{if(j&&j.evaluacion)metas=j});}
 // meta por planta
 function prog(a){const st=+a.start||25000,b=+(a.bal??st);if(a.type==="funded"){const m=+metas.fondeada.metaRetiro||(st>=45000?2000:1000);return{p:Math.max(0,Math.min(1,(b-st)/m)),lbl:"Próximo retiro",m}}const m=+a.profitTarget||+metas.evaluacion.meta||(st>=45000?3000:1250);return{p:Math.max(0,Math.min(1,(b-st)/m)),lbl:"Meta de evaluación",m}}
 const bars=new Map();
@@ -6103,25 +6064,12 @@ function tree(gx,x,z,i){const g=new gx.wt();g.position.set(x,0,z);const Box=gx.Y
  if(!Box||!Mat||!Mesh){console.warn("jardin: geometría no lista");return g}
  try{tallFlowerVox(17+i*97).forEach(([vx,vy,vz,col])=>{const m=new Mesh(new Box(vs*0.95,vs*0.95,vs*0.95),new Mat({color:col,roughness:.82,metalness:.05}));m.position.set(vx*vs,(vy+.5)*vs,vz*vs);g.add(m)});g.scale.setScalar(2.6)}catch(err){console.warn("jardin flor",err)}
  g.userData.entryIndex=i;return g}
-const KG="tl_garden_v1";const loadMine=()=>{try{return JSON.parse(localStorage.getItem(KG))||[]}catch(e){return[]}};const saveMine=a=>{try{localStorage.setItem(KG,JSON.stringify(a))}catch(e){}};
-function entries(){const gx=window.__gx;const out=[],seen=new Set();const add=e=>{const k=mask(e.cuenta||e.nombre||"");if(!k||seen.has(k))return;seen.add(k);out.push(e)};
- loadMine().forEach(l=>add({cuenta:l.cuenta,nombre:l.nombre,firma:l.firma||"Yo",tipo:l.tipo||"Cuenta fondeada",fecha:l.fecha,certUrl:l.certUrl,mine:1}));
- (gx&&gx.At||[]).forEach(n=>{if(n.removed||!n.a)return;if(n.a.memorial){add({nombre:n.a.name,cuenta:n.a.name,firma:"Lucid Trading",tipo:"Cuenta fondeada",mem:1,ref:n});return}if(n.d&&n.d.kind==="tree")add({nombre:n.a.name,cuenta:n.a.name,firma:/^LF/.test(n.a.name)?"Lucid Trading":(n.a.firma||"Lucid Trading"),tipo:"Cuenta fondeada"})});
- liveFunded.forEach(id=>add({cuenta:id,firma:"Lucid Trading",tipo:"Cuenta fondeada"}));
- logros.forEach(l=>add({cuenta:l.cuenta||l.nombre,nombre:l.nombre,firma:l.firma||"Lucid Trading",tipo:l.tipo||"Evaluación superada",fecha:l.fecha,certUrl:l.certUrl}));const hid=loadHid();return out.filter(e=>!hid.includes(mask(e.cuenta||e.nombre||"")))}
-const KH="tl_garden_hidden";const loadHid=()=>{try{return JSON.parse(localStorage.getItem(KH))||[]}catch(e){return[]}};
-let sig="";
-function build(){const gx=window.__gx;if(!gx||!gx.wt||!gx.Xt)return;const es=entries();const s=JSON.stringify(es.map(e=>e.cuenta));if(s===sig)return;sig=s;
- if(G){G.removeFromParent();tags.forEach(t=>t.remove())}sparks=[];tags=[];items=es;G=new gx.wt();gx.Xt.add(G);
- CT=cherry(gx);G.add(CT);czMoveFlowers(gx);es.forEach((e,i)=>{const t=apple(gx,CT,i);e.obj=t;t.userData.entry=e;
-  if(e.ref){e.ref.g.visible=false;const w=e.ref.el&&e.ref.el.parentElement&&e.ref.el.parentElement.parentElement;if(w)w.style.display="none"}
-  const d=document.createElement("div");d.className="pfGTag pfApple";d.title="Ver certificado";d.innerHTML="";d.onclick=ev=>{ev.stopPropagation();cert(e)};document.body.appendChild(d);tags.push(d);e.tag=d});
+const MANZANAS=5;
+function build(){const gx=window.__gx;if(!gx||!gx.wt||!gx.Xt||G)return;G=new gx.wt();gx.Xt.add(G);
+ CT=cherry(gx);G.add(CT);czMoveFlowers(gx);for(let i=0;i<MANZANAS;i++)apple(gx,CT,i);
 }
 function scr(gx,obj,dy){const v=obj.getWorldPosition(new gx.P);v.y+=dy;v.project(gx.Lt);return v.z<1&&Math.abs(v.x)<1.1&&Math.abs(v.y)<1.1?{x:(v.x+1)/2*innerWidth,y:(1-v.y)/2*innerHeight}:null}
-function loop(t){requestAnimationFrame(loop);const gx=window.__gx;if(!gx||!gx.Lt)return;czMoveFlowers(gx);const s=t/1000;
- sparks.forEach(p=>{const u=p.userData;p.position.set(Math.cos(u.a+s*u.v)*u.r,u.y+Math.sin(s*1.3+u.a)*.25,Math.sin(u.a+s*u.v)*u.r);p.scale.setScalar(.7+.5*Math.sin(s*3+u.a))});
- items.forEach(e=>{const gl=e.obj.userData.glow;if(gl)gl.material.opacity=.09+.05*Math.sin(s*1.5);const p=scr(gx,e.obj,0);if(p){e.tag.style.display="";e.tag.style.left=p.x+"px";e.tag.style.top=p.y+14+"px"}else e.tag.style.display="none"});
-
+function loop(t){requestAnimationFrame(loop);const gx=window.__gx;if(!gx||!gx.Lt)return;czMoveFlowers(gx);
  const seen=new Set();(gx.At||[]).forEach(n=>{if(n.removed||!n.a||n.a.memorial||!n.d||n.d.kind==="wither"||!n.g.visible)return;seen.add(n);let b=bars.get(n);if(!b){b=document.createElement("div");b.className="pfMeta";b.innerHTML='<div class="doneHoy" aria-hidden="true">Listo por hoy</div><div class="nm"></div><div class="t"><i class="neg"></i><i class="pos"></i></div>';document.body.appendChild(b);bars.set(n,b)}
   const st0=+n.a.start||25000,dd0=+(n.a.dd)||(st0>=45000?2000:1000),lim0=+(n.a.dailyLoss)||(st0>=45000?1200:600),bal0=+(n.a.bal??st0),pnl0=bal0-st0,cl=Math.max(-dd0,Math.min(dd0,pnl0)),w0=Math.abs(cl)/dd0*50;
   const nm0=(n.a.plantName&&String(n.a.plantName).trim())||String(n.a.name).slice(-3),mk0=window.__tlStageMark?window.__tlStageMark(n.a.name):"";
@@ -6135,27 +6083,7 @@ function loop(t){requestAnimationFrame(loop);const gx=window.__gx;if(!gx||!gx.Lt
  bars.forEach((b,n)=>{if(!seen.has(n)){b.remove();bars.delete(n)}})}
 // barra en el panel de detalle
 function panelBar(){const Z=document.getElementById("panel");if(!Z)return;new MutationObserver(()=>{if(Z.querySelector(".pfMetaRow"))return;const h=Z.querySelector("h2,h3");const gx=window.__gx;if(!h||!gx)return;const n=(gx.At||[]).find(x=>!x.removed&&x.a&&!x.a.memorial&&h.textContent.includes(x.a.name));if(!n||n.d.kind==="wither")return;const pr=prog(n.a),pc=Math.round(pr.p*100);const r=document.createElement("div");r.className="pfMetaRow";r.innerHTML=`${pr.lbl} · $${pr.m.toLocaleString("en-US")} · <b style="color:${LIME}">${pc}%</b><div class="t"><i style="width:${pc}%"></i></div>`;h.insertAdjacentElement("afterend",r)}).observe(Z,{childList:true,subtree:true})}
-// certificado
-const cm=document.createElement("div");cm.id="pfCert";cm.innerHTML='<div class="c"><button class="x" title="Cerrar">×</button><h3>Certificado verificado</h3><img alt="Certificado"><button class="del" title="Eliminar">🗑</button></div>';document.body.appendChild(cm);
-cm.onclick=e=>{if(e.target===cm||e.target.classList.contains("x"))cm.classList.remove("open")};
-function cert(e){cm.__e=e;const img=cm.querySelector("img");const custom=e.certUrl;if(custom){img.src=custom;img.style.display="block";img.style.maxHeight="220px";img.style.objectFit="contain";img.style.margin="0 auto 10px"}else{const l=document.querySelector("#hud img.logo");img.src=l?l.src:"/propfarm-logo.png";img.style.maxHeight="";}
- const nm=e.mem&&mask(e.cuenta)!==e.nombre?esc(String(e.nombre).replace(/^[^wÁ-ú]+/,"")):"";
- const _b=cm.querySelector(".b");if(_b)_b.innerHTML=`Se certifica que la cuenta<br><b>${esc(mask(e.cuenta))}</b><br>de <b>${esc(e.firma||"")}</b> superó la prueba de evaluación.${nm?`<br><span style="color:#8a7aa8">${nm}</span>`:""}<br><span style="color:#7a6a9a">${esc(e.tipo||"Cuenta fondeada")}</span>`;cm.classList.add("open")}
-cm.querySelector(".del").onclick=ev=>{ev.stopPropagation();const e=cm.__e;if(!e||!confirm("¿Eliminar este logro?"))return;const k=mask(e.cuenta||e.nombre||"");if(e.mine){saveMine(loadMine().filter(l=>mask(l.cuenta||l.nombre||"")!==k))}else{const h=loadHid();if(!h.includes(k)){h.push(k);try{localStorage.setItem(KH,JSON.stringify(h))}catch(x){}}}cm.classList.remove("open");sig="";build()};
-function openAdd(){let box=document.getElementById("pfAddG");if(!box){box=document.createElement("div");box.id="pfAddG";box.innerHTML='<div class="c"><button class="x" data-x>×</button><h3>Nuevo logro</h3><p class="sub">Sube el certificado y listo</p><label class="drop">Elegir certificado<input data-file type=file accept="image/*"></label><div class="prev" data-prev></div><div class="acts"><button data-x>Cancelar</button><button class="ok" data-save disabled>Crear logro</button></div></div>';document.body.appendChild(box);box.onclick=e=>{if(e.target===box||e.target.hasAttribute("data-x"))box.classList.remove("open")};}
- box.classList.add("open");const file=box.querySelector("[data-file]"),prev=box.querySelector("[data-prev]"),saveBtn=box.querySelector("[data-save]");let certUrl="";
- saveBtn.disabled=true;prev.innerHTML="";file.value="";
- file.onchange=async()=>{const f=file.files[0];if(!f){certUrl="";saveBtn.disabled=true;prev.innerHTML="";return}certUrl=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)});prev.innerHTML='<img alt="cert">';prev.querySelector("img").src=certUrl;saveBtn.disabled=false};
- saveBtn.onclick=()=>{if(!certUrl)return;const a=loadMine();const n=a.length+1;a.push({cuenta:"Fondeo "+n,firma:"Yo",nombre:"Fondeo "+n,tipo:"Cuenta fondeada",fecha:new Date().toISOString().slice(0,10),certUrl});saveMine(a);box.classList.remove("open");sig="";build()};
-}
-window.__pfGarden={cert,build,entries:()=>items};
-(function start(){const gx=window.__gx;if(!gx||!gx.At||!gx.wt)return setTimeout(start,400);load();panelBar();setInterval(build,5000);setInterval(load,60000);requestAnimationFrame(loop);
- const cv=gx.It&&gx.It.domElement;if(cv&&!cv.__pfRoseClick){cv.__pfRoseClick=1;let d=null;cv.addEventListener("pointerdown",e=>{d=[e.clientX,e.clientY]});cv.addEventListener("pointerup",e=>{if(!d||Math.hypot(e.clientX-d[0],e.clientY-d[1])>8)return;d=null;
- let best=null,bd=22;if(G&&items.length){for(const e2 of items){if(!e2.obj)continue;const p2=scr(gx,e2.obj,0);if(!p2)continue;const dd=Math.hypot(e.clientX-p2.x,e.clientY-p2.y);if(dd<bd){bd=dd;best=e2}}}
- if(best){cert(best);return}
- // clic en zona del jardín (sin flor) → agregar
- if(CT){const tp=scr(gx,CT,9.4),bp=scr(gx,CT,0);if(tp&&bp){const hh=Math.abs(bp.y-tp.y),inTree=e.clientY>tp.y-10&&e.clientY<bp.y+hh*.12&&Math.abs(e.clientX-(tp.x+bp.x)/2)<hh*.5;if(inTree)openAdd()}}
- })}
+(function start(){const gx=window.__gx;if(!gx||!gx.At||!gx.wt)return setTimeout(start,400);load();panelBar();build();setInterval(load,60000);requestAnimationFrame(loop);
 })();
 })();</script>
 

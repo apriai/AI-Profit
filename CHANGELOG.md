@@ -18,6 +18,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **El ojo de los algoritmos vuelve a mostrar y ocultar.** `POST /api/algo-tv` lo respondía el atajo de `/order` con «ruta desconocida» y el clic no hacía nada. Ahora esa ruta llega a `fijar`.
 - **La flor sale en una instalación nueva.** La barra lee la cuenta en TradingView (`/api/colchon/accounts`). La flor solo miraba `accounts.json` y, si todavía no había saldo, no plantaba nada. Ahora usa la misma lista que la barra. Si el saldo aún no llegó, la flor usa el inicio del plan (25K o 50K).
 ### Cambiado
+- **El cerezo ya no recibe certificados.** Sigue en la escena, con cinco manzanas fijas. No hay botón para subir, ni archivo, ni panel de certificado. Lo que ya estaba guardado en el navegador (`tl_garden_v1`) o en `logros.json` no se borra; la página deja de usarlo. Las plantas de las cuentas, los pagos (cubos dorados) y los árboles memoriales siguen.
 - **Solo queda Profito Algoritmo.** Se quitó Smart Money Algo (antes Smart Money Structure). Si Profito lo había puesto en el gráfico, lo quita una vez y no toca órdenes ni posiciones. Ai Profit Camp Algo pasa a llamarse Profito Algoritmo en la granja y en el título del indicador. El script guardado se actualiza con `save/next` en la sesión de TradingView de esa persona.
 ### Notas
 - No abre, no mueve y no cierra órdenes. `orders.mjs` sigue apagado.
