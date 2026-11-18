@@ -5200,19 +5200,24 @@ function qu(){dh.update();const n=Math.min(dh.getDelta(),jx);qo+=n;const e=qo;fo
 .algoswrap{position:relative;display:inline-flex}
 #tlAlgosBtn{width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.28);background:rgba(20,8,40,.28);color:#fff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0}
 #tlAlgosBtn svg{width:18px;height:18px}
-#tlAlgosPanel{position:absolute;top:calc(100% + 10px);left:0;z-index:30;min-width:260px;padding:10px 12px;border-radius:14px}
+#tlAlgosPanel{position:fixed;z-index:80;min-width:260px;padding:10px 12px;border-radius:14px;background:#1a1230;color:#fff;opacity:1;border:1px solid rgba(255,255,255,.22);box-shadow:0 18px 42px rgba(0,0,0,.55);backdrop-filter:none;-webkit-backdrop-filter:none}
 #tlAlgosPanel[hidden]{display:none}
-#tlAlgosPanel .tit{font-size:11px;letter-spacing:.4px;text-transform:uppercase;opacity:.55;margin:0 0 8px}
+#tlAlgosPanel .tit{font-size:11px;letter-spacing:.4px;text-transform:uppercase;opacity:1;color:#fff;font-weight:650;margin:0 0 8px}
 #tlAlgosPanel .fila{display:flex;align-items:center;gap:8px;padding:4px 0}
 #tlAlgosPanel .senal button{border-radius:999px;border:1px solid rgba(255,255,255,.28);background:transparent;color:#fff;font:600 12px Inter,system-ui;padding:4px 10px;cursor:pointer}
-#tlAlgosPanel .senal button[aria-pressed="false"]{opacity:.45}
-#tlAlgosPanel .nom{flex:1;font-size:13px;white-space:nowrap}
+#tlAlgosPanel .senal button[aria-pressed="false"]{opacity:1;color:#fff;border-color:rgba(255,255,255,.45)}
+#tlAlgosPanel .nom{flex:1;font-size:13px;white-space:nowrap;color:#fff}
 #tlAlgosPanel .ojo{width:28px;height:28px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:transparent;color:#fff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0}
 #tlAlgosPanel .ojo svg{width:16px;height:16px}
 #tlAlgosPanel .ojo .sl{display:none}
 #tlAlgosPanel .ojo.oculto .sl{display:inline}
-#tlAlgosPanel.off{opacity:.4}
-#tlAlgosPanel.off .ojo{cursor:default}#tlAlgoAviso{position:absolute;z-index:40;width:min(340px,calc(100vw - 24px));padding:12px 14px;text-align:left;font-size:14px;line-height:1.4;color:#fff;pointer-events:none}#tlAlgoAviso[hidden]{display:none}#tlAlgoAviso.listo{font-weight:650;text-align:center}#tlAlgoAviso .cola{position:absolute;top:-7px;width:14px;height:14px;margin-left:-7px;background:linear-gradient(160deg,#ffffff59,#3c1e5a);border-left:1px solid rgba(255,255,255,.45);border-top:1px solid rgba(255,255,255,.45);transform:rotate(45deg);border-radius:2px}
+#tlAlgosPanel.off{opacity:1}
+#tlAlgosPanel.off .ojo{cursor:default}
+#tlAlgosPanel,#tlAlgosPanel .tit,#tlAlgosPanel .nom,#tlAlgosPanel small,#tlAlgosPanel button{opacity:1;color:#fff}
+#tlAlgoAviso,#blobColors,#botConfirm{background:#1a1230;color:#fff;border:1px solid rgba(255,255,255,.22);box-shadow:0 18px 42px rgba(0,0,0,.55);backdrop-filter:none;-webkit-backdrop-filter:none}
+#tlAlgosPanel small{opacity:1;color:#fff}
+#botConfirm .bc-s,#blobColors .bc-t{opacity:1;color:#f7f4ff}
+#tlAlgoAviso{position:absolute;z-index:40;width:min(340px,calc(100vw - 24px));padding:12px 14px;text-align:left;font-size:14px;line-height:1.4;color:#f7f4ff;pointer-events:none}#tlAlgoAviso[hidden]{display:none}#tlAlgoAviso.listo{font-weight:650;text-align:center}#tlAlgoAviso .cola{position:absolute;top:-7px;width:14px;height:14px;margin-left:-7px;background:rgba(20,14,35,.94);border-left:1px solid rgba(255,255,255,.18);border-top:1px solid rgba(255,255,255,.18);transform:rotate(45deg);border-radius:2px}
 </style></head>
 <body>
 <div id="fatal"><div class="box"><h2>Algo salió mal</h2><p>Toma una captura de esta pantalla y envíamela. Si es un error de datos, prueba "Reiniciar datos".</p><pre></pre><button onclick="location.reload()">Recargar</button><button onclick="try{localStorage.removeItem('granja.v2')}catch(e){};location.reload()">Reiniciar datos</button></div></div>
@@ -5224,7 +5229,7 @@ function qu(){dh.update();const n=Math.min(dh.getDelta(),jx);qo+=n;const e=qo;fo
   <button type="button" id="tlHudDia" title="Trades de la sesión, hasta las 4 PM ET. Clic para el P&amp;L."><span id="tlHudTxt">Hoy <b id="pnlHoy">0</b> trades · <b id="tradesPos" class="pos">0+</b> · <b id="tradesNeg" class="neg">0−</b></span> <small id="pnlEj">(ejemplo)</small></button>
   <span class="algoswrap">
     <button type="button" id="tlAlgosBtn" title="Profito Algoritmo" aria-label="Profito Algoritmo" aria-expanded="false" aria-haspopup="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 12S5.5 4.8 12 4.8 22.5 12 22.5 12 18.5 19.2 12 19.2 1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/></svg></button>
-    <div id="tlAlgosPanel" class="glass" hidden><div class="tit">Profito Algoritmo</div><div class="fila senal"><span class="nom">Sonido de la señal</span><button type="button" id="tlSenalAlgo" aria-pressed="true">Sí</button></div><div class="lista"></div></div>
+    <div id="tlAlgosPanel" hidden><div class="tit">Profito Algoritmo</div><div class="fila senal"><span class="nom">Sonido de la señal</span><button type="button" id="tlSenalAlgo" aria-pressed="true">Sí</button></div><div class="lista"></div></div>
     <div id="tlAlgoAviso" class="glass" hidden role="status" aria-live="polite"><i class="cola" aria-hidden="true"></i><span class="txt"></span></div>
   </span>
   <span class="sep"></span>
@@ -5241,6 +5246,21 @@ function qu(){dh.update();const n=Math.min(dh.getDelta(),jx);qo+=n;const e=qo;fo
   var panel = document.getElementById('tlAlgosPanel');
   var lista = panel && panel.querySelector('.lista');
   if (!btn || !panel || !lista) return;
+  if (panel.parentElement !== document.body) document.body.appendChild(panel);
+  function colocar() {
+    if (panel.hasAttribute('hidden')) return;
+    var r = btn.getBoundingClientRect();
+    var ancho = Math.max(panel.offsetWidth || 260, 260);
+    var left = r.left;
+    if (left + ancho > window.innerWidth - 8) left = Math.max(8, window.innerWidth - ancho - 8);
+    panel.style.position = 'fixed';
+    panel.style.left = Math.max(8, left) + 'px';
+    panel.style.top = (r.bottom + 10) + 'px';
+    panel.style.opacity = '1';
+    panel.style.background = '#1a1230';
+    panel.style.color = '#fff';
+    panel.style.zIndex = '80';
+  }
   var ojo = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 12S5.5 4.8 12 4.8 22.5 12 22.5 12 18.5 19.2 12 19.2 1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/><path class="sl" d="M3.5 3.5l17 17"/></svg>';
   function son(e, fn) { if (e) e.__tlSon = 1; try { fn && fn(); } catch (err) {} }
   function abierto() { return !panel.hasAttribute('hidden'); }
@@ -5253,7 +5273,7 @@ function qu(){dh.update();const n=Math.min(dh.getDelta(),jx);qo+=n;const e=qo;fo
   btn.addEventListener('click', function (e) {
     e.stopPropagation();
     var abre = !abierto();
-    if (abre) { panel.removeAttribute('hidden'); btn.setAttribute('aria-expanded', 'true'); }
+    if (abre) { panel.removeAttribute('hidden'); btn.setAttribute('aria-expanded', 'true'); colocar(); requestAnimationFrame(colocar); }
     else { panel.setAttribute('hidden', ''); btn.setAttribute('aria-expanded', 'false'); }
     son(e, abre ? window.__tlCard : window.__tlTap);
   });
@@ -5330,7 +5350,7 @@ function qu(){dh.update();const n=Math.min(dh.getDelta(),jx);qo+=n;const e=qo;fo
     requestAnimationFrame(anclarAviso);
     [300, 1000].forEach(function (ms) { setTimeout(anclarAviso, ms); });
   }
-  window.addEventListener('resize', anclarAviso);
+  window.addEventListener('resize', function () { anclarAviso(); colocar(); });
   var hud = document.getElementById('hud');
   if (hud) hud.addEventListener('animationend', anclarAviso);
   function pintar(j) {
@@ -6258,7 +6278,7 @@ function hook(){const G=window.__granja&&window.__granja.pet;if(!G||!G.renderer|
  if(cfg.kind!=="perro"||cfg.body!==A.perro.b||cfg.accent!==A.perro.a){try{applyPet(G,cfg)}catch(err){console.warn("mascota",err)}}
  (function lab(){const p=window.__pet.screen();if(p&&cfg.name){tag.textContent=cfg.name;tag.style.left=p.x+"px";tag.style.top=(p.y-8)+"px";tag.style.display="block"}else tag.style.display="none";requestAnimationFrame(lab)})()}
 setTimeout(hook,600);})();</script>
-<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.21</div>
+<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.23</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/api/version",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
 <script>/* 0.7.0: Profito duerme al abrir (granja en pausa), riega con laptop durante un trade, y etiquetas de cuentas con saldo y etapa. Solo visual: no toca el motor de trading. */
 (function(){
