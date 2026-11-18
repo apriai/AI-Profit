@@ -36,6 +36,7 @@ assert.equal(isPaper(sinDom.name, sinDom.broker), false);
 assert.equal(realAllowed(sinDom.name, { allowAll: false, allow: [] }), true, 'sin lista, una Lucid no se bloquea');
 assert.equal(realAllowed(sinDom.name, { allowAll: false, allow: ['OTRA'] }), true, 'una Lucid bien formada no depende de la lista');
 assert.equal(realAllowed('DEMO123', { allowAll: true, allow: [] }), false);
+assert.equal(realAllowed('CUENTA88421', { allowAll: false, allow: [] }), true, 'sin prefijo LFE también es operable');
 
 const domVacio = await run({ querySelector: () => ({ innerText: '   ' }) }, broker('D-TEST-002', lista));
 assert.equal(domVacio.name, 'Demo Account');

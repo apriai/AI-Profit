@@ -39,8 +39,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // ---- Gate de seguridad ----
 // cuenta elegible para la prueba: tipo demo/paper, nunca live, nunca Lucid (LFE/LFF/lucid)
 export function accountAllowed(a, broker = '') { if (!a || a.type === 'live' || /\bLF[EF]\d*/i.test(a.name || '') || /lucid/i.test(`${a.name} ${a.title}`)) return false; return a.type === 'demo' && isPaper(a.name, `${a.title || ''} ${broker}`); }
-// ---- Cuentas Lucid (LFE = evaluación, LFF = fondeada). Sin archivo, vacío o ilegible = todas permitidas.
-// Una lista escrita en el archivo ya no bloquea: cualquier LFE/LFF bien formada puede operarse.
+// ---- Toda cuenta que no es Paper/Demo es Lucid y se puede operar, aunque el nombre no empiece por LFE/LFF.
+// real-allowlist.json no bloquea ninguna cuenta.
 export function loadAllow(file = path.join(DIR, 'real-allowlist.json')) {
   const abierto = { allowAll: true, allow: [] };
   try {
@@ -53,8 +53,8 @@ export function loadAllow(file = path.join(DIR, 'real-allowlist.json')) {
     return { allowAll: false, allow };
   } catch { return abierto; }
 }
-export function realAllowed(name) { return /^LF[EF]\d+$/.test(String(name || '').trim()); }
-export const realLabel = name => { const n = String(name || ''); return `${n} (${/^LFF/.test(n) ? 'fondeada' : /^LFE/.test(n) ? 'evaluación' : 'real'})`; };
+export function realAllowed(name) { const n = String(name || '').trim(); return !!n && !isPaper(n); }
+export const realLabel = name => { const n = String(name || ''); return `${n} (LucidFlex · ${tipoDe({ id: n, name: n }) === 'funded' ? 'fondeada' : 'evaluación'})`; };
 export function isPaper(name = '', broker = '') {
   const s = `${name || ''} ${broker || ''}`;
   if (/\bLF[EF]\d*/i.test(s) || /lucid/i.test(s)) return false;   // nunca Lucid
@@ -360,7 +360,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
   const evFile = path.join(path.dirname(logFile), 'colchon-eventos.jsonl'); const ev = (type, d = {}) => { try { fs.appendFileSync(evFile, JSON.stringify({ at: new Date().toISOString(), type, ...d }) + '\n'); } catch {} };
   const allow = () => loadAllow(opts.realAllowFile ?? path.join(DIR, 'real-allowlist.json'));
   const log = (...a) => { const s = `${new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' })} ET ${a.join(' ')}`; S.log.push(s); S.log = S.log.slice(-40); try { fs.appendFileSync(logFile, s + '\n'); } catch {} };
-  async function check() { let acc; try { acc = await (await D()).account(); } catch (e) { driver = null; return { account: {}, paper: false, msg: 'Sin conexión con TradingView (CDP 9222): ' + e.message }; } const ok = isPaper(acc.name, acc.broker), real = !ok && realAllowed(acc.name, allow()); return { account: acc, paper: ok, real, realLabel: real ? realLabel(acc.name) : null, msg: ok ? 'Paper/Demo OK' : real ? `CUENTA REAL · ${realLabel(acc.name)}` : (acc.name ? 'Bloqueado: esta cuenta no es Paper/Demo ni Lucid (LFE/LFF)' : 'No veo la cuenta en TradingView') }; }
+  async function check() { let acc; try { acc = await (await D()).account(); } catch (e) { driver = null; return { account: {}, paper: false, msg: 'Sin conexión con TradingView (CDP 9222): ' + e.message }; } const ok = isPaper(acc.name, acc.broker), real = !ok && realAllowed(acc.name, allow()); return { account: acc, paper: ok, real, realLabel: real ? realLabel(acc.name) : null, msg: ok ? 'Paper/Demo OK' : real ? `CUENTA REAL · ${realLabel(acc.name)}` : (acc.name ? 'No pude leer esa cuenta de TradingView' : 'No veo la cuenta en TradingView') }; }
   async function loop(c, paper) {
     const st = { locked: false, fails: 0, uiTried: false }; const driver = await D(); const real = S.mode === 'real';
     const FZ = fuenteCfg(opts.fuenteFile, opts.fuente), SRC = {}, ticks = {}, leadN = {}; let lead = null; S.fuenteModo = FZ.modo; S.fuenteLider = null; S.fuentes = {};
@@ -486,7 +486,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
   return {
     check,
     strategies: () => ({ ok: true, default: DEFAULT_STRATEGY, strategies: listStrategies() }),
-    async accounts() { try { const r = await (await D()).accounts(); return { ok: true, ...r, accounts: r.accounts.map(a => { const p = accountAllowed(a, `${r.broker} ${r.brokerId}`), re = !p && realAllowed(a.name, allow()); const hint = accountHintFor(a.name); const tipo = tipoDe({ id: a.name, name: a.name, type: hint.type }); const acc = { id: a.name, name: a.name, ...(a.balance != null ? { balance: a.balance } : {}), ...hint, type: tipo }; const rules = rulesFor({ id: a.name, name: a.name, ...acc }); const pnl = acc.balance != null ? Math.round((acc.balance - rules.start) * 100) / 100 : null; return { ...a, type: tipo, ...(acc.balance != null ? { balance: acc.balance, totalPnl: pnl } : { totalPnl: null }), allowed: p || re, real: re, realLabel: re ? realLabel(a.name) : null, plan: rules.size, scale: rules.scale, start: rules.start, planStart: rules.start, dd: rules.dd, dailyLoss: rules.dailyLoss, profitTarget: rules.profitTarget, lockTriggerOver: rules.lockTriggerOver, lockFloorOver: rules.lockFloorOver, atRisk: rules.atRisk, maxMinis: maxQtyFor('NQ', acc), maxMicros: maxQtyFor('MNQ', acc) }; }) }; } catch (e) { driver = null; return { ok: false, err: 'Sin conexión con TradingView: ' + e.message, accounts: [] }; } },
+    async accounts() { try { const r = await (await D()).accounts(); return { ok: true, ...r, accounts: r.accounts.map(a => { const papel = isPaper(a.name || '', `${r.broker || ''} ${r.brokerId || ''}`), tiene = !!String(a.name || '').trim(), re = tiene && !papel; const hint = accountHintFor(a.name); const tipo = tipoDe({ id: a.name, name: a.name, type: hint.type }); const acc = { id: a.name, name: a.name, ...(a.balance != null ? { balance: a.balance } : {}), ...hint, type: tipo }; const rules = rulesFor({ id: a.name, name: a.name, ...acc }); const pnl = acc.balance != null ? Math.round((acc.balance - rules.start) * 100) / 100 : null; return { ...a, type: tipo, ...(acc.balance != null ? { balance: acc.balance, totalPnl: pnl } : { totalPnl: null }), allowed: tiene, real: re, realLabel: re ? realLabel(a.name) : null, plan: rules.size, scale: rules.scale, start: rules.start, planStart: rules.start, dd: rules.dd, dailyLoss: rules.dailyLoss, profitTarget: rules.profitTarget, lockTriggerOver: rules.lockTriggerOver, lockFloorOver: rules.lockFloorOver, atRisk: rules.atRisk, maxMinis: maxQtyFor('NQ', acc), maxMicros: maxQtyFor('MNQ', acc) }; }) }; } catch (e) { driver = null; return { ok: false, err: 'Sin conexión con TradingView: ' + e.message, accounts: [] }; } },
     async start(args = {}) {
       if (S.state === 'running') return { ok: false, err: 'Ya hay una prueba corriendo' };
       if (acctGuard.testActive) return { ok: false, err: 'esperando lectura…', waitingLectura: true };
@@ -511,7 +511,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
         const l = await this.accounts(); if (!l.ok) return { ok: false, err: l.err };
         const a = l.accounts.find(x => x.id === String(accountId)); if (!a) return { ok: false, err: 'Cuenta no encontrada' }; chosen = a;
         { const maxChosen = maxQtyFor(symbol, a); if (qty > maxChosen) return { ok: false, err: `Cantidad inválida: ${symbol} entre 1 y ${maxChosen}` }; }
-        if (!a.allowed) return { ok: false, blocked: true, err: `Bloqueado: ${a.name} no es Paper/Demo ni una cuenta Lucid` };
+        if (!a.allowed) return { ok: false, blocked: true, err: `No veo el nombre de la cuenta ${a.name || ''}` };
         if (a.real && confirmReal !== true) return { ok: false, blocked: true, needConfirm: true, err: `CUENTA REAL · ${a.realLabel}: falta confirmación` };
         if (!a.current && S.state === 'running') return { ok: false, err: 'Hay una prueba en marcha: no se cambia de cuenta' };
         if (!a.current) { const sw = await (await D()).switchAccount(a.id, a.name); if (!sw || !sw.ok) return { ok: false, err: 'No se pudo activar la cuenta ' + a.name + ': ' + ((sw && sw.error) || '?') }; switched = { name: a.name, ms: sw.ms }; }

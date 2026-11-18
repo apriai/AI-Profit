@@ -23,11 +23,27 @@ const tv = (...a) => new Promise(r => execFile(process.execPath, [TV, ...a], (e,
 const ev = async js => (await tv('ui', 'eval', js)).result;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const typeOf = (id, extra = {}) => tipoDe({ id, name: id, ...extra });
-function rulesOf(id, extra = {}) { return rulesFor({ id, name: id, ...extra }); }
+function rulesOf(id, extra = {}) {
+  const s = (sod.accounts || {})[id] || {};
+  return rulesFor({
+    id, name: id,
+    balance: extra.balance, equity: extra.equity,
+    peak: extra.peak ?? s.peak, startOfDay: extra.startOfDay ?? s.bal,
+    inicio: extra.inicio ?? s.inicio, planStart: extra.planStart ?? s.planStart,
+    lastBal: extra.lastBal ?? s.lastBal, planSaldo: extra.planSaldo ?? s.planSaldo,
+  });
+}
+function guardarPlan(id, size) {
+  const s = sod.accounts && sod.accounts[id];
+  if (!s) return;
+  if (size === '50K') { s.planSaldo = '50K'; s.inicio = 50000; s.plan = '50K'; }
+  else if (s.planSaldo !== '50K') { s.planSaldo = '25K'; s.plan = '25K'; if (s.inicio == null) s.inicio = 25000; }
+}
 function applyPlan(a) {
   if (!a || !a.id) return a;
   const s = (sod.accounts || {})[a.id] || {};
-  const r = rulesOf(a.id, { inicio: s.inicio, startOfDay: a.startOfDay ?? s.bal, start: a.start, planStart: a.planStart, plan: a.plan });
+  const r = rulesOf(a.id, { balance: a.balance, equity: a.equity, peak: a.peak, startOfDay: a.startOfDay ?? s.bal, inicio: s.inicio, lastBal: s.lastBal });
+  guardarPlan(a.id, r.size);
   a.plan = r.size; a.scale = r.scale; a.planStart = r.start; a.start = r.start;
   a.dd = r.dd; a.dailyLoss = r.dailyLoss; a.profitTarget = r.profitTarget;
   a.lockTriggerOver = r.lockTriggerOver; a.lockFloorOver = r.lockFloorOver; a.atRisk = r.atRisk;
@@ -62,8 +78,9 @@ function save(c) {
     const s = sod.accounts[c.id];
     // cambio de día: se conservan peak y breachedAt (quema pegajosa; −$600 + −$600 en 2 días = −$1,200 → quemada)
     // cuenta de evaluación (también un nombre sin prefijo) vista por primera vez en una granja que ya tenía cuentas: empieza el día en el saldo del plan, no en la primera lectura. Instalación nueva (sod vacío): se mantiene la primera lectura.
+    const planAhora = rulesOf(c.id, { balance: a.balance, equity: a.equity, peak: s && s.peak, inicio: s && s.inicio, lastBal: a.balance, planSaldo: s && s.planSaldo });
     const nuevaEval = !s && typeOf(c.id) === 'eval' && Object.keys(sod.accounts).length > 0;
-    if (!s || s.day !== day) sod.accounts[c.id] = nuevaEval ? { day, bal: rulesOf(c.id).start, inicio: rulesOf(c.id).start, lastBal: a.balance } : { ...(s || {}), ...(s && s.lastBal != null && !fueraDeSesion() ? { peak: Math.max(rulesOf(c.id).start, s.peak ?? 0, s.lastBal) } : {}), day, bal: s && s.lastBal != null ? s.lastBal : a.balance, lastBal: a.balance, ...(s && s.day && s.lastBal != null && s.bal != null ? { prev: { day: s.day, pnl: netoSesionGuardado(s.day, c.id) ?? Math.round((s.lastBal - s.bal) * 100) / 100 } } : {}) };
+    if (!s || s.day !== day) sod.accounts[c.id] = nuevaEval ? { day, bal: planAhora.start, inicio: planAhora.start, planSaldo: planAhora.size, plan: planAhora.size, lastBal: a.balance } : { ...(s || {}), ...(s && s.lastBal != null && !fueraDeSesion() ? { peak: Math.max(planAhora.start, s.peak ?? 0, s.lastBal) } : {}), day, bal: s && s.lastBal != null ? s.lastBal : a.balance, lastBal: a.balance, ...(s && s.day && s.lastBal != null && s.bal != null ? { prev: { day: s.day, pnl: netoSesionGuardado(s.day, c.id) ?? Math.round((s.lastBal - s.bal) * 100) / 100 } } : {}) };
     else s.lastBal = a.balance;
     sod.accounts[c.id].readAt = a.readAt;
     sod.accounts[c.id].lastAt = a.readAt;

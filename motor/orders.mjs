@@ -3,6 +3,7 @@
 // Activar envio real requiere un cambio de codigo explicito autorizado por Baned.
 import { rulesFor, maxQtyFor } from './account-size.mjs';
 import { diaFarm, fueraDeSesion } from './colchon.mjs';
+import { tipoDe } from './granja-flores.mjs';
 export const DRY_RUN = true;
 export const SYMBOLS = { NQ: 2, MNQ: 20 };           // tope 25K (2 minis o 20 micros); 50K y la fondeada usan maxQtyFor
 export const MAX_QTY = 20;
@@ -12,7 +13,7 @@ export const BRACKET = {                             // USD por trade (TP / SL)
 };
 export const TRADES_PER_DAY = 1;
 const NEWS_BEFORE_MIN = 40, NEWS_AFTER_MIN = 5;
-const typeOf = id => id.startsWith('LFF') ? 'funded' : id.startsWith('LFE') ? 'eval' : 'unknown';
+const typeOf = account => tipoDe(typeof account === 'string' ? { id: account, name: account } : (account || {}));
 let botEnabled = false;                               // bot APAGADO por defecto
 const pending = new Map(); const log = []; const tradesToday = new Map();
 export const bot = { get: () => botEnabled, set: v => { botEnabled = !!v; return botEnabled; } };
@@ -26,8 +27,8 @@ export function check(o, accounts, ms) {
   const err = [];
   if (!botEnabled) err.push('El bot esta apagado');
   const a = accounts[o.account];
-  if (!a) err.push('Cuenta desconocida'); else if (typeOf(a.id) === 'unknown') err.push('Cuenta no es LFE/LFF');
-  if (a && typeOf(a.id) === 'eval' && a.balance != null) { const R = rulesFor(a); if (a.balance <= R.start - R.dd) err.push('Cuenta en drawdown maximo (quemada)'); }
+  if (!a) err.push('Cuenta desconocida');
+  if (a && typeOf(a) === 'eval' && a.balance != null) { const R = rulesFor(a); if (a.balance <= R.start - R.dd) err.push('Cuenta en drawdown maximo (quemada)'); }
   if (!['buy', 'sell'].includes(o.side)) err.push('Lado invalido');
   const sym = o.symbol || 'MNQ';
   if (!(sym in SYMBOLS)) err.push('Simbolo debe ser NQ o MNQ');
@@ -40,7 +41,7 @@ export function check(o, accounts, ms) {
   return err;
 }
 function plan(o, accounts) {
-  const acc = accounts[o.account]; const sym = o.symbol || 'MNQ'; const kind = typeOf(acc.id);
+  const acc = accounts[o.account]; const sym = o.symbol || 'MNQ'; const kind = typeOf(acc);
   const sc = rulesFor(acc).scale;
   return { ...o, symbol: sym, type: 'bracket', tp: BRACKET[kind].tp * sc, sl: BRACKET[kind].sl * sc };
 }

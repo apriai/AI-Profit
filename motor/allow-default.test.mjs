@@ -28,7 +28,8 @@ fs.writeFileSync(roto, '{');
 assert.equal(loadAllow(roto).allowAll, true);
 assert.equal(realAllowed('LFF02500000000009', loadAllow(roto)), true);
 
-assert.equal(realAllowed('DEMO123', loadAllow(falta)), false, 'una cuenta que no es Lucid no pasa por aquí');
-assert.equal(realAllowed('LFE02500000000001', { allowAll: false, allow: ['OTRA'] }), true, 'una Lucid bien formada no se bloquea por la lista');
+assert.equal(realAllowed('DEMO123', loadAllow(falta)), false, 'paper o demo no es la cuenta real');
+assert.equal(realAllowed('CUENTA88421', loadAllow(falta)), true, 'una Lucid sin LFE/LFF se puede operar');
+assert.equal(realAllowed('LFE02500000000001', { allowAll: false, allow: ['OTRA'] }), true, 'la lista no bloquea ninguna cuenta');
 
 console.log('allow-default ok');

@@ -4,12 +4,40 @@
 // instalación nueva eso llega vacío. Una cuenta que la barra ve siempre
 // tiene flor, aunque todavía no haya saldo y aunque el id no empiece por LFE/LFF.
 
+// A partir de este saldo la cuenta es 50K. 37.500 queda entre 25.000 y 50.000.
+export const UMBRAL_50K = 37500;
+
+const CAMPOS_SALDO = ['balance', 'equity', 'peak', 'bal', 'start', 'inicio', 'planStart', 'initialBalance', 'startBalance', 'startOfDay', 'highest', 'lastBal'];
+
+function numerosDe(cuenta) {
+  return CAMPOS_SALDO.map(k => Number(cuenta[k])).filter(n => Number.isFinite(n) && n > 0);
+}
+
+function nombreDice50(cuenta) {
+  const nombre = `${cuenta.name || ''} ${cuenta.id || ''} ${cuenta.accountId || ''} ${cuenta.cuenta || ''}`;
+  return cuenta.plan === '50K' || cuenta.size === '50K' || cuenta.planSize === '50K' || /^LF[EF]050/i.test(nombre) || /(^|[^0-9])50\s*K/i.test(nombre);
+}
+
+function nombreDice25(cuenta) {
+  const nombre = `${cuenta.name || ''} ${cuenta.id || ''} ${cuenta.accountId || ''} ${cuenta.cuenta || ''}`;
+  return cuenta.plan === '25K' || cuenta.size === '25K' || cuenta.planSize === '25K' || /^LF[EF]025/i.test(nombre) || /(^|[^0-9])25\s*K/i.test(nombre);
+}
+
+// El saldo manda. planSaldo o un inicio ya guardado de 50.000 no bajan a 25K
+// aunque el saldo de hoy esté en drawdown. El nombre solo vale si aún no hay ningún saldo.
+export function planDe(cuenta = {}) {
+  if (cuenta == null) cuenta = {};
+  if (typeof cuenta === 'string') cuenta = { id: cuenta, name: cuenta };
+  if (cuenta.planSaldo === '50K') return '50K';
+  const nums = numerosDe(cuenta);
+  if (nums.length) return Math.max(...nums) >= UMBRAL_50K ? '50K' : '25K';
+  if (nombreDice50(cuenta)) return '50K';
+  if (nombreDice25(cuenta)) return '25K';
+  return '25K';
+}
+
 export function inicioDe(cuenta = {}) {
-  const explicito = Number(cuenta.start ?? cuenta.planStart);
-  if (Number.isFinite(explicito) && explicito > 0) return explicito;
-  const nombre = `${cuenta.name || ''} ${cuenta.id || ''} ${cuenta.plan || ''}`;
-  if (cuenta.plan === '50K' || /^LF[EF]050/i.test(nombre) || /(^|[^0-9])50\s*K/i.test(nombre)) return 50000;
-  return 25000;
+  return planDe(cuenta) === '50K' ? 50000 : 25000;
 }
 
 export function tipoDe(cuenta = {}) {

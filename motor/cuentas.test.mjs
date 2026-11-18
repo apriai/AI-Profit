@@ -1,7 +1,7 @@
 // Cualquier nombre de cuenta se reconoce. El libro vacío anota la compra; uno ya escrito no la duplica.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { tipoDe, inicioDe } from './granja-flores.mjs';
+import { tipoDe, inicioDe, planDe } from './granja-flores.mjs';
 import { esPapel, debeGuardarSaldo, fusionarCuentas, anotarNegocio, filtroFondeadas } from './cuentas.mjs';
 
 assert.equal(tipoDe({ name: 'APEX123456' }), 'eval');
@@ -10,6 +10,9 @@ assert.equal(tipoDe({ name: 'LFF05000000000099', type: 'eval' }), 'eval');
 assert.equal(tipoDe({ name: 'FONDO-X', type: 'funded' }), 'funded');
 assert.equal(inicioDe({ name: 'APEX50K999111' }), 50000);
 assert.equal(inicioDe({ name: 'TAKE999111222' }), 25000);
+assert.equal(planDe({ name: 'LFE02500000000019', balance: 51000 }), '50K');
+assert.equal(planDe({ name: 'LFE05000000000099', balance: 26000 }), '25K');
+assert.equal(inicioDe({ balance: 30000, inicio: 50000 }), 50000);
 assert.equal(esPapel({ name: 'Paper Trading' }), true);
 assert.equal(esPapel({ name: 'LFE02500000000019' }), false);
 assert.equal(debeGuardarSaldo({ name: 'APEX123456', balance: 25110 }), true);
@@ -98,6 +101,7 @@ const colchon = fs.readFileSync(new URL('./colchon.mjs', import.meta.url), 'utf8
 assert.match(colchon, /tipoDe\(\{ id: a\.name/);
 assert.match(colchon, /export function realAllowed/);
 const ordenes = fs.readFileSync(new URL('./orders.mjs', import.meta.url), 'utf8');
-assert.match(ordenes, /Cuenta no es LFE\/LFF/);
+assert.equal(ordenes.includes('Cuenta no es LFE/LFF'), false);
+assert.equal(html.includes('· bloqueada'), false);
 
 console.log('cuentas ok');

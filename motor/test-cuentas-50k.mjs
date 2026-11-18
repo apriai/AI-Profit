@@ -14,10 +14,15 @@ function assert(cond, msg) {
 
 const a25 = { name: 'LFE02500000000019', inicio: 25000, startOfDay: 25000 };
 const a50 = { name: 'LFE05000000000099', inicio: 50000, startOfDay: 50000 };
-assert(accountPlanSize(a25) === '25K', 'detecta 25K por LFE025');
-assert(accountPlanSize(a50) === '50K', 'detecta 50K por LFE050');
-assert(accountPlanSize({ name: 'LFE05000000000099', inicio: 25000 }) === '50K', 'LFE050 gana aunque inicio sea 25000');
-assert(accountPlanSize({ name: 'LFE02500000000019', startOfDay: 50000 }) === '25K', 'LFE025 no cambia por startOfDay crecido');
+assert(accountPlanSize(a25) === '25K', 'saldo de 25.000 es 25K');
+assert(accountPlanSize(a50) === '50K', 'saldo de 50.000 es 50K');
+assert(accountPlanSize({ name: 'LFE05000000000099', inicio: 25000 }) === '25K', 'un inicio de 25.000 gana al nombre 050');
+assert(accountPlanSize({ name: 'LFE02500000000019', balance: 50000 }) === '50K', 'un saldo de 50.000 gana al nombre 025');
+assert(accountPlanSize({ name: 'CUENTA88421', balance: 37500 }) === '50K', '37.500 ya es 50K');
+assert(accountPlanSize({ name: 'CUENTA88421', balance: 37499 }) === '25K', '37.499 sigue en 25K');
+assert(accountPlanSize({ balance: 30000, peak: 51000 }) === '50K', 'el pico evita reclasificar un 50K en drawdown');
+assert(accountPlanSize({ balance: 30000, planSaldo: '50K' }) === '50K', 'el plan ya guardado no baja a 25K');
+assert(accountPlanSize({ name: 'CUENTA88421' }) === '25K', 'sin saldo ni nombre de tamaño, 25K');
 assert(accountPlanSize({ start: 50000 }) === '50K', 'start 50000 sin id → 50K');
 assert(accountPlanSize({ name: 'LFF05000000000099' }) === '50K', 'detecta 50K por LFF050');
 assert(accountPlanSize({ name: 'Flex 50K demo' }) === '50K', 'detecta token 50K');

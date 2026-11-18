@@ -132,7 +132,7 @@ Parámetros comunes: `SL_USD`, `TP_USD` (bracket en $), `STEPS` (escalones `{tri
 ## 10. Cuentas reales
 - **Lucid:** LFE = evaluación, LFF = fondeada (`/^LF[EF]\d+$/`).
 - **`real-allowlist.json`:** si no existe, está vacío o no se puede leer, todas las cuentas Lucid (LFE/LFF) quedan permitidas. Una lista escrita en el archivo ya no las bloquea.
-- **Para operar en real** hace falta `confirmReal:true` (la UI lo pide), la cuenta activa visible y que no haya posición ni órdenes. La UI muestra la insignia roja «CUENTA REAL». Una cuenta que no sea Lucid ni Paper sigue bloqueada.
+- **Para operar en real** hace falta `confirmReal:true` (la UI lo pide), la cuenta activa visible y que no haya posición ni órdenes. La UI muestra la insignia roja «CUENTA REAL». Cualquier cuenta que no sea Paper ni Demo es Lucid y se puede operar, aunque el nombre no empiece por LFE o LFF.
 - La hora no cierra una cuenta real ni una de paper. El stop, el objetivo y el colchón siguen hasta el botón Detener.
 
 ## 11. Pitfalls conocidos
