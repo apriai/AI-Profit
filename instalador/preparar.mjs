@@ -6,7 +6,7 @@ const MOTOR = [
   'tradinglink.mjs', 'colchon.mjs', 'account-size.mjs', 'busy.mjs',
   'estrategias-propias.mjs', 'negocio.mjs', 'orders.mjs', 'rutas.mjs', 'strategies.mjs',
   'tv-reporte.mjs', 'tv-vista-previa.mjs', 'version-api.mjs', 'pnl-sesion.mjs',
-  'pine-algo.mjs', 'rutas-api.mjs', 'granja-flores.mjs', 'pine/manifest.json', 'pine/ai-profit-camp-algo.pine', 'Granja-de-Cuentas-v2.html',
+  'pine-algo.mjs', 'rutas-api.mjs', 'granja-flores.mjs', 'cuentas.mjs', 'pine/manifest.json', 'pine/ai-profit-camp-algo.pine', 'Granja-de-Cuentas-v2.html',
   'sonidos/clic-burbuja.wav', 'sonidos/despertar-wuhu.wav',
 ];
 const TV_MODULOS = ['chrome-remote-interface', 'ws', 'commander'];

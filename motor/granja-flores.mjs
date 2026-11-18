@@ -8,13 +8,15 @@ export function inicioDe(cuenta = {}) {
   const explicito = Number(cuenta.start ?? cuenta.planStart);
   if (Number.isFinite(explicito) && explicito > 0) return explicito;
   const nombre = `${cuenta.name || ''} ${cuenta.id || ''} ${cuenta.plan || ''}`;
-  if (cuenta.plan === '50K' || /^LF[EF]050/i.test(nombre) || /(^|[^A-Za-z0-9])50K([^A-Za-z0-9]|$)/i.test(nombre)) return 50000;
+  if (cuenta.plan === '50K' || /^LF[EF]050/i.test(nombre) || /(^|[^0-9])50\s*K/i.test(nombre)) return 50000;
   return 25000;
 }
 
 export function tipoDe(cuenta = {}) {
+  if (cuenta.type === 'funded') return 'funded';
+  if (cuenta.type === 'eval') return 'eval';
   const nombre = String(cuenta.name || cuenta.id || '');
-  if (cuenta.type === 'funded' || /^LFF/i.test(nombre)) return 'funded';
+  if (/^LFF/i.test(nombre)) return 'funded';
   return 'eval';
 }
 
@@ -104,7 +106,7 @@ export function aplicarFlores(store, datos) {
   if (plan.puedeBorrar) {
     for (const x of [...actuales()]) {
       if (!x || x.memorial || plan.mantener.has(x.name)) continue;
-      if (x.type === 'funded' && /^LFF/.test(String(x.name || '')) && store.markBurned) {
+      if (x.type === 'funded' && store.markBurned) {
         if (!x.burnedAt) store.markBurned(x.id);
       } else if (store.deleteAccount) store.deleteAccount(x.id);
     }

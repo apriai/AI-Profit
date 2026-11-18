@@ -1,3 +1,5 @@
+import { tipoDe } from './granja-flores.mjs';
+
 // Fuente única del tamaño de cuenta (25K / 50K) y de las reglas que dependen de él.
 // Detección: id Lucid LFE050…/LFF050… o token 50K, o algún saldo de plan ≥ 45,000.
 // Un id LFE025/LFF025 o token 25K gana sobre un startOfDay crecido.
@@ -61,8 +63,8 @@ export function accountPlanSize(account = {}) {
   const labels = [account.id, account.name, account.accountId, account.cuenta]
     .filter(v => v != null && String(v).trim() !== '')
     .map(v => String(v).trim());
-  if (labels.some(s => /^LF[EF]050/i.test(s) || /(^|[^A-Za-z0-9])50K([^A-Za-z0-9]|$)/i.test(s))) return '50K';
-  if (labels.some(s => /^LF[EF]025/i.test(s) || /(^|[^A-Za-z0-9])25K([^A-Za-z0-9]|$)/i.test(s))) return '25K';
+  if (labels.some(s => /^LF[EF]050/i.test(s) || /(^|[^0-9])50\s*K/i.test(s))) return '50K';
+  if (labels.some(s => /^LF[EF]025/i.test(s) || /(^|[^0-9])25\s*K/i.test(s))) return '25K';
   const starts = [account.inicio, account.initialBalance, account.startBalance, account.planStart, account.start, account.startOfDay]
     .map(numOrNull)
     .filter(x => x != null);
@@ -121,12 +123,7 @@ export function paramsForAccount(params, account) {
 function isFundedAccount(account = {}) {
   if (account == null) account = {};
   if (typeof account === 'string') account = { id: account, name: account };
-  if (account.type === 'funded') return true;
-  if (account.type === 'eval') return false;
-  const labels = [account.id, account.name, account.accountId, account.cuenta]
-    .filter(v => v != null && String(v).trim() !== '')
-    .map(v => String(v).trim());
-  return labels.some(s => /^LFF/i.test(s));
+  return tipoDe(account) === 'funded';
 }
 
 // Tope vigente. Evaluación: el techo del plan, sin escalar por beneficio.

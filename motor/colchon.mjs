@@ -1,4 +1,5 @@
 import { getStrategy, listStrategies, DEFAULT_STRATEGY, paramsForAccount, accountPlanSize, rulesFor, maxQtyFor } from './strategies.mjs';
+import { tipoDe } from './granja-flores.mjs';
 // TradingLink - "Colchón" (stop-to-profit). Paper/Demo, y cuentas Lucid (LFE/LFF) con confirmReal (el motor puede activarla con setCurrentAccount si no hay trades/órdenes abiertas). Sin real-allowlist.json no se bloquean.
 // La IA nunca coloca/modifica/cierra órdenes: solo el usuario arranca una prueba desde la Granja.
 // Servidor: import { colchon } from './colchon.mjs'  -> colchon.start({side,symbol,qty}), colchon.stop(), colchon.status()
@@ -76,6 +77,7 @@ function accountHintFor(name) {
       if (a.planStart != null) hint.planStart = a.planStart;
       if (a.plan) hint.plan = a.plan;
       if (a.size) hint.size = a.size;
+      if (a.type) hint.type = a.type;
     }
   } catch {}
   try {
@@ -484,7 +486,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
   return {
     check,
     strategies: () => ({ ok: true, default: DEFAULT_STRATEGY, strategies: listStrategies() }),
-    async accounts() { try { const r = await (await D()).accounts(); return { ok: true, ...r, accounts: r.accounts.map(a => { const p = accountAllowed(a, `${r.broker} ${r.brokerId}`), re = !p && realAllowed(a.name, allow()); const hint = accountHintFor(a.name); const named = /^LFF/i.test(a.name || '') ? 'funded' : /^LFE/i.test(a.name || '') ? 'eval' : undefined; const acc = { id: a.name, name: a.name, ...(a.balance != null ? { balance: a.balance } : {}), ...hint, ...(named ? { type: named } : {}) }; const rules = rulesFor({ id: a.name, name: a.name, ...acc }); const pnl = acc.balance != null ? Math.round((acc.balance - rules.start) * 100) / 100 : null; return { ...a, ...(named ? { type: named } : {}), ...(acc.balance != null ? { balance: acc.balance, totalPnl: pnl } : { totalPnl: null }), allowed: p || re, real: re, realLabel: re ? realLabel(a.name) : null, plan: rules.size, scale: rules.scale, start: rules.start, planStart: rules.start, dd: rules.dd, dailyLoss: rules.dailyLoss, profitTarget: rules.profitTarget, lockTriggerOver: rules.lockTriggerOver, lockFloorOver: rules.lockFloorOver, atRisk: rules.atRisk, maxMinis: maxQtyFor('NQ', acc), maxMicros: maxQtyFor('MNQ', acc) }; }) }; } catch (e) { driver = null; return { ok: false, err: 'Sin conexión con TradingView: ' + e.message, accounts: [] }; } },
+    async accounts() { try { const r = await (await D()).accounts(); return { ok: true, ...r, accounts: r.accounts.map(a => { const p = accountAllowed(a, `${r.broker} ${r.brokerId}`), re = !p && realAllowed(a.name, allow()); const hint = accountHintFor(a.name); const tipo = tipoDe({ id: a.name, name: a.name, type: hint.type }); const acc = { id: a.name, name: a.name, ...(a.balance != null ? { balance: a.balance } : {}), ...hint, type: tipo }; const rules = rulesFor({ id: a.name, name: a.name, ...acc }); const pnl = acc.balance != null ? Math.round((acc.balance - rules.start) * 100) / 100 : null; return { ...a, type: tipo, ...(acc.balance != null ? { balance: acc.balance, totalPnl: pnl } : { totalPnl: null }), allowed: p || re, real: re, realLabel: re ? realLabel(a.name) : null, plan: rules.size, scale: rules.scale, start: rules.start, planStart: rules.start, dd: rules.dd, dailyLoss: rules.dailyLoss, profitTarget: rules.profitTarget, lockTriggerOver: rules.lockTriggerOver, lockFloorOver: rules.lockFloorOver, atRisk: rules.atRisk, maxMinis: maxQtyFor('NQ', acc), maxMicros: maxQtyFor('MNQ', acc) }; }) }; } catch (e) { driver = null; return { ok: false, err: 'Sin conexión con TradingView: ' + e.message, accounts: [] }; } },
     async start(args = {}) {
       if (S.state === 'running') return { ok: false, err: 'Ya hay una prueba corriendo' };
       if (acctGuard.testActive) return { ok: false, err: 'esperando lectura…', waitingLectura: true };

@@ -138,8 +138,8 @@ export function manejar(q, r, deps) {
       }
     }
   }
-  if (q.method === 'GET' && (q.url === '/granja-flores.mjs' || q.url.startsWith('/granja-flores.mjs?'))) {
-    const archivo = path.join(deps.ROOT, 'motor', 'granja-flores.mjs');
+  if (q.method === 'GET' && (q.url === '/granja-flores.mjs' || q.url.startsWith('/granja-flores.mjs?') || q.url === '/cuentas.mjs' || q.url.startsWith('/cuentas.mjs?'))) {
+    const archivo = path.join(deps.ROOT, 'motor', path.basename(q.url.split('?')[0]));
     if (fs.existsSync(archivo)) {
       r.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
       return fs.createReadStream(archivo).pipe(r);

@@ -3,13 +3,14 @@
 Documento de relevo para cualquier agente (Grok) que trabaje en este repositorio. Sin datos personales: no hay cuentas, saldos ni claves aquí.
 
 ## Versión actual
-- **Última versión: 0.10.18** (2026-11-18). Está en el archivo `VERSION` y se ve en la esquina inferior izquierda de la granja y, abajo a la derecha de Demo, dentro del panel Negocio. AI Profit abre en la bandeja del reloj, con pantalla de carga y sin consola. El ojo junto a Hoy muestra u oculta Profito Algoritmo. La flor sale de la misma lista de cuentas que la barra (`/api/colchon/accounts`), también en una instalación nueva sin saldo. El estudio de Pine se añade con `createStudyInserter({type:'pine'})`.
+- **Última versión: 0.10.19** (2026-11-18). Está en el archivo `VERSION` y se ve en la esquina inferior izquierda de la granja y, abajo a la derecha de Demo, dentro del panel Negocio. Una cuenta se reconoce por el nombre que ya muestra la barra, aunque no empiece por LFE o LFF. Si no se sabe el tipo, es evaluación. Operar sigue pidiendo Paper o una Lucid. AI Profit abre en la bandeja del reloj, con pantalla de carga y sin consola. El ojo junto a Hoy muestra u oculta Profito Algoritmo. La flor sale de la misma lista de cuentas que la barra (`/api/colchon/accounts`). El estudio de Pine se añade con `createStudyInserter({type:'pine'})`.
 - Historial completo y detallado: `CHANGELOG.md`. Cada versión tiene su release en GitHub (`v0.5.1`, etc.).
 - **Al terminar un cambio, actualiza este documento** (versión, fecha y la lista de abajo).
 
 ## Lo que cambió
 | Versión | Qué cambió |
 |---|---|
+| 0.10.19 | Cualquier nombre de cuenta se reconoce (saldo, flor, Negocio, tamaño y etiqueta), no solo LFE/LFF. Sin tipo, es evaluación y el Negocio anota el precio estimado. Un libro que ya tiene la cuenta no se duplica. Operar no cambia: Paper o Lucid. |
 | 0.10.18 | Bandeja junto al reloj, sin ventanas negras. Pantalla «Cargando Profito…». Cerrar Profito no toca TradingView ni las órdenes. El ojo vuelve a funcionar. La flor se planta con la cuenta que ya ve la barra. Solo queda Profito Algoritmo. El cerezo queda con manzanas fijas, sin subir certificados. |
 | 0.10.17 | En TradingView Desktop 3.5.0 el estudio de Pine se añade con `createStudyInserter({type:'pine', pineId:'USER;<hash>', pineVersion:'last'})`. Un texto o un metaInfo JSON no sirve. Si ya está en el gráfico, no se duplica. |
 | 0.10.16 | Smart Money Structure se llama Smart Money Algo y, si el estudio viejo ya estaba, se reemplaza sin duplicarlo y conserva si estaba oculto. El id `script$user;…` de TradingView Desktop 3.5.0 ya se acepta. Si la instalación falla, se ve el motivo y se reintenta. La granja abre otra vez en ventana propia aunque falte el ayudante del navegador. |
