@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { tipoDe, inicioDe, planDe } from './granja-flores.mjs';
-import { esPapel, debeGuardarSaldo, fusionarCuentas, anotarNegocio, filtroFondeadas } from './cuentas.mjs';
+import { esPapel, debeGuardarSaldo, fusionarCuentas, anotarNegocio, filtroFondeadas, listaDe } from './cuentas.mjs';
 
 assert.equal(tipoDe({ name: 'APEX123456' }), 'eval');
 assert.equal(tipoDe({ name: 'LFF05000000000099' }), 'funded');
@@ -89,8 +89,74 @@ assert.equal(fondeo.ledger[0].amount, 0);
 const re = filtroFondeadas(['CUENTA-FONDEADA', 'A.B']);
 assert.match('CUENTA-FONDEADA', new RegExp(re));
 assert.doesNotMatch('APEX50K999111', new RegExp(re));
+assert.match('CUENTA-FONDEADA', new RegExp(filtroFondeadas(new Set(['CUENTA-FONDEADA']))));
+assert.equal(filtroFondeadas(null), null);
+assert.equal(filtroFondeadas({}), null);
+
+assert.deepEqual(listaDe(null), []);
+assert.deepEqual(listaDe(new Set(['LFE02500000000019'])), ['LFE02500000000019']);
+assert.deepEqual(listaDe({ LFE02500000000019: true }), ['LFE02500000000019']);
+assert.deepEqual(listaDe('["LFE02500000000019"]'), ['LFE02500000000019']);
+
+const yaVista = { name: 'LFE02500000000019', type: 'eval', balance: 25000 };
+const conSet = anotarNegocio({
+  cuentas: [yaVista],
+  ledger: libro,
+  seen: new Set(['LFE02500000000019']),
+  burned: new Set(),
+  precio: 50,
+  hoy: '2026-11-18',
+});
+assert.equal(conSet.ledger.filter(e => e.type === 'compra').length, 0, 'un Set de vistos no vuelve a anotar la compra');
+assert.ok(conSet.seen.includes('LFE02500000000019'));
+
+const conObjeto = anotarNegocio({
+  cuentas: [yaVista],
+  ledger: libro,
+  seen: { LFE02500000000019: 1 },
+  burned: {},
+  precio: 50,
+  hoy: '2026-11-18',
+});
+assert.equal(conObjeto.ledger.filter(e => e.type === 'compra').length, 0, 'un objeto viejo usa las claves como cuentas ya vistas');
+
+const conTexto = anotarNegocio({
+  cuentas: [yaVista],
+  ledger: JSON.stringify(libro),
+  seen: '["LFE02500000000019"]',
+  burned: '[]',
+  precio: 50,
+  hoy: '2026-11-18',
+});
+assert.equal(conTexto.ledger.filter(e => e.type === 'compra').length, 0, 'un texto JSON viejo no rompe ni duplica');
+assert.equal(conTexto.ledger.some(e => e.id === 'manual'), true, 'el libro en texto se conserva');
+
+const quemadaSet = anotarNegocio({
+  cuentas: [{ name: 'TAKE999111222', balance: 24000 }],
+  ledger: libro,
+  seen: new Set(['TAKE999111222']),
+  burned: new Set(['TAKE999111222']),
+  precio: 75,
+  hoy: '2026-11-18',
+});
+assert.equal(quemadaSet.ledger.filter(e => e.type === 'quemada').length, 0, 'un Set de quemadas no se repite');
+
+const setNuevo = anotarNegocio({
+  cuentas: [{ name: 'TAKE999111222', balance: 25000 }],
+  ledger: libro,
+  seen: new Set(),
+  burned: new Set(),
+  precio: 75,
+  hoy: '2026-11-18',
+});
+assert.equal(setNuevo.ledger.filter(e => e.type === 'compra').length, 1, 'un Set vacío sigue anotando la cuenta nueva');
 
 const html = fs.readFileSync(new URL('./Granja-de-Cuentas-v2.html', import.meta.url), 'utf8');
+const poll = html.slice(html.indexOf('async function poll()'), html.indexOf('poll();setInterval(poll'));
+assert.ok(poll.includes('async function poll(){'), 'hay un sondeo del Negocio');
+assert.ok(poll.includes('try{let archivo'), 'el sondeo del Negocio va dentro de try');
+assert.ok(poll.includes('}catch(e){}'), 'un fallo del Negocio no puede romper la granja');
+assert.equal(poll.includes('gset('), false, 'el sondeo ya no fuerza un Set antes de anotar');
 assert.match(html, /from '\/cuentas\.mjs'/);
 assert.equal(html.includes('startsWith("LFE")'), false);
 assert.match(html, /\/api\/colchon\/accounts/);

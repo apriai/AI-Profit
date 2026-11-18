@@ -39,8 +39,55 @@ export function fusionarCuentas({ accountsJson = {}, colchon = null } = {}) {
   });
 }
 
+// Set, lista, texto JSON, claves de un objeto o vacío → lista de textos.
+// El Negocio guarda lo ya visto como Set; instalaciones viejas dejaron un objeto o un texto.
+export function listaDe(valor) {
+  if (valor == null || valor === false) return [];
+  if (typeof valor === 'string') {
+    const t = valor.trim();
+    if (!t) return [];
+    const abre = t[0];
+    const cierra = t[t.length - 1];
+    if (abre === '[' || abre === '{' || (abre === '"' && cierra === '"')) {
+      try { return listaDe(JSON.parse(t)); } catch { /* el texto es un id */ }
+    }
+    return [t];
+  }
+  if (valor instanceof Set || Array.isArray(valor)) {
+    const out = [];
+    for (const x of valor) {
+      if (x == null || typeof x === 'object') continue;
+      const s = String(x).trim();
+      if (s) out.push(s);
+    }
+    return out;
+  }
+  if (typeof valor === 'object') return Object.keys(valor).map(s => String(s).trim()).filter(Boolean);
+  const s = String(valor).trim();
+  return s ? [s] : [];
+}
+
+function libroDe(ledger) {
+  let raw = ledger;
+  if (typeof raw === 'string') {
+    try { raw = JSON.parse(raw); } catch { return []; }
+  }
+  if (raw instanceof Set) raw = [...raw];
+  if (!Array.isArray(raw)) return [];
+  return raw.map(x => ({ ...x }));
+}
+
+function cuentasDe(cuentas) {
+  let raw = cuentas;
+  if (typeof raw === 'string') {
+    try { raw = JSON.parse(raw); } catch { return []; }
+  }
+  if (raw instanceof Set) raw = [...raw];
+  return Array.isArray(raw) ? raw : [];
+}
+
 export function filtroFondeadas(nombres) {
-  const lista = [...(nombres || [])].map(s => String(s).trim()).filter(Boolean);
+  const lista = listaDe(nombres);
   if (!lista.length) return null;
   const alt = lista.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
   return `^(?:${alt})$`;
@@ -53,16 +100,16 @@ function yaEnLibro(ledger, id) {
 // Libro vacío: anota la compra estimada de las cuentas que ya existen.
 // Libro con datos: no repite una cuenta cuyo id ya está en una línea.
 export function anotarNegocio({ cuentas = [], ledger = [], seen = [], burned = [], precio = 50, hoy = '', idNuevo } = {}) {
-  const l = (Array.isArray(ledger) ? ledger : []).map(x => ({ ...x }));
-  const vistos = new Set((seen || []).map(String));
-  const quemadas = new Set((burned || []).map(String));
+  const l = libroDe(ledger);
+  const vistos = new Set(listaDe(seen));
+  const quemadas = new Set(listaDe(burned));
   const vacio = l.length === 0;
   const nuevo = typeof idNuevo === 'function' ? idNuevo : (p, id) => p + String(id).slice(-4);
   const monto = Number.isFinite(+precio) && +precio >= 0 ? +precio : 50;
   let changed = false;
   let seenChanged = false;
   let fondeos = 0;
-  for (const raw of cuentas) {
+  for (const raw of cuentasDe(cuentas)) {
     const id = String((raw && (raw.name || raw.id)) || '').trim();
     if (!id || IGN.has(id) || esPapel(raw)) continue;
     const tipo = tipoDe(raw);
