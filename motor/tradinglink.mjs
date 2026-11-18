@@ -360,7 +360,7 @@ const guardarHist = () => { for (const d of new Set([diaFarm(), diaFarm(Date.now
 setInterval(guardarHist, 3 * 60 * 1000);
 setTimeout(guardarHist, 15000);
 
-let algoTv = { estado: () => ({ conectado: false, algos: [], texto: '' }), intentar: async () => algoTv.estado(), sincronizar: async () => algoTv.estado(), fijar: async () => ({ ok: false, ...algoTv.estado() }) };
+let algoTv = { estado: () => ({ conectado: false, algos: [], texto: '', senal: { seq: 0, barra: null, lado: null } }), intentar: async () => algoTv.estado(), sincronizar: async () => algoTv.estado(), fijar: async () => ({ ok: false, ...algoTv.estado() }), oirSenal: async () => algoTv.estado() };
 try {
   algoTv = crearAlgoTv({
     dir: DIR,
@@ -390,8 +390,11 @@ try {
     } finally { algoEnCurso = false; }
   };
   const verOjos = () => algoTv.sincronizar().catch(e => console.log('algo:', e && e.message));
+  const oirSenal = () => algoTv.oirSenal().catch(() => {});
   setTimeout(pasarAlgo, 20000);
   setInterval(pasarAlgo, 10 * 60 * 1000);
   setTimeout(verOjos, 25000);
   setInterval(verOjos, 30000);
+  setTimeout(oirSenal, 5000);
+  setInterval(oirSenal, 1500);
 } catch (e) { console.log('algo: no arrancó; el motor sigue.', e && e.message); }

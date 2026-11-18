@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.20] — 2026-11-18
+### Agregado
+- **Suena cuando el círculo de Profito Algoritmo aparece en la vela que se está formando.** Una vez por vela y dirección: si se apaga y vuelve en la misma vela, no se repite. Si el indicador está oculto o no está en el gráfico, no suena. El interruptor «Sonido de la señal» queda encendido; se guarda en el navegador. El silencio general lo apaga también. BUY y SELL siguen en silencio. No lee ni toca órdenes ni la cuenta.
+### Notas
+- No abre, no mueve y no cierra órdenes.
+
 ## [0.10.19] — 2026-11-18
 ### Corregido
 - **Cualquier cuenta se reconoce, no solo las que empiezan por LFE.** El saldo, la flor, el Negocio, el tamaño y la etiqueta usan la lista del bróker (`/api/colchon/accounts`) junto con `accounts.json`. Si el nombre no dice el tipo, se trata como evaluación. En el Negocio, un libro vacío anota la compra con el precio guardado (`tl_price`) y la nota «monto estimado — edítalo». Si el libro ya tiene esa cuenta, no se anota otra vez. Una fondeada que desaparece se marca quemada aunque el nombre no sea LFF.
