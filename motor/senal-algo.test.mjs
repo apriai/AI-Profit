@@ -16,6 +16,7 @@ assert.equal(decidirToque(vistos, { ok: true, visible: true, enGrafico: 1, barra
 assert.equal(decidirToque(vistos, { ok: true, visible: false, enGrafico: 1, barra: barra + 120, alcista: true }).tocar, false, 'oculto no suena');
 assert.equal(decidirToque(vistos, { ok: true, visible: true, enGrafico: 0, barra: barra + 120, alcista: true }).tocar, false, 'sin estudio no suena');
 assert.equal(decidirToque(vistos, { ok: false, visible: true, enGrafico: 1, barra: barra + 180, alcista: true }).tocar, false, 'un fallo del gráfico no suena');
+assert.equal(decidirToque(new Set([barra + '|alcista']), { ok: true, visible: true, enGrafico: 1, barra, alcista: true }).tocar, false, 'un Set no es el anillo y no rompe');
 
 function pagina(estudio, visible) {
   const study = estudio || {
