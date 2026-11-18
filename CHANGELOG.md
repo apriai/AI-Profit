@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.22] — 2026-11-18
+### Corregido
+- **El menú del ojo se lee sobre los árboles.** El panel de Profito Algoritmo, el aviso de instalación, el color del agente y la confirmación de activarlo quedan en un violeta casi opaco, con borde y sombra. El texto queda claro. La barra de arriba sigue en cristal.
+### Notas
+- No abre, no mueve y no cierra órdenes. Solo es la página.
+
 ## [0.10.21] — 2026-11-18
 ### Corregido
 - **Abrir la granja ya no se cae en el Negocio.** Las cuentas ya vistas y las quemadas llegan como un conjunto (y, en instalaciones viejas, como un objeto o un texto). El Negocio las pedía como lista y al abrir salía «Algo salió mal». Ahora las acepta todas. Si el Negocio falla, la granja sigue abierta.
