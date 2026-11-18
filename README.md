@@ -197,7 +197,7 @@ Los cambios llegan a `main` únicamente por *pull request* aprobado por Bänéd.
 - **La IA nunca coloca, modifica, cancela ni cierra órdenes reales por su cuenta.** Solo la persona inicia un trade desde la granja.
 - **Nada de datos personales en el repositorio:** ni cuentas, ni saldos, ni historial, ni claves. Los ids de cuenta se muestran enmascarados (4 primeros y 3 últimos caracteres).
 - **Los datos se quedan en tu PC.** El servidor escucha solo en `127.0.0.1`.
-- **Cuentas Lucid (LFE/LFF):** se pueden operar con confirmación explícita. No hace falta `real-allowlist.json`. Una cuenta que no sea Lucid ni Paper sigue bloqueada.
+- **Cuentas Lucid:** se pueden operar con confirmación explícita, aunque el nombre no empiece por LFE o LFF. No hace falta `real-allowlist.json`. Paper y demo siguen siendo paper.
 - **Respaldo antes de cada edición** (carpeta `backups\`) y **sin reiniciar el servidor con operaciones abiertas**.
 - **Sin clics dentro de TradingView** ni cambio de cuenta con un trade abierto.
 - **Sin instalaciones en todo el sistema:** solo herramientas portátiles dentro de la carpeta.

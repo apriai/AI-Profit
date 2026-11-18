@@ -1,5 +1,5 @@
 // TradingLink Fase 1 — SOLO LECTURA. No coloca órdenes.
-// Regla: cuentas LFE = evaluación, LFF = fondeada.
+// Regla de tipo: fondeada si el tipo o el nombre LFF lo dicen; si no, evaluación. Cualquier nombre se guarda.
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
 import * as orders from './orders.mjs';
 import { negocio } from './negocio.mjs';
@@ -10,6 +10,8 @@ import { estrategiasPropias } from './estrategias-propias.mjs';
 import { execFile } from 'node:child_process';
 import { dataDir, ROOT, HTML, TV_CLI } from './rutas.mjs';
 import { rulesFor, maxQtyFor } from './account-size.mjs';
+import { tipoDe, inicioDe } from './granja-flores.mjs';
+import { debeGuardarSaldo, esPapel, filtroFondeadas } from './cuentas.mjs';
 import { textoVersion } from './version-api.mjs';
 import { cerrarSesion } from './pnl-sesion.mjs';
 import { crearAlgoTv } from './pine-algo.mjs';
@@ -20,12 +22,28 @@ const PORT = 8787, EVERY_MS = 5 * 60 * 1000;
 const tv = (...a) => new Promise(r => execFile(process.execPath, [TV, ...a], (e, o) => { try { r(JSON.parse(o)); } catch { r({ success: false }); } }));
 const ev = async js => (await tv('ui', 'eval', js)).result;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const typeOf = id => id.startsWith('LFF') ? 'funded' : id.startsWith('LFE') ? 'eval' : 'unknown';
-function rulesOf(id, extra = {}) { return rulesFor({ id, name: id, ...extra }); }
+const typeOf = (id, extra = {}) => tipoDe({ id, name: id, ...extra });
+function rulesOf(id, extra = {}) {
+  const s = (sod.accounts || {})[id] || {};
+  return rulesFor({
+    id, name: id,
+    balance: extra.balance, equity: extra.equity,
+    peak: extra.peak ?? s.peak, startOfDay: extra.startOfDay ?? s.bal,
+    inicio: extra.inicio ?? s.inicio, planStart: extra.planStart ?? s.planStart,
+    lastBal: extra.lastBal ?? s.lastBal, planSaldo: extra.planSaldo ?? s.planSaldo,
+  });
+}
+function guardarPlan(id, size) {
+  const s = sod.accounts && sod.accounts[id];
+  if (!s) return;
+  if (size === '50K') { s.planSaldo = '50K'; s.inicio = 50000; s.plan = '50K'; }
+  else if (s.planSaldo !== '50K') { s.planSaldo = '25K'; s.plan = '25K'; if (s.inicio == null) s.inicio = 25000; }
+}
 function applyPlan(a) {
   if (!a || !a.id) return a;
   const s = (sod.accounts || {})[a.id] || {};
-  const r = rulesOf(a.id, { inicio: s.inicio, startOfDay: a.startOfDay ?? s.bal, start: a.start, planStart: a.planStart, plan: a.plan });
+  const r = rulesOf(a.id, { balance: a.balance, equity: a.equity, peak: a.peak, startOfDay: a.startOfDay ?? s.bal, inicio: s.inicio, lastBal: s.lastBal });
+  guardarPlan(a.id, r.size);
   a.plan = r.size; a.scale = r.scale; a.planStart = r.start; a.start = r.start;
   a.dd = r.dd; a.dailyLoss = r.dailyLoss; a.profitTarget = r.profitTarget;
   a.lockTriggerOver = r.lockTriggerOver; a.lockFloorOver = r.lockFloorOver; a.atRisk = r.atRisk;
@@ -40,7 +58,7 @@ let state = { updated: null, accounts: {}, error: null, daily: {} };
 const SOD_FILE = path.join(DIR, 'sod.json');
 let sod = { accounts: {}, daily: {} }; try { sod = { accounts: {}, daily: {}, ...JSON.parse(fs.readFileSync(SOD_FILE, 'utf8')) }; } catch {}
 // Semilla: al reiniciar, las cuentas no activas no se releen (p.ej. con pausa-lectura.flag); se publica su ÚLTIMO saldo real conocido (sod.lastBal) marcado stale para que la granja pueda marcar quemada una fondeada.
-for (const [id, s] of Object.entries(sod.accounts || {})) if (/^LF[EF]/.test(id) && s && s.lastBal != null && !s.gone) state.accounts[id] = applyPlan({ id, type: typeOf(id), balance: s.lastBal, equity: s.lastBal, profit: null, readAt: s.readAt || null, startOfDay: s.bal, dayPnl: Math.round((s.lastBal - s.bal) * 100) / 100, totalPnl: Math.round((s.lastBal - 25000) * 100) / 100, tradingDay: s.day, stale: true });
+for (const [id, s] of Object.entries(sod.accounts || {})) if (s && s.lastBal != null && !s.gone && !esPapel({ id, name: id })) state.accounts[id] = applyPlan({ id, type: typeOf(id, { type: s.type }), balance: s.lastBal, equity: s.lastBal, profit: null, readAt: s.readAt || null, startOfDay: s.bal, dayPnl: Math.round((s.lastBal - s.bal) * 100) / 100, totalPnl: Math.round((s.lastBal - inicioDe({ id, type: s.type, plan: s.plan })) * 100) / 100, tradingDay: s.day, stale: true });
 function tradingDay() { return diaFarm(); }
 
 const readCurrent = () => ev(`(()=>{const n=document.querySelector('[class*=accountName]');const f=[...document.querySelectorAll('[class*=accountSummaryField]')].map(e=>e.innerText.split('\\n'));const p=(document.querySelector('[class*=accountManager]')||{}).innerText||'';return JSON.stringify({id:n&&n.innerText.trim(),f,busy:/Positions\\s*\\(?[1-9]|Orders\\s*\\(?[1-9]/.test(p)})})()`).then(s => JSON.parse(s || '{}'));
@@ -59,12 +77,14 @@ function save(c) {
   if (a.balance != null) {
     const s = sod.accounts[c.id];
     // cambio de día: se conservan peak y breachedAt (quema pegajosa; −$600 + −$600 en 2 días = −$1,200 → quemada)
-    // cuenta de EVALUACION vista por primera vez en una granja que ya tenia cuentas: empieza el dia en el saldo inicial (25,000), no en la primera lectura (que puede traer una posicion abierta con P&L flotante). Instalacion nueva (sod vacio): se mantiene la primera lectura.
-    const nuevaEval = !s && /^LFE/.test(c.id) && Object.keys(sod.accounts).length > 0;
-    if (!s || s.day !== day) sod.accounts[c.id] = nuevaEval ? { day, bal: rulesOf(c.id).start, inicio: rulesOf(c.id).start, lastBal: a.balance } : { ...(s || {}), ...(s && s.lastBal != null && !fueraDeSesion() ? { peak: Math.max(rulesOf(c.id).start, s.peak ?? 0, s.lastBal) } : {}), day, bal: s && s.lastBal != null ? s.lastBal : a.balance, lastBal: a.balance, ...(s && s.day && s.lastBal != null && s.bal != null ? { prev: { day: s.day, pnl: netoSesionGuardado(s.day, c.id) ?? Math.round((s.lastBal - s.bal) * 100) / 100 } } : {}) };
+    // cuenta de evaluación (también un nombre sin prefijo) vista por primera vez en una granja que ya tenía cuentas: empieza el día en el saldo del plan, no en la primera lectura. Instalación nueva (sod vacío): se mantiene la primera lectura.
+    const planAhora = rulesOf(c.id, { balance: a.balance, equity: a.equity, peak: s && s.peak, inicio: s && s.inicio, lastBal: a.balance, planSaldo: s && s.planSaldo });
+    const nuevaEval = !s && typeOf(c.id) === 'eval' && Object.keys(sod.accounts).length > 0;
+    if (!s || s.day !== day) sod.accounts[c.id] = nuevaEval ? { day, bal: planAhora.start, inicio: planAhora.start, planSaldo: planAhora.size, plan: planAhora.size, lastBal: a.balance } : { ...(s || {}), ...(s && s.lastBal != null && !fueraDeSesion() ? { peak: Math.max(planAhora.start, s.peak ?? 0, s.lastBal) } : {}), day, bal: s && s.lastBal != null ? s.lastBal : a.balance, lastBal: a.balance, ...(s && s.day && s.lastBal != null && s.bal != null ? { prev: { day: s.day, pnl: netoSesionGuardado(s.day, c.id) ?? Math.round((s.lastBal - s.bal) * 100) / 100 } } : {}) };
     else s.lastBal = a.balance;
     sod.accounts[c.id].readAt = a.readAt;
     sod.accounts[c.id].lastAt = a.readAt;
+    sod.accounts[c.id].type = a.type;
     a.startOfDay = sod.accounts[c.id].bal; a.dayPnl = pnlDelDia(c.id, a.balance, a.startOfDay); a.tradingDay = day; applyPlan(a);
     sod.daily[day] = Math.round(Object.values(state.accounts).filter(x => x.tradingDay === day && x.dayPnl != null).reduce((t, x) => t + x.dayPnl, 0) * 100) / 100;
     try { fs.writeFileSync(SOD_FILE, JSON.stringify(sod, null, 2)); } catch {}
@@ -86,8 +106,8 @@ function riesgo(a) { if (!a || a.balance == null) return; applyPlan(a); const R 
   a.breached = a.balance <= a.floor || a.balance <= R.start - R.dd || !!(sa && sa.breachedAt); if (a.breached && sa && !sa.breachedAt) { sa.breachedAt = new Date().toISOString(); try { fs.writeFileSync(SOD_FILE, JSON.stringify(sod, null, 2)); } catch {} } if (a.breached && a.type === "funded") { a.burned = true; a.breachedAt = sa && sa.breachedAt; }
   if (a.breached) console.log('MAX LOSS roto:', a.id, a.type, 'saldo', a.balance, '<= piso', a.floor); }
 // Cuentas vivas que no se leyeron en este ciclo (p. ej. pausa-lectura.flag activo o servidor reiniciado): usar el último saldo leído (sod.json)
-function rellenar(live) { for (const a of Object.values(state.accounts)) if (a.floor == null) riesgo(a); for (const id of live || []) { if (state.accounts[id] || !/^LF[EF]/.test(id)) continue; const s = sod.accounts[id]; if (!s || s.lastBal == null) continue;
-  const a = state.accounts[id] = { id, type: typeOf(id), balance: s.lastBal, equity: s.lastBal, profit: 0, readAt: s.lastAt || null, stale: true, tradingDay: s.day };
+function rellenar(live) { for (const a of Object.values(state.accounts)) if (a.floor == null) riesgo(a); for (const id of live || []) { if (state.accounts[id] || esPapel({ id, name: id })) continue; const s = sod.accounts[id]; if (!s || s.lastBal == null || s.gone) continue;
+  const a = state.accounts[id] = { id, type: typeOf(id, { type: s.type }), balance: s.lastBal, equity: s.lastBal, profit: 0, readAt: s.lastAt || null, stale: true, tradingDay: s.day };
   if (s.day === tradingDay()) { a.startOfDay = s.bal; a.dayPnl = pnlDelDia(id, s.lastBal, s.bal); } applyPlan(a); riesgo(a); } }
 let cycling = false;
 async function cycle() {
@@ -104,15 +124,20 @@ async function cycle() {
     // Con pausa-lectura.flag NO se recorren las evaluaciones, pero las FONDEADAS (LFF) se siguen leyendo cada 5 min
     // (mismas protecciones: sin posición/orden abierta, TradingView en segundo plano, sin prueba colchón ni arranque) para evaluar la quema de $1,000.
     const fundedOnly = !full && pausa && Date.now() - lastFunded >= FULL_MS && !operando;
-    const r = await readAccounts({ all: full || fundedOnly, only: fundedOnly ? '^LFF' : null }); if (r.error) throw new Error(r.error);
+    const nombresFondeadas = new Set();
+    for (const a of Object.values(state.accounts)) if (tipoDe(a) === 'funded' && a.id) nombresFondeadas.add(a.id);
+    for (const [id, s] of Object.entries(sod.accounts || {})) if (s && !s.gone && tipoDe({ id, type: s.type }) === 'funded') nombresFondeadas.add(id);
+    const soloFondeadas = fundedOnly ? filtroFondeadas(nombresFondeadas) : null;
+    const recorrer = full || !!soloFondeadas;
+    const r = await readAccounts({ all: recorrer, only: soloFondeadas }); if (r.error) throw new Error(r.error);
     if (fundedOnly && r.full && !r.busy && !r.visible && !r.aborted) lastFunded = Date.now();
     if (full) lastFull = Date.now();
     if (full && (r.busy || r.visible || r.aborted)) console.log(new Date().toLocaleTimeString(), 'lectura completa ' + (r.aborted ? 'cortada (TradingView pasó a primer plano)' : 'saltada: ' + (r.busy ? 'posición/orden abierta' : 'TradingView en primer plano')) + ' · reintento en 5 min'); // con posicion/orden (r.busy) no cambia de cuenta y se reintenta en 5 min
     if (r.busy || colchon.status().state === 'running' || acctGuard.testActive) lastBusy = Date.now();
-    for (const a of r.accounts) if (/^LF[EF]/.test(a.name) && a.balance != null)
+    for (const a of r.accounts) if (debeGuardarSaldo(a))
       save({ id: a.name, f: [['Account Balance', String(a.balance)], ['Equity', String(a.equity ?? a.balance)], ['Profit', String(a.profit ?? 0)]] });
     // la granja refleja SOLO las cuentas que TradingView tiene ahora (accountsMetainfo); se borran las que ya no existen
-    if (Array.isArray(r.live) && r.live.length) { state.live = r.live.map(a => a.name); for (const k of Object.keys(state.accounts)) if (!state.live.includes(k)) { console.log('cuenta ya no está en TradingView, se quita:', k); delete state.accounts[k]; if (!/^LFF/.test(k) && sod.accounts[k] && !sod.accounts[k].gone) { sod.accounts[k].gone = new Date().toISOString(); try { fs.writeFileSync(SOD_FILE, JSON.stringify(sod, null, 2)); } catch {} } } for (const id of state.live) if (sod.accounts[id] && sod.accounts[id].gone) delete sod.accounts[id].gone; rellenar(state.live); }
+    if (Array.isArray(r.live) && r.live.length) { state.live = r.live.map(a => a.name); for (const k of Object.keys(state.accounts)) if (!state.live.includes(k)) { console.log('cuenta ya no está en TradingView, se quita:', k); const previa = state.accounts[k]; delete state.accounts[k]; if (tipoDe(previa || { id: k }) !== 'funded' && sod.accounts[k] && !sod.accounts[k].gone) { sod.accounts[k].gone = new Date().toISOString(); try { fs.writeFileSync(SOD_FILE, JSON.stringify(sod, null, 2)); } catch {} } } for (const id of state.live) if (sod.accounts[id] && sod.accounts[id].gone) delete sod.accounts[id].gone; rellenar(state.live); }
     state.updated = new Date().toISOString(); state.error = null;
   } catch (e) { state.error = String(e.message || e); }
   fs.writeFileSync(path.join(DIR, 'accounts.json'), JSON.stringify(state, null, 2));
@@ -121,7 +146,7 @@ async function cycle() {
 }
 
 // ---- Solo lectura para la granja: historial de trades, informes y luces de conexión ----
-const maskId = t => String(t ?? '').replace(/\b(LF[EF]\d)\d{3,}(\d{3})\b/g, '$1…$2');
+const maskId = t => String(t ?? '').replace(/\b([A-Za-z][A-Za-z0-9]{3})[A-Za-z0-9]{4,}([A-Za-z0-9]{3})\b/g, '$1…$2');
 // Detalle de UN trade para la granja (SOLO LECTURA): junta, desde colchon-eventos.jsonl, el cierre (fin_trade), los movimientos del stop y la comparacion broker/chart de esa operacion.
 // Puntos maximos del trade (SOLO LECTURA): peor y mejor P&L visto en las lecturas 1/s de colchon-eventos.jsonl, convertido a puntos.
 function maxPuntos(W, t1, tam) { const m = /(\d+)\s*(MNQ|NQ)/i.exec(String(tam || '')); if (!m) return null; const pv = (/^MNQ$/i.test(m[2]) ? 2 : 20) * +m[1]; const v = W.filter(x => x.type === 'lectura' && Date.parse(x.at) <= t1 + 1e3).map(x => x.brokerPl ?? x.chartPl).filter(x => typeof x === 'number' && isFinite(x)); if (!v.length) return null; const q = u => Math.round(u / pv / .25) * .25; return { neg: q(Math.min(0, ...v)), pos: q(Math.max(0, ...v)), n: v.length, fuente: 'lecturas del broker (1/s)' }; }

@@ -57,6 +57,10 @@ try {
   assert.equal(fuera(check(orden, accounts, t1759)), true);
   assert.equal(fuera(check(orden, accounts, t1800)), false);
   assert.equal(fuera(check(orden, accounts, domingo18)), false, 'domingo 18:00 no queda bloqueado por ser fin de semana');
+  const otra = 'CUENTA88421';
+  const errOtra = check({ account: otra, side: 'buy', symbol: 'MNQ', qty: 1 }, { [otra]: { id: otra, balance: 50000 } }, t1800);
+  assert.equal(errOtra.some(x => /LFE|LFF/.test(x)), false, 'un nombre sin prefijo no se rechaza');
+  assert.equal(errOtra.length, 0, 'esa cuenta Lucid pasa el filtro de la orden');
 
   const pedido = request(orden, accounts, t1800);
   assert.equal(pedido.ok, true);

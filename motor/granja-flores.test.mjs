@@ -71,6 +71,16 @@ aplicarFlores(conSaldo, {
 assert.equal(conSaldo.cuentas.length, 1);
 assert.equal(conSaldo.cuentas[0].bal, 25110);
 
+const quemada = tienda();
+quemada.cuentas.push({ id: 3, name: 'FONDEADA-OTRA', type: 'funded', memorial: false, bal: 50000 });
+quemada.cuentas.push({ id: 4, name: 'EVAL-OTRA', type: 'eval', memorial: false, bal: 25000 });
+aplicarFlores(quemada, {
+  accountsJson: { accounts: {}, live: [] },
+  colchon: { ok: true, accounts: [{ name: 'SIGUE', type: 'eval' }] },
+});
+assert.equal(quemada.cuentas.find(a => a.name === 'FONDEADA-OTRA').burnedAt, 'quemada', 'una fondeada que ya no está se marca, aunque el nombre no sea LFF');
+assert.equal(quemada.cuentas.some(a => a.name === 'EVAL-OTRA'), false, 'una evaluación que ya no está se quita');
+
 const html = fs.readFileSync(new URL('./Granja-de-Cuentas-v2.html', import.meta.url), 'utf8');
 assert.match(html, /from '\/granja-flores\.mjs'/);
 assert.match(html, /aplicarFlores/);
