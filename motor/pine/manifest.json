@@ -1,13 +1,8 @@
 [
   {
-    "nombre": "Ai Profit Camp Algo",
-    "version": "1",
-    "archivo": "ai-profit-camp-algo.pine"
-  },
-  {
-    "nombre": "Smart Money Algo",
-    "version": "1",
-    "archivo": "smart-money-algo.pine",
-    "anterior": "Smart Money Structure"
+    "nombre": "Profito Algoritmo",
+    "version": "2",
+    "archivo": "ai-profit-camp-algo.pine",
+    "anterior": "Ai Profit Camp Algo"
   }
 ]

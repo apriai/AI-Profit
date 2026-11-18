@@ -20,7 +20,7 @@ import { avisarSiHaceFalta } from './aviso-actualizacion.mjs';
 
 const SRV = 8787, TVP = 9222;
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
-const LANZADOR = path.join(AQUI, 'lanzar-tradingview.cmd');
+const LANZADOR = path.join(AQUI, 'lanzar-tradingview.vbs');
 const [, , cmd = 'estado', iniFile, a3, a4] = process.argv;
 const win = path.win32;
 
@@ -246,7 +246,7 @@ async function main() {
     const tvexe = tvexeParaLanzador(eleccion, lanzadorDisponible(), abierto);
     escribir({ ...(await servidor(dir)), ...(await tv()), tvabierto: abierto ? 1 : 0, tvexe, tv_ruta: eleccion.ruta, tv_tipo: eleccion.tipo, listo: 1 });
   } else if (cmd === 'abrir') {
-    const r = execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(AQUI, 'abrir-tradingview.ps1'), '-Port', '9222'], { stdio: 'inherit' });
+    execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', path.join(AQUI, 'abrir-tradingview.ps1'), '-Port', '9222'], { windowsHide: true, stdio: 'ignore' });
     void r;
   } else if (cmd === 'esperar-servidor') {
     const fin = Date.now() + 1000 * Number(a3 || 25); let s;

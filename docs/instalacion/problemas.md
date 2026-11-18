@@ -26,7 +26,7 @@ No lances `taskkill` a mano y no le preguntes nada a la persona. Vuelve a abrir 
 
 ## La granja no abre
 
-Mira la ventana minimizada «TradingLink». Si la cerraste, el servidor se apagó: vuelve a abrir **AI Profit**. Si otro programa ocupa la conexión de la granja, tampoco arranca; no lo cierres a ciegas. A la persona dile solo: «No pude abrir la granja. Cierra y vuelve a abrir AI Profit.»
+El servidor no tiene ventana. Si el icono junto al reloj no está, el servidor está apagado: vuelve a abrir **AI Profit**. Si otro programa ocupa la conexión de la granja, tampoco arranca; no lo cierres a ciegas. A la persona dile solo: «No pude abrir la granja. Cierra y vuelve a abrir AI Profit.» Los detalles quedan en `%LOCALAPPDATA%\Profito\datos\logs`.
 
 ## No se ven cuentas
 

@@ -1,5 +1,5 @@
 //@version=6
-indicator("Ai Profit Camp Algo", overlay = true)
+indicator("Profito Algoritmo", "Profito Algoritmo", overlay = true)
 minBody = input.float(70.0, "Cuerpo Min %") / 100
 maxCloseW = input.float(12.0, "Mecha Max Cierre %") / 100
 maxOppW = input.float(25.0, "Mecha Max Contra %") / 100

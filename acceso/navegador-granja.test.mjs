@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { elegirNavegador, exeDeComando, esChromium } from './navegador-granja.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const bat = fs.readFileSync(path.join(here, 'Abrir Granja.bat'), 'utf8');
+const bat = fs.readFileSync(path.join(here, 'abrir-granja.ps1'), 'utf8');
 
 const chrome = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const edge = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
@@ -43,8 +43,8 @@ assert.equal(elegirNavegador({ comando: `"${roto}" %1`, existe, env }), chrome, 
 
 assert.ok(bat.includes('navegador-granja.mjs'), 'el acceso pregunta el predeterminado');
 assert.ok(bat.includes('--autoplay-policy=no-user-gesture-required'));
-assert.ok(bat.includes('--app="http://localhost:8787/Granja-de-Cuentas-v2.html"'));
-assert.ok(bat.includes('--user-data-dir="%PERFIL%"'));
+assert.ok(bat.includes('--app=http://localhost:8787/Granja-de-Cuentas-v2.html'));
+assert.ok(bat.includes('--user-data-dir='));
 assert.ok(bat.includes('--no-first-run'));
 assert.ok(bat.includes('--no-default-browser-check'));
 assert.ok(bat.includes('start "" "http://localhost:8787/Granja-de-Cuentas-v2.html"'), 'último recurso: la dirección');

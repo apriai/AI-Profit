@@ -260,10 +260,21 @@ FunctionEnd
 
 Function ListoSalir
   Call SoltarImagen
-  ExecShell "open" "$INSTDIR\acceso\AI Profit.cmd"
+  ExecShell "" "$SYSDIR\wscript.exe" '//B //Nologo "$INSTDIR\acceso\AI Profit.vbs"' SW_HIDE
 FunctionEnd
 
 Section "Profito" SecMain
+  IfFileExists "$INSTDIR\acceso\profito-bandeja.mjs" 0 sin_bandeja
+  IfFileExists "$INSTDIR\node-win\node.exe" 0 sin_bandeja
+  nsExec::ExecToStack '"$INSTDIR\node-win\node.exe" "$INSTDIR\acceso\profito-bandeja.mjs" parar-instalador --root "$INSTDIR"'
+  Pop $0
+  Pop $2
+  ${If} $0 == 30
+    MessageBox MB_OK|MB_ICONSTOP "Hay un trade abierto, o no pude comprobarlo. Espera a que termine y vuelve a abrir el instalador."
+    Abort
+  ${EndIf}
+  Goto sin_previo
+  sin_bandeja:
   IfFileExists "$INSTDIR\acceso\profito-estado.mjs" 0 sin_previo
   IfFileExists "$INSTDIR\node-win\node.exe" 0 sin_previo
   nsExec::ExecToStack '"$INSTDIR\node-win\node.exe" "$INSTDIR\acceso\profito-estado.mjs" parar "$PLUGINSDIR\parar.ini" "$INSTDIR"'
@@ -290,8 +301,8 @@ Section "Profito" SecMain
   SetOutPath "$INSTDIR"
   WriteUninstaller "$INSTDIR\Desinstalar AI Profit.exe"
   CreateDirectory "$SMPROGRAMS\Profito"
-  CreateShortcut "$DESKTOP\AI Profit.lnk" "$INSTDIR\acceso\AI Profit.cmd" "" "$INSTDIR\assets\abrir-granja-icon.ico" 0
-  CreateShortcut "$SMPROGRAMS\Profito\AI Profit.lnk" "$INSTDIR\acceso\AI Profit.cmd" "" "$INSTDIR\assets\abrir-granja-icon.ico" 0
+  CreateShortcut "$DESKTOP\AI Profit.lnk" "$SYSDIR\wscript.exe" '//B //Nologo "$INSTDIR\acceso\AI Profit.vbs"' "$INSTDIR\assets\profito.ico" 0
+  CreateShortcut "$SMPROGRAMS\Profito\AI Profit.lnk" "$SYSDIR\wscript.exe" '//B //Nologo "$INSTDIR\acceso\AI Profit.vbs"' "$INSTDIR\assets\profito.ico" 0
   CreateShortcut "$SMPROGRAMS\Profito\Quitar Profito.lnk" "$INSTDIR\Desinstalar AI Profit.exe"
   CreateShortcut "$SMPROGRAMS\Profito\Carpeta de datos.lnk" "$INSTDIR\datos"
 

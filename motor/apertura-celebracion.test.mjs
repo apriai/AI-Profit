@@ -38,13 +38,15 @@ assert.equal(html.includes('tocar("wuhu")'), false);
 assert.equal(html.includes('__tlClic'), false);
 assert.ok(html.includes('function play(big){if(muted||!ac||ac.state!=="running")return false;'));
 assert.ok(html.includes('function playPerdida(){'));
-assert.ok(html.includes('>v0.10.17</div>'));
+assert.ok(html.includes('>v0.10.18</div>'));
 
-assert.ok(bat.includes('--autoplay-policy=no-user-gesture-required'), 'el acceso pide autoplay');
-assert.ok(bat.includes('--app="http://localhost:8787/Granja-de-Cuentas-v2.html"'), 'abre en modo app');
-assert.ok(bat.includes('--user-data-dir="%PERFIL%"'), 'perfil propio para que el flag no se pierda');
-assert.ok(bat.includes('navegador-granja.mjs'), 'elige el navegador predeterminado');
-assert.ok(cmd.includes('Abrir Granja.bat'), 'el acceso del escritorio llega a este bat');
-assert.ok(nsi.includes('acceso\\AI Profit.cmd'), 'el instalador crea el acceso hacia el cmd');
+const granja = fs.readFileSync(path.join(root, 'acceso', 'abrir-granja.ps1'), 'utf8');
+assert.ok(granja.includes('--autoplay-policy=no-user-gesture-required'), 'el acceso pide autoplay');
+assert.ok(granja.includes('--app=http://localhost:8787/Granja-de-Cuentas-v2.html'), 'abre en modo app');
+assert.ok(granja.includes('--user-data-dir='), 'perfil propio para que el flag no se pierda');
+assert.ok(granja.includes('navegador-granja.mjs'), 'elige el navegador predeterminado');
+assert.ok(cmd.includes('AI Profit.vbs'), 'el acceso del escritorio llega a la bandeja');
+assert.ok(nsi.includes('acceso\\AI Profit.vbs'), 'el instalador crea el acceso hacia la bandeja');
+assert.ok(nsi.includes('wscript.exe'), 'el acceso no abre una consola');
 
 console.log('apertura-celebracion ok');

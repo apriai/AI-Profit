@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const html = fs.readFileSync(path.join(here, 'Granja-de-Cuentas-v2.html'), 'utf8');
-const server = fs.readFileSync(path.join(here, 'tradinglink.mjs'), 'utf8');
+const server = fs.readFileSync(path.join(here, 'rutas-api.mjs'), 'utf8');
 
 function duracion(nombre, min, max) {
   const buf = fs.readFileSync(path.join(here, 'sonidos', nombre));
