@@ -184,5 +184,31 @@ const p25 = textoEnPagina(propiaVista, 1), p50 = textoEnPagina(propiaVista, 2);
 assert(p25.includes('SL −$400') && p25.includes('TP +$800') && p25.includes('+$100') && !p25.includes('duplica'), 'propia 25K muestra lo guardado');
 assert(p50.includes('SL −$800') && p50.includes('TP +$1,600') && p50.includes('+$200') && !p50.includes('duplica'), 'propia 50K muestra el doble, sin aviso');
 
+// Aunque el servidor haya mandado escala 1, un saldo de 50K reescribe el texto.
+{
+  const page = texts['Granja-de-Cuentas-v2.html'];
+  const code = page.slice(page.indexOf('const accPlan='), page.indexOf('const QS='));
+  const cuenta50 = { id: 'C', name: 'CUENTA88421', balance: 51000, scale: 1, plan: '25K', start: 25000, planStart: 25000, maxMicros: 20, maxMinis: 2, type: 'eval' };
+  const ctx = {
+    window: {}, accId: 'C', sym: 'MNQ', qty: 8, PV: { MNQ: 2, NQ: 20 }, CR: { MNQ: 1, NQ: 3.5 },
+    accs: { ok: true, accounts: [cuenta50] },
+    strs: [getStrategy('evaluacion-simple'), getStrategy('dos-disparos'), getStrategy('evaluacion')],
+    stratId: 'evaluacion-simple',
+  };
+  vm.createContext(ctx);
+  vm.runInContext(code + '\nout=textoCuentaHtml(); sc=accPlan().scale; mx=accPlan().maxMicros;', ctx);
+  const txt = String(ctx.out).replace(/<[^>]+>/g, ' ');
+  assert(ctx.sc === 2 && ctx.mx === 40, 'un saldo de 51.000 pone escala 2 aunque scale venga en 1');
+  assert(txt.includes('SL −$1,260') && txt.includes('TP +$1,260') && !txt.includes('$630'), 'el texto de Evaluación usa los dólares de 50K');
+  ctx.stratId = 'evaluacion';
+  vm.runInContext('out2=textoCuentaHtml();', ctx);
+  const trail = String(ctx.out2).replace(/<[^>]+>/g, ' ');
+  assert(trail.includes('+$400') && trail.includes('protege $200') && trail.includes('protege $400'), 'el trailing de 50K dobla los escalones');
+  ctx.accs.accounts[0] = { id: 'C', name: 'CUENTA88421', balance: 25100, scale: 1, plan: '25K', start: 25000, maxMicros: 20, maxMinis: 2, type: 'eval' };
+  ctx.stratId = 'evaluacion-simple';
+  vm.runInContext('out3=textoCuentaHtml(); sc3=accPlan().scale;', ctx);
+  assert(ctx.sc3 === 1 && String(ctx.out3).includes('$630') && !String(ctx.out3).includes('$1,260'), 'al volver a una cuenta de 25K el texto baja');
+}
+
 if (failed) { console.error('\n' + failed + ' comprobaciones fallaron'); process.exit(1); }
 console.log('\nTodas las comprobaciones pasaron.');

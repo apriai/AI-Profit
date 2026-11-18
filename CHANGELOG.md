@@ -15,6 +15,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cualquier cuenta se reconoce, no solo las que empiezan por LFE.** El saldo, la flor, el Negocio, el tamaño y la etiqueta usan la lista del bróker (`/api/colchon/accounts`) junto con `accounts.json`. Si el nombre no dice el tipo, se trata como evaluación. En el Negocio, un libro vacío anota la compra con el precio guardado (`tl_price`) y la nota «monto estimado — edítalo». Si el libro ya tiene esa cuenta, no se anota otra vez. Una fondeada que desaparece se marca quemada aunque el nombre no sea LFF.
 - **Toda cuenta Lucid se puede operar, aunque el nombre no empiece por LFE o LFF.** El menú no deja la fila en gris por el nombre. `orders.mjs` ya no rechaza ese nombre. Paper y demo siguen siendo paper. La confirmación de cuenta real, la cuenta activa y el tope de contratos siguen igual.
 - **25K o 50K sale del saldo.** Desde 37.500 es 50K; por debajo, 25K. Si ya se vio un saldo de 50K (pico, inicio o `planSaldo`), un drawdown no lo baja a 25K. El nombre «50K» o «25K» solo se usa cuando todavía no hay saldo.
+- **El texto de la estrategia usa el tamaño de la cuenta elegida.** En 50K el stop, el objetivo, el colchón y los escalones salen del doble de la configuración que usa el motor, y cambian al cambiar de cuenta. La meta de la planta y el tope de contratos siguen ese mismo tamaño.
 ### Notas
 - No abre, no mueve y no cierra órdenes por su cuenta. El filtro de simulación de `orders.mjs` sigue igual.
 

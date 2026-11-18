@@ -85,6 +85,9 @@ function accountHintFor(name) {
     const s = j && j.accounts && j.accounts[id];
     if (s) {
       if (s.inicio != null) hint.inicio = s.inicio;
+      if (s.planSaldo) hint.planSaldo = s.planSaldo;
+      if (s.peak != null) hint.peak = s.peak;
+      if (s.lastBal != null) hint.lastBal = s.lastBal;
       if (hint.startOfDay == null && s.bal != null) hint.startOfDay = s.bal;
     }
   } catch {}
@@ -486,7 +489,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
   return {
     check,
     strategies: () => ({ ok: true, default: DEFAULT_STRATEGY, strategies: listStrategies() }),
-    async accounts() { try { const r = await (await D()).accounts(); return { ok: true, ...r, accounts: r.accounts.map(a => { const papel = isPaper(a.name || '', `${r.broker || ''} ${r.brokerId || ''}`), tiene = !!String(a.name || '').trim(), re = tiene && !papel; const hint = accountHintFor(a.name); const tipo = tipoDe({ id: a.name, name: a.name, type: hint.type }); const acc = { id: a.name, name: a.name, ...(a.balance != null ? { balance: a.balance } : {}), ...hint, type: tipo }; const rules = rulesFor({ id: a.name, name: a.name, ...acc }); const pnl = acc.balance != null ? Math.round((acc.balance - rules.start) * 100) / 100 : null; return { ...a, type: tipo, ...(acc.balance != null ? { balance: acc.balance, totalPnl: pnl } : { totalPnl: null }), allowed: tiene, real: re, realLabel: re ? realLabel(a.name) : null, plan: rules.size, scale: rules.scale, start: rules.start, planStart: rules.start, dd: rules.dd, dailyLoss: rules.dailyLoss, profitTarget: rules.profitTarget, lockTriggerOver: rules.lockTriggerOver, lockFloorOver: rules.lockFloorOver, atRisk: rules.atRisk, maxMinis: maxQtyFor('NQ', acc), maxMicros: maxQtyFor('MNQ', acc) }; }) }; } catch (e) { driver = null; return { ok: false, err: 'Sin conexión con TradingView: ' + e.message, accounts: [] }; } },
+    async accounts() { try { const r = await (await D()).accounts(); return { ok: true, ...r, accounts: r.accounts.map(a => { const papel = isPaper(a.name || '', `${r.broker || ''} ${r.brokerId || ''}`), tiene = !!String(a.name || '').trim(), re = tiene && !papel; const hint = accountHintFor(a.name); const tipo = tipoDe({ id: a.name, name: a.name, type: hint.type }); const acc = { id: a.name, name: a.name, ...hint, ...(a.balance != null ? { balance: a.balance } : {}), ...(a.equity != null ? { equity: a.equity } : {}), type: tipo }; const rules = rulesFor({ id: a.name, name: a.name, ...acc }); const pnl = acc.balance != null ? Math.round((acc.balance - rules.start) * 100) / 100 : null; return { ...a, type: tipo, ...(acc.balance != null ? { balance: acc.balance, totalPnl: pnl } : { totalPnl: null }), allowed: tiene, real: re, realLabel: re ? realLabel(a.name) : null, plan: rules.size, ...(acc.planSaldo ? { planSaldo: acc.planSaldo } : {}), scale: rules.scale, start: rules.start, planStart: rules.start, dd: rules.dd, dailyLoss: rules.dailyLoss, profitTarget: rules.profitTarget, lockTriggerOver: rules.lockTriggerOver, lockFloorOver: rules.lockFloorOver, atRisk: rules.atRisk, maxMinis: maxQtyFor('NQ', acc), maxMicros: maxQtyFor('MNQ', acc) }; }) }; } catch (e) { driver = null; return { ok: false, err: 'Sin conexión con TradingView: ' + e.message, accounts: [] }; } },
     async start(args = {}) {
       if (S.state === 'running') return { ok: false, err: 'Ya hay una prueba corriendo' };
       if (acctGuard.testActive) return { ok: false, err: 'esperando lectura…', waitingLectura: true };

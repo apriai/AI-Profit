@@ -10,7 +10,7 @@ Documento de relevo para cualquier agente (Grok) que trabaje en este repositorio
 ## Lo que cambió
 | Versión | Qué cambió |
 |---|---|
-| 0.10.19 | Cualquier cuenta Lucid se reconoce y se opera, aunque el nombre no empiece por LFE/LFF. El menú no la deja en gris. 25K o 50K sale del saldo (umbral 37.500); un 50K ya visto no baja por un drawdown. Sin saldo, vale el nombre. Sin tipo, es evaluación. El Negocio anota el precio estimado y no duplica. |
+| 0.10.19 | Cualquier cuenta Lucid se reconoce y se opera, aunque el nombre no empiece por LFE/LFF. El menú no la deja en gris. 25K o 50K sale del saldo (umbral 37.500); un 50K ya visto no baja por un drawdown. El texto de la estrategia usa ese tamaño. Sin saldo, vale el nombre. Sin tipo, es evaluación. El Negocio anota el precio estimado y no duplica. |
 | 0.10.18 | Bandeja junto al reloj, sin ventanas negras. Pantalla «Cargando Profito…». Cerrar Profito no toca TradingView ni las órdenes. El ojo vuelve a funcionar. La flor se planta con la cuenta que ya ve la barra. Solo queda Profito Algoritmo. El cerezo queda con manzanas fijas, sin subir certificados. |
 | 0.10.17 | En TradingView Desktop 3.5.0 el estudio de Pine se añade con `createStudyInserter({type:'pine', pineId:'USER;<hash>', pineVersion:'last'})`. Un texto o un metaInfo JSON no sirve. Si ya está en el gráfico, no se duplica. |
 | 0.10.16 | Smart Money Structure se llama Smart Money Algo y, si el estudio viejo ya estaba, se reemplaza sin duplicarlo y conserva si estaba oculto. El id `script$user;…` de TradingView Desktop 3.5.0 ya se acepta. Si la instalación falla, se ve el motivo y se reintenta. La granja abre otra vez en ventana propia aunque falte el ayudante del navegador. |
