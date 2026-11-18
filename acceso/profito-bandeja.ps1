@@ -287,8 +287,11 @@ $arranquePs1 = Join-Path $aqui 'profito-arranque.ps1'
 $script:arranque = Start-Oculto 'powershell.exe' "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$arranquePs1`" -Root `"$root`"" $root
 
 $notify = New-Object System.Windows.Forms.NotifyIcon
-if (Test-Path -LiteralPath $ico) { $notify.Icon = New-Object System.Drawing.Icon($ico) }
-else { $notify.Icon = [System.Drawing.SystemIcons]::Application }
+if (Test-Path -LiteralPath $ico) {
+  $tam = [System.Windows.Forms.SystemInformation]::SmallIconSize
+  try { $notify.Icon = New-Object System.Drawing.Icon($ico, [int]$tam.Width, [int]$tam.Height) }
+  catch { $notify.Icon = New-Object System.Drawing.Icon($ico) }
+} else { $notify.Icon = [System.Drawing.SystemIcons]::Application }
 $notify.Text = 'AI Profit'
 $notify.Visible = $true
 $menu = New-Object System.Windows.Forms.ContextMenuStrip

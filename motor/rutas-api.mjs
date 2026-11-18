@@ -152,6 +152,23 @@ export function manejar(q, r, deps) {
       return fs.createReadStream(logo).pipe(r);
     }
   }
+  if (q.method === 'GET') {
+    const ruta = q.url.split('?')[0];
+    const icono = {
+      '/favicon.ico': ['profito.ico', 'image/x-icon'],
+      '/favicon-192.png': ['favicon-192.png', 'image/png'],
+      '/favicon-512.png': ['favicon-512.png', 'image/png'],
+      '/apple-touch-icon.png': ['apple-touch-icon.png', 'image/png'],
+      '/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json; charset=utf-8'],
+    }[ruta];
+    if (icono) {
+      const archivo = path.join(deps.ROOT, 'assets', icono[0]);
+      if (fs.existsSync(archivo)) {
+        r.writeHead(200, { 'content-type': icono[1], 'cache-control': 'no-store' });
+        return fs.createReadStream(archivo).pipe(r);
+      }
+    }
+  }
   r.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
   fs.createReadStream(deps.HTML).pipe(r);
 }

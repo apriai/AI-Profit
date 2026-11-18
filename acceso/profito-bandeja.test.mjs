@@ -89,7 +89,22 @@ assert.ok(nsi.includes('assets\\profito.ico'));
 assert.ok(nsi.includes('AI Profit.vbs'));
 assert.equal(fs.existsSync(path.join(root, 'assets', 'profito.ico')), true);
 const ico = fs.readFileSync(path.join(root, 'assets', 'profito.ico'));
-assert.equal(ico.readUInt16LE(4), 7, 'el icono trae varios tamaños');
+assert.equal(ico.readUInt16LE(4), 10, 'el icono trae 16, 20, 24, 32, 40, 48, 64, 96, 128 y 256');
+const pedidos = [16, 20, 24, 32, 40, 48, 64, 96, 128, 256];
+for (let i = 0; i < pedidos.length; i++) {
+  const w = ico[6 + i * 16] || 256;
+  const off = ico.readUInt32LE(6 + i * 16 + 12);
+  const ancho = ico.readUInt32BE(off + 16);
+  assert.equal(w, pedidos[i], 'falta el tamaño ' + pedidos[i]);
+  assert.equal(ancho, pedidos[i], 'el tamaño ' + pedidos[i] + ' no está pintado a ese tamaño');
+}
+const htmlIcono = fs.readFileSync(path.join(root, 'motor', 'Granja-de-Cuentas-v2.html'), 'utf8');
+assert.match(htmlIcono, /href="\/favicon-192\.png"/);
+assert.match(htmlIcono, /href="\/favicon-512\.png"/);
+assert.match(htmlIcono, /apple-touch-icon/);
+assert.match(htmlIcono, /href="\/manifest\.webmanifest"/);
+assert.equal(htmlIcono.includes('rel="icon" type="image/png" href="data:image/png;base64'), false);
+assert.match(fs.readFileSync(path.join(root, 'motor', 'rutas-api.mjs'), 'utf8'), /\/favicon-512\.png/);
 
 const server = fs.readFileSync(path.join(root, 'motor', 'tradinglink.mjs'), 'utf8');
 assert.match(server, /setTimeout\(pasarAlgo, 20000\)/);
