@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.24] — 2026-11-18
+### Corregido
+- **El icono de Profito se ve nítido en Windows.** La carita verde se pinta a 1024 y de ahí salen los tamaños 16, 20, 24, 32, 40, 48, 64, 96, 128 y 256, sin agrandar un dibujo chico. La ventana de la granja (Chrome en modo aplicación) usa el favicon de 192 y de 512 y el manifiesto. El acceso del instalador, el del menú Inicio y el icono junto al reloj usan ese mismo `.ico`.
+### Notas
+- No abre, no mueve y no cierra órdenes.
+
 ## [0.10.23] — 2026-11-18
 ### Corregido
 - **El menú del ojo queda sólido aunque se abra el archivo directo.** Al abrir `Granja-de-Cuentas-v2.html` en el navegador, sin servidor, el panel se marcaba desconectado y bajaba al 40 % de opacidad: se veía el árbol y el texto lavado. Ahora el panel sale de la barra (esa barra se desvanece al entrar), el fondo es `#1a1230` opaco y el texto es blanco. También al servirlo en localhost.

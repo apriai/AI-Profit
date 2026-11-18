@@ -43,7 +43,7 @@ export function preparar(root, dest) {
     if (!ok) continue;
     copiarArchivo(path.join(acceso, entrada.name), path.join(dest, 'acceso', entrada.name));
   }
-  for (const nombre of ['abrir-granja-icon.ico', 'profito.ico', 'propfarm-logo.png']) {
+  for (const nombre of ['abrir-granja-icon.ico', 'profito.ico', 'propfarm-logo.png', 'favicon-192.png', 'favicon-512.png', 'apple-touch-icon.png', 'profito-icon-1024.png', 'manifest.webmanifest']) {
     copiarArchivo(path.join(root, 'assets', nombre), path.join(dest, 'assets', nombre));
   }
   for (const nombre of ['1-escenario.jpg', '2-multitud-islas.jpg', '3-granja-cerca.jpg', '4-isla-granja.jpg']) {

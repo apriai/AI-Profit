@@ -17,7 +17,7 @@ function Convert-PngToIco([string]$PngPath, [string]$IcoPath) {
   $bytes = [System.IO.File]::ReadAllBytes($PngPath)
   $pngStream = [System.IO.MemoryStream]::new($bytes)
   $src = $null
-  $sizes = @(16, 24, 32, 48, 64, 128, 256)
+  $sizes = @(16, 20, 24, 32, 40, 48, 64, 96, 128, 256)
   $images = New-Object System.Collections.Generic.List[byte[]]
   try {
     $src = [System.Drawing.Image]::FromStream($pngStream)
@@ -85,6 +85,7 @@ function Convert-PngToIco([string]$PngPath, [string]$IcoPath) {
 
 $png = $null
 foreach ($candidate in @(
+  (Join-Path $root 'assets\profito-icon-1024.png'),
   (Join-Path $root 'assets\propfarm-logo.png'),
   (Join-Path $root 'assets\abrir-granja-icon.png'),
   (Join-Path $root 'assets\ai-profit-icon.png')
@@ -95,7 +96,13 @@ foreach ($candidate in @(
 $ico = Join-Path $root 'assets\profito.ico'
 if (-not (Test-Path -LiteralPath $ico)) { $ico = Join-Path $root 'assets\abrir-granja-icon.ico' }
 $iconNote = ''
-if ($png) {
+# El .ico del repositorio ya trae cada tamaño pintado desde el PNG de 1024.
+# No lo vuelvas a sacar del logo de 192: eso lo agranda y se ve borroso.
+if ((Test-Path -LiteralPath (Join-Path $root 'assets\profito.ico')) -and $png -and ($png -like '*profito-icon-1024.png')) {
+  $ico = Join-Path $root 'assets\profito.ico'
+  $iconNote = 'Uso el .ico de alta definición (16 a 256).'
+} elseif ($png -and -not (Test-Path -LiteralPath (Join-Path $root 'assets\profito.ico'))) {
+  $ico = Join-Path $root 'assets\profito.ico'
   try {
     Convert-PngToIco $png $ico
     $iconNote = "Icono actualizado desde $png"
