@@ -8,7 +8,15 @@ const PINE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'pine');
 export const FUENTE_PINE = path.join(PINE, 'ai-profit-camp-algo.pine');
 export const PINE_DIR = PINE;
 
-export const ALGO_NOMBRE = 'Ai Profit Camp Algo';
+export const ALGO_NOMBRE = 'Profito Algoritmo';
+export const ALGO_ANTERIOR = 'Ai Profit Camp Algo';
+export const RETIRADOS = [
+  {
+    nombre: 'Smart Money Algo',
+    tambien: ['Smart Money Structure'],
+    pineId: 'USER;c372e364a273408e83cec7ca380539ca',
+  },
+];
 export const ALGO_VERSION = '1';
 const FACADE = 'https://pine-facade.tradingview.com/pine-facade';
 
@@ -337,6 +345,37 @@ function guardarEstado(archivo, j) {
   fs.renameSync(tmp, archivo);
 }
 
+export function exprQuitar({ nombres = [], ids = [] } = {}) {
+  const datos = JSON.stringify({ quitar: true, nombres, ids: ids.map(String) });
+  return `(async function(){
+var D=${datos};
+function chart(){var api=window.TradingViewApi; if(!api||typeof api.activeChart!=='function') return null; try{return api.activeChart()}catch(e){return null}}
+function norm(n){return String(n||'').trim().toLowerCase()}
+function todos(){
+  var out=[], c=chart();
+  if(c&&typeof c.getAllStudies==='function'){
+    var raw=[]; try{raw=c.getAllStudies()||[]}catch(e){raw=[]}
+    for(var i=0;i<raw.length;i++){
+      var s=raw[i]||{};
+      out.push({id:s.id!=null?String(s.id):'', name:String(s.name||s.title||s.description||'')});
+    }
+  }
+  return out;
+}
+var c=chart();
+if(!c||typeof c.removeEntity!=='function') return {ok:false, motivo:'sin-tv'};
+var nombres=D.nombres.map(norm), ids=D.ids, n=0;
+var lista=todos();
+for(var i=0;i<lista.length;i++){
+  var s=lista[i];
+  if(!s.id) continue;
+  if(nombres.indexOf(norm(s.name))<0 && ids.indexOf(String(s.id))<0) continue;
+  try{ c.removeEntity(s.id); n++; }catch(e){}
+}
+return {ok:true, quitados:n};
+})()`;
+}
+
 export function exprOjos({ nombres = [], accion = 'leer', nombre = '', visible = true, studyId = '' } = {}) {
   const datos = JSON.stringify({ nombres, accion, nombre, visible: !!visible, studyId: String(studyId || '') });
   return `(async function(){
@@ -539,12 +578,52 @@ export function crearAlgoTv({
     log('algo:', m.nombre, 'instalado v' + m.version + (r.plan ? ' (' + r.plan + ')' : ''));
     const visible = typeof r.visible === 'boolean' ? r.visible : (sondeo.visible === true ? true : sondeo.visible === false ? false : prev.visible);
     publicar(m.nombre, { estado: 'instalado', motivo: '', visible, scriptId: r.scriptId || prev.scriptId || '', studyId: r.studyId || sondeo.studyId || prev.studyId || '' }, m.version);
+    if (m.anterior && memoria.algos[m.anterior]) delete memoria.algos[m.anterior];
+    try { guardarEstado(archivo, memoria); } catch {}
     return { trabajo: anuncia, fallo: false };
+  }
+  async function quitarRetirados() {
+    memoria.quitados = Array.isArray(memoria.quitados) ? memoria.quitados : [];
+    const pendientes = RETIRADOS.filter(q => !memoria.quitados.includes(q.nombre));
+    if (!pendientes.length) return;
+    const conRegistro = [];
+    let cambio = false;
+    for (const q of pendientes) {
+      const nombres = [q.nombre, ...(q.tambien || [])];
+      if (!nombres.some(n => memoria.algos && memoria.algos[n])) {
+        memoria.quitados.push(q.nombre);
+        cambio = true;
+        continue;
+      }
+      conRegistro.push(q);
+    }
+    if (!conRegistro.length) {
+      if (cambio) { try { guardarEstado(archivo, memoria); } catch {} }
+      return;
+    }
+    const nombres = [];
+    const ids = [];
+    for (const q of conRegistro) {
+      for (const n of [q.nombre, ...(q.tambien || [])]) {
+        nombres.push(n);
+        const prev = memoria.algos[n];
+        if (prev && prev.studyId) ids.push(String(prev.studyId));
+      }
+    }
+    let r;
+    try { r = await evaluar(exprQuitar({ nombres, ids })); } catch { return; }
+    if (!r || r.ok !== true) return;
+    for (const q of conRegistro) {
+      for (const n of [q.nombre, ...(q.tambien || [])]) delete memoria.algos[n];
+      if (!memoria.quitados.includes(q.nombre)) memoria.quitados.push(q.nombre);
+    }
+    try { guardarEstado(archivo, memoria); } catch (e) { log('algo: no pude guardar el estado', e && e.message); }
   }
   async function intentar() {
     let trabajo = false;
     let fallo = false;
     try {
+      await quitarRetirados();
       for (const m of manifiesto) {
         try {
           const r = await uno(m);

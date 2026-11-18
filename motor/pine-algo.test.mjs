@@ -4,21 +4,22 @@ import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import {
-  ALGO_NOMBRE, ALGO_VERSION, FUENTE_PINE, PINE_DIR, crearAlgoTv, esElAlgo, estudiosAlgo, exprAlgo, exprMirar, exprOjos, formasEstudio, insertarEstudio, leerFuente, mismoEstudioId, planAlgo, textoAlgo, textoMotivo,
+  ALGO_NOMBRE, ALGO_VERSION, FUENTE_PINE, PINE_DIR, RETIRADOS, crearAlgoTv, esElAlgo, estudiosAlgo, exprAlgo, exprMirar, exprOjos, exprQuitar, formasEstudio, insertarEstudio, leerFuente, mismoEstudioId, planAlgo, textoAlgo, textoMotivo,
 } from './pine-algo.mjs';
 
 const fuente = leerFuente(FUENTE_PINE);
-assert.match(fuente, /indicator\("Ai Profit Camp Algo", overlay = true\)/);
+assert.match(fuente, /indicator\("Profito Algoritmo", "Profito Algoritmo", overlay = true\)/);
 assert.match(fuente, /maxCloseW = input\.float\(12\.0, "Mecha Max Cierre %"\)/);
 assert.match(fuente, /low - 2 \* syminfo\.mintick/);
 assert.match(fuente, /high \+ 2 \* syminfo\.mintick/);
 assert.match(fuente, /linewidth = 6/);
-assert.equal(ALGO_NOMBRE, 'Ai Profit Camp Algo');
+assert.equal(ALGO_NOMBRE, 'Profito Algoritmo');
 assert.equal(ALGO_VERSION, '1');
-assert.equal(esElAlgo('ai profit camp algo'), true);
-assert.equal(esElAlgo('  AI PROFIT CAMP ALGO '), true);
+assert.equal(esElAlgo('profito algoritmo'), true);
+assert.equal(esElAlgo('  PROFITO ALGORITMO '), true);
 assert.equal(esElAlgo('Envolvente M1 Final'), false);
-assert.equal(estudiosAlgo([{ name: 'AI PROFIT CAMP ALGO' }, { name: 'VWAP' }]).length, 1);
+assert.equal(esElAlgo('Ai Profit Camp Algo'), false);
+assert.equal(estudiosAlgo([{ name: 'PROFITO ALGORITMO' }, { name: 'VWAP' }]).length, 1);
 
 assert.equal(planAlgo({ enGrafico: 1, versionGuardada: '1' }), 'nada');
 assert.equal(planAlgo({ enGrafico: 1, versionGuardada: '' }), 'actualizar');
@@ -62,28 +63,29 @@ function grafico35() {
   };
   return { chart, llamadas };
 }
-const metaJson = { id: 'Script$USER;4637f0d246f54b92a991cbfa83a7f992@tv-scripting-101', description: 'Ai Profit Camp Algo' };
+const metaJson = { id: 'Script$USER;4637f0d246f54b92a991cbfa83a7f992@tv-scripting-101', description: 'Profito Algoritmo' };
 const roto = grafico35();
 await assert.rejects(() => roto.chart.createStudy(metaJson), /Failed to create study/);
-await assert.rejects(() => roto.chart.createStudy('Ai Profit Camp Algo'), /unexpected study id/);
+await assert.rejects(() => roto.chart.createStudy('Profito Algoritmo'), /unexpected study id/);
 await assert.rejects(() => roto.chart.createStudy(idCamp), /unexpected study id/);
 const bueno = grafico35();
-assert.equal(await insertarEstudio(bueno.chart, idCamp, 'Ai Profit Camp Algo'), 'd9IHvG');
+assert.equal(await insertarEstudio(bueno.chart, idCamp, 'Profito Algoritmo'), 'd9IHvG');
 assert.deepEqual(bueno.llamadas[0], { type: 'pine', pineId: 'USER;4637f0d246f54b92a991cbfa83a7f992', pineVersion: 'last' });
 assert.equal(bueno.llamadas.some(x => typeof x === 'string' || (x && x.description)), false);
-assert.equal(await insertarEstudio(grafico35().chart, metaJson.id, 'Ai Profit Camp Algo'), 'd9IHvG');
+assert.equal(await insertarEstudio(grafico35().chart, metaJson.id, 'Profito Algoritmo'), 'd9IHvG');
 const bandas = grafico35();
 assert.equal(await insertarEstudio(bandas.chart, 'STD;BB', 'Bollinger Bands'), 'bb-id');
 assert.match(textoMotivo('unexpected study id:' + idCamp), /Lo reintento/);
 assert.match(textoMotivo('sin-broker'), /Lo reintento/);
-assert.equal(textoAlgo({ nombre: 'Ai Profit Camp Algo', estado: 'instalado', version: '1' }), 'Algo TradingView: Ai Profit Camp Algo instalado v1');
-assert.equal(textoAlgo({ nombre: 'Ai Profit Camp Algo', estado: 'pendiente' }), 'Algo TradingView: Ai Profit Camp Algo pendiente');
-assert.equal(textoAlgo({ nombre: 'Ai Profit Camp Algo', estado: 'instalando' }), 'Algo TradingView: Ai Profit Camp Algo instalando');
-assert.equal(textoAlgo({ nombre: 'Ai Profit Camp Algo', estado: 'error' }), 'Algo TradingView: Ai Profit Camp Algo error');
+assert.equal(textoAlgo({ nombre: 'Profito Algoritmo', estado: 'instalado', version: '2' }), 'Algo TradingView: Profito Algoritmo instalado v2');
+assert.equal(textoAlgo({ nombre: 'Profito Algoritmo', estado: 'pendiente' }), 'Algo TradingView: Profito Algoritmo pendiente');
+assert.equal(textoAlgo({ nombre: 'Profito Algoritmo', estado: 'instalando' }), 'Algo TradingView: Profito Algoritmo instalando');
+assert.equal(textoAlgo({ nombre: 'Profito Algoritmo', estado: 'error' }), 'Algo TradingView: Profito Algoritmo error');
 
 const expr = exprAlgo({ source: fuente, versionGuardada: '', studyIdGuardado: '' });
 assert.match(expr, /getAllStudies/);
-assert.match(expr, /Ai Profit Camp Algo/);
+assert.match(expr, /Profito Algoritmo/);
+assert.match(exprAlgo({ source: 'x', nombre: 'Profito Algoritmo', anterior: 'Ai Profit Camp Algo' }), /Ai Profit Camp Algo/);
 assert.match(expr, /pine-facade\/save\/new/);
 assert.match(expr, /pine-facade\/save\/next/);
 assert.doesNotMatch(expr, /placeOrder|modifyOrder|closePosition|editPositionBrackets|cancelOrder|setCurrentAccount|setSymbol|activeBroker|paper_trading|positions\(|activeOrders|sin-broker|sin-posiciones/);
@@ -116,30 +118,24 @@ algo = crearAlgoTv({
     if (codigo.includes('"accion":"fijar"')) return { ok: true, visible: false, studyId: 's1' };
     assert.equal(algo.estado().fase, 'instalando');
     assert.equal(algo.estado().algos.some(a => a.estado === 'instalando'), true);
-    return { ok: true, estado: 'instalado', version: '1', enGrafico: 1, visible: true, studyId: 's1', scriptId: 'USER;1', plan: 'instalar' };
+    return { ok: true, estado: 'instalado', version: '2', enGrafico: 1, visible: true, studyId: 's1', scriptId: 'USER;1', plan: 'instalar' };
   },
   log: () => {},
 });
-assert.match(algo.estado().texto, /Ai Profit Camp Algo pendiente/);
+assert.match(algo.estado().texto, /Profito Algoritmo pendiente/);
+assert.equal(algo.estado().algos.some(a => a.nombre === 'Smart Money Algo'), false);
 const hecho = await algo.intentar();
-assert.match(hecho.texto, /Ai Profit Camp Algo instalado v1/);
+assert.match(hecho.texto, /Profito Algoritmo instalado v2/);
 assert.equal(hecho.fase, 'listos');
-assert.match(hecho.texto, /Smart Money Algo instalado v1/);
-assert.equal(hecho.algos.length, 2);
+assert.equal(hecho.algos.length, 1);
 const estudios = vistos.filter(c => c.includes('pine-facade/save/new'));
-assert.equal(estudios.length, 2);
-assert.equal(estudios.filter(c => c.includes('"nombre":"Ai Profit Camp Algo"')).length, 1);
-assert.equal(estudios.filter(c => c.includes('"nombre":"Smart Money Algo"')).length, 1);
-assert.match(estudios.find(c => c.includes('Smart Money Algo')), /formasEstudio/);
-assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'algo-tv.json'), 'utf8')).algos['Ai Profit Camp Algo'].version, '1');
-assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'algo-tv.json'), 'utf8')).algos['Smart Money Algo'].version, '1');
-const sms = leerFuente(path.join(PINE_DIR, 'smart-money-algo.pine'));
-assert.match(sms, /indicator\("Smart Money Algo", "Smart Money Algo"/);
-assert.doesNotMatch(sms, /indicator\("Smart Money Structure"/);
-assert.match(sms, /\/\/@version=5/);
-assert.doesNotMatch(sms, /Findi/);
-assert.match(sms, /alertcondition\(eql_alert, 'Equal Lows', 'Equal lows detected'\)/);
-const ojo = await algo.fijar('Ai Profit Camp Algo', false);
+assert.equal(estudios.length, 1);
+assert.equal(estudios.filter(c => c.includes('"nombre":"Profito Algoritmo"')).length, 1);
+assert.equal(estudios.filter(c => c.includes('Smart Money')).length, 0);
+assert.match(estudios[0], /formasEstudio/);
+assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'algo-tv.json'), 'utf8')).algos['Profito Algoritmo'].version, '2');
+assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'algo-tv.json'), 'utf8')).algos['Smart Money Algo'], undefined);
+const ojo = await algo.fijar('Profito Algoritmo', false);
 assert.equal(ojo.ok, true);
 assert.equal(ojo.algos[0].visible, false);
 assert.notEqual(ojo.fase, 'instalando');
@@ -153,8 +149,8 @@ const enTrade = crearAlgoTv({
     : { ok: true, estado: 'instalado', version: '1', enGrafico: 1, visible: false, studyId: 's9', scriptId: 'USER;9', plan: 'instalar' },
 });
 const durante = await enTrade.intentar();
-assert.match(durante.texto, /Ai Profit Camp Algo instalado v1/);
-assert.equal(durante.algos.find(a => a.nombre === 'Ai Profit Camp Algo').visible, false);
+assert.match(durante.texto, /Profito Algoritmo instalado v2/);
+assert.equal(durante.algos.find(a => a.nombre === 'Profito Algoritmo').visible, false);
 
 const caido = crearAlgoTv({
   dir: fs.mkdtempSync(path.join(os.tmpdir(), 'algo-caido-')),
@@ -181,7 +177,7 @@ assert.equal(mal.algos.every(a => a.estado === 'pendiente'), true);
 
 const dirYa = fs.mkdtempSync(path.join(os.tmpdir(), 'algo-ya-'));
 fs.writeFileSync(path.join(dirYa, 'algo-tv.json'), JSON.stringify({ algos: {
-  'Ai Profit Camp Algo': { estado: 'instalado', version: '1', visible: true, studyId: 's1' },
+  'Profito Algoritmo': { estado: 'instalado', version: '2', visible: true, studyId: 's1' },
   'Smart Money Algo': { estado: 'instalado', version: '1', visible: false, studyId: idSms },
 } }));
 const vistosYa = [];
@@ -190,15 +186,30 @@ const ya = crearAlgoTv({
   pineDir: PINE_DIR,
   evaluar: async (codigo) => {
     vistosYa.push(codigo);
+    if (codigo.includes('"quitar":true')) {
+      assert.match(codigo, /Smart Money Algo/);
+      assert.match(codigo, /Smart Money Structure/);
+      assert.ok(codigo.includes(idSms));
+      assert.match(codigo, /removeEntity/);
+      assert.doesNotMatch(codigo, /placeOrder|closePosition|activeBroker|positions\(|activeOrders/);
+      return { ok: true, quitados: 1 };
+    }
     if (!codigo.includes('"mirar":true')) throw new Error('no debía guardar');
-    const oculto = codigo.includes('Smart Money Algo');
-    return { ok: true, mirar: true, enGrafico: 1, visible: !oculto, studyId: oculto ? 's2' : 's1' };
+    return { ok: true, mirar: true, enGrafico: 1, visible: true, studyId: 's1', viejos: 0 };
   },
 });
 const quieto = await ya.intentar();
 assert.equal(quieto.fase, null);
 assert.equal(vistosYa.some(c => c.includes('pine-facade')), false);
-assert.equal(quieto.algos.find(a => a.nombre === 'Smart Money Algo').visible, false);
+assert.equal(quieto.algos.find(a => a.nombre === 'Smart Money Algo'), undefined);
+assert.ok(JSON.parse(fs.readFileSync(path.join(dirYa, 'algo-tv.json'), 'utf8')).quitados.includes('Smart Money Algo'));
+const otra = await ya.intentar();
+assert.equal(vistosYa.filter(c => c.includes('"quitar":true')).length, 1, 'se quita una sola vez');
+assert.equal(otra.algos.find(a => a.nombre === 'Profito Algoritmo').visible, true);
+assert.equal(RETIRADOS[0].pineId, 'USER;c372e364a273408e83cec7ca380539ca');
+const quitar = exprQuitar({ nombres: ['Smart Money Algo'], ids: [idSms] });
+assert.match(quitar, /removeEntity/);
+assert.doesNotMatch(quitar, /placeOrder|closePosition|activeOrders|positions\(/);
 
 const dirVisto = fs.mkdtempSync(path.join(os.tmpdir(), 'algo-visto-'));
 const vistosVisto = [];
@@ -208,22 +219,21 @@ const visto = crearAlgoTv({
   evaluar: async (codigo) => {
     vistosVisto.push(codigo);
     if (codigo.includes('"mirar":true')) {
-      const camp = codigo.includes('Ai Profit Camp Algo');
+      const camp = codigo.includes('Profito Algoritmo');
       return { ok: true, mirar: true, enGrafico: camp ? 1 : 0, visible: camp ? true : null, studyId: camp ? 'd9IHvG' : '', viejos: 0 };
     }
-    assert.match(codigo, /Smart Money Algo/);
-    assert.doesNotMatch(codigo, /"nombre":"Ai Profit Camp Algo"/);
-    return { ok: true, estado: 'instalado', visible: true, studyId: idSms, scriptId: idSms, plan: 'instalar' };
+    assert.match(codigo, /Profito Algoritmo/);
+    return { ok: true, estado: 'instalado', visible: true, studyId: 'd9IHvG', scriptId: idCamp, plan: 'nada' };
   },
 });
 const vistoHecho = await visto.intentar();
-assert.equal(vistoHecho.algos.find(a => a.nombre === 'Ai Profit Camp Algo').estado, 'instalado');
-assert.equal(JSON.parse(fs.readFileSync(path.join(dirVisto, 'algo-tv.json'), 'utf8')).algos['Ai Profit Camp Algo'].studyId, 'd9IHvG');
-assert.equal(vistosVisto.filter(c => c.includes('createStudyInserter') && c.includes('"nombre":"Ai Profit Camp Algo"')).length, 0);
+assert.equal(vistoHecho.algos.find(a => a.nombre === 'Profito Algoritmo').estado, 'instalado');
+assert.equal(JSON.parse(fs.readFileSync(path.join(dirVisto, 'algo-tv.json'), 'utf8')).algos['Profito Algoritmo'].studyId, 'd9IHvG');
+assert.equal(vistosVisto.filter(c => c.includes('createStudyInserter') && c.includes('"nombre":"Profito Algoritmo"')).length, 0);
 
 const migraDir = fs.mkdtempSync(path.join(os.tmpdir(), 'algo-migra-'));
 fs.writeFileSync(path.join(migraDir, 'algo-tv.json'), JSON.stringify({ algos: {
-  'Ai Profit Camp Algo': { estado: 'instalado', version: '1', visible: true, studyId: idCamp },
+  'Ai Profit Camp Algo': { estado: 'instalado', version: '1', visible: false, studyId: idCamp },
 } }));
 let migra;
 const vistosMigra = [];
@@ -233,18 +243,19 @@ migra = crearAlgoTv({
   evaluar: async (codigo) => {
     vistosMigra.push(codigo);
     if (codigo.includes('"mirar":true')) {
-      if (codigo.includes('Smart Money Algo')) return { ok: true, mirar: true, enGrafico: 0, visible: null, studyId: '', viejos: 1, visibleViejo: false };
-      return { ok: true, mirar: true, enGrafico: 1, visible: true, studyId: idCamp, viejos: 0, visibleViejo: null };
+      return { ok: true, mirar: true, enGrafico: 0, visible: null, studyId: '', viejos: 1, visibleViejo: false };
     }
     assert.equal(migra.estado().fase, 'instalando');
-    assert.match(codigo, /Smart Money Structure/);
-    assert.match(codigo, /USER;c372e364a273408e83cec7ca380539ca|formasEstudio/);
-    return { ok: true, estado: 'instalado', visible: false, studyId: idSms, scriptId: idSms, plan: 'migrar' };
+    assert.match(codigo, /Ai Profit Camp Algo/);
+    assert.match(codigo, /Profito Algoritmo/);
+    assert.match(codigo, /formasEstudio/);
+    return { ok: true, estado: 'instalado', visible: false, studyId: 'd9IHvG', scriptId: idCamp, plan: 'migrar' };
   },
 });
 const migrado = await migra.intentar();
 assert.equal(migrado.fase, 'listos');
-assert.equal(migrado.algos.find(a => a.nombre === 'Smart Money Algo').visible, false);
+assert.equal(migrado.algos.find(a => a.nombre === 'Profito Algoritmo').visible, false);
+assert.equal(migrado.algos.find(a => a.nombre === 'Ai Profit Camp Algo'), undefined);
 assert.equal(migrado.algos.every(a => a.estado === 'instalado'), true);
 
 let rechazo;
@@ -277,14 +288,14 @@ assert.match(html, /id="tlAlgoAviso"/);
 assert.match(html, /class="cola"/);
 assert.match(html, /anclarAviso/);
 assert.ok(html.indexOf('id="tlAlgosBtn"') < html.indexOf('id="tlAlgoAviso"'));
-assert.match(html, /Instalando los algoritmos en tu TradingView\. Tarda de 1 a 2 minutos\. Es normal que veas moverse el gráfico y el editor de Pine\./);
-assert.match(html, /Algoritmos listos/);
+assert.match(html, /Instalando Profito Algoritmo en tu TradingView\. Tarda de 1 a 2 minutos\. Es normal que veas moverse el gráfico y el editor de Pine\./);
+assert.match(html, /Profito Algoritmo listo/);
 assert.match(html, /j\.fase === 'instalando'/);
 assert.match(rutas, /q\.method === 'POST'/);
 assert.match(rutas, /algoTv\.fijar/);
 assert.ok(rutas.indexOf("'/api/algo-tv'") < rutas.indexOf("q.method === 'POST' || q.url === '/bot'"), 'el ojo no cae en el POST genérico');
 assert.match(server, /algoTv\.sincronizar/);
 assert.doesNotMatch(server.slice(server.indexOf('crearAlgoTv(')), /ocupado:/);
-assert.doesNotMatch(fs.readFileSync(new URL('./orders.mjs', import.meta.url), 'utf8'), /pine-algo|Ai Profit Camp Algo/);
+assert.doesNotMatch(fs.readFileSync(new URL('./orders.mjs', import.meta.url), 'utf8'), /pine-algo|Profito Algoritmo|Ai Profit Camp Algo/);
 
 console.log('pine-algo ok');

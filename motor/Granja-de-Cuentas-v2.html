@@ -5189,8 +5189,8 @@ function qu(){dh.update();const n=Math.min(dh.getDelta(),jx);qo+=n;const e=qo;fo
   <span class="sep"></span>
   <button type="button" id="tlHudDia" title="Trades de la sesión, hasta las 4 PM ET. Clic para el P&amp;L."><span id="tlHudTxt">Hoy <b id="pnlHoy">0</b> trades · <b id="tradesPos" class="pos">0+</b> · <b id="tradesNeg" class="neg">0−</b></span> <small id="pnlEj">(ejemplo)</small></button>
   <span class="algoswrap">
-    <button type="button" id="tlAlgosBtn" title="Algos TradingView" aria-label="Algos TradingView" aria-expanded="false" aria-haspopup="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 12S5.5 4.8 12 4.8 22.5 12 22.5 12 18.5 19.2 12 19.2 1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/></svg></button>
-    <div id="tlAlgosPanel" class="glass" hidden><div class="tit">Algos TradingView</div><div class="lista"></div></div>
+    <button type="button" id="tlAlgosBtn" title="Profito Algoritmo" aria-label="Profito Algoritmo" aria-expanded="false" aria-haspopup="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 12S5.5 4.8 12 4.8 22.5 12 22.5 12 18.5 19.2 12 19.2 1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/></svg></button>
+    <div id="tlAlgosPanel" class="glass" hidden><div class="tit">Profito Algoritmo</div><div class="lista"></div></div>
     <div id="tlAlgoAviso" class="glass" hidden role="status" aria-live="polite"><i class="cola" aria-hidden="true"></i><span class="txt"></span></div>
   </span>
   <span class="sep"></span>
@@ -5244,7 +5244,7 @@ function qu(){dh.update();const n=Math.min(dh.getDelta(),jx);qo+=n;const e=qo;fo
     if (a.estado === 'error') return por ? 'error. ' + por : 'error';
     return por ? 'pendiente. ' + por : 'pendiente';
   }
-  var AVISO_INSTALANDO = 'Instalando los algoritmos en tu TradingView. Tarda de 1 a 2 minutos. Es normal que veas moverse el gráfico y el editor de Pine.';
+  var AVISO_INSTALANDO = 'Instalando Profito Algoritmo en tu TradingView. Tarda de 1 a 2 minutos. Es normal que veas moverse el gráfico y el editor de Pine.';
   function anclarAviso() {
     var el = document.getElementById('tlAlgoAviso');
     var cola = el && el.querySelector('.cola');
@@ -5279,13 +5279,13 @@ function qu(){dh.update();const n=Math.min(dh.getDelta(),jx);qo+=n;const e=qo;fo
     } else if (j && j.fase === 'listos') {
       el.hidden = false;
       el.classList.add('listo');
-      txt.textContent = 'Algoritmos listos';
+      txt.textContent = 'Profito Algoritmo listo';
     } else {
       var pendientes = (j && j.algos || []).filter(function (a) { return a.estado !== 'instalado' && a.motivo; });
       if (pendientes.length) {
         el.hidden = false;
         el.classList.remove('listo');
-        txt.textContent = 'No pude dejar listos los algoritmos. ' + razon(pendientes[0].motivo);
+        txt.textContent = 'No pude dejar listo Profito Algoritmo. ' + razon(pendientes[0].motivo);
       } else {
         el.hidden = true;
         txt.textContent = '';
@@ -5338,12 +5338,20 @@ function qu(){dh.update();const n=Math.min(dh.getDelta(),jx);qo+=n;const e=qo;fo
 body:has(#prLive[style*="block"]) #panel{left:358px!important}
 @media (max-width:760px){#panel{left:10px!important;width:min(320px,calc(100vw - 20px))!important;z-index:13}body:has(#prLive[style*="block"]) #panel{left:10px!important}}</style>
 <div id="toast" class="glass"></div>
-<script>/* TradingLink: lee accounts.json y actualiza la granja. LFE=evaluación, LFF=fondeada */
-(function(){async function sync(){try{const s=window.granjaStore;if(!s)return;const d=await (await fetch('/accounts.json',{cache:'no-store'})).json();
-for(const a of Object.values(d.accounts||{})){if(a.balance==null)continue;const ex=(s.get().accounts||[]).find(x=>x.name===a.id);
-const t=a.type==='funded'?'funded':'eval';if(ex){if(ex.type!==t)s.upsertAccount({id:ex.id,type:t,bal:a.balance});else s.setDaily(ex.id,{bal:a.balance,pnlToday:a.dayPnl??0});if(a.peak!=null&&a.peak>(ex.peak??0))s.upsertAccount({id:ex.id,peak:a.peak});else if(a.breached===false&&ex.burnedAt&&a.peak!=null)s.upsertAccount({id:ex.id,peak:a.peak,bal:a.balance});if(a.start||a.planStart||a.dd!=null)s.upsertAccount({id:ex.id,start:a.start||a.planStart,dd:a.dd,dailyLoss:a.dailyLoss,profitTarget:a.profitTarget,scale:a.scale,plan:a.plan,lockTriggerOver:a.lockTriggerOver,lockFloorOver:a.lockFloorOver,atRisk:a.atRisk});}/* max loss: 25K pierde $1,000 / 50K pierde $2,000 = quemada (también acumulado); el servidor manda peak/breached */
-else{const n=s.upsertAccount({name:a.id,type:t,start:a.start||a.planStart||25000,bal:a.balance,peak:Math.max(a.start||a.planStart||25000,a.peak??0),dd:a.dd,dailyLoss:a.dailyLoss,profitTarget:a.profitTarget,scale:a.scale,plan:a.plan,lockTriggerOver:a.lockTriggerOver,lockFloorOver:a.lockFloorOver,atRisk:a.atRisk});n&&(a.burned||a.breached)&&s.markBurned&&s.markBurned(n.id);n&&s.setDaily(n.id,{pnlToday:a.dayPnl??0});}}if(d.daily&&s.setDayTotal)for(const[k,v]of Object.entries(d.daily))s.setDayTotal(k,v);const ids=Array.isArray(d.live)&&d.live.length?d.live:Object.keys(d.accounts||{});if(ids.length)for(const x of [...(s.get().accounts||[])])if(!ids.includes(x.name)&&!x.memorial){if(x.type==='funded'&&/^LFF/.test(x.name)&&s.markBurned){if(!x.burnedAt)s.markBurned(x.id)}else s.deleteAccount(x.id);}for(const a of Object.values(d.accounts||{})){const ex=(s.get().accounts||[]).find(x=>x.name===a.id);if(ex&&(a.burned||a.breached)&&s.markBurned)s.markBurned(ex.id)}}catch(e){console.warn('TradingLink',e)}}
-setTimeout(sync,2000);setInterval(sync,30000);})();</script>
+<script type="module">/* La flor usa la misma lista que el menú de cuentas (/api/colchon/accounts), no solo accounts.json. */
+import { aplicarFlores } from '/granja-flores.mjs';
+async function sync() {
+  const s = window.granjaStore;
+  if (!s) { setTimeout(sync, 500); return; }
+  try {
+    const archivo = await fetch('/accounts.json', { cache: 'no-store' }).then(r => r.json()).catch(() => ({}));
+    const broker = await fetch('/api/colchon/accounts', { cache: 'no-store' }).then(r => r.json()).catch(() => ({ ok: false, accounts: [] }));
+    aplicarFlores(s, { accountsJson: archivo, colchon: broker });
+  } catch (e) { console.warn('TradingLink', e); }
+}
+setTimeout(sync, 500);
+setInterval(sync, 30000);
+</script>
 <script>/* Árbol recuerdo: primer pago */
 (function(){const N="🏆 Memorial";function plant(){const s=window.granjaStore;if(!s)return setTimeout(plant,500);
 if(false&&!(s.get().accounts||[]).some(x=>x.memorial)){try{const a=s.upsertAccount({name:N,type:"funded",start:25000,bal:25000,peak:25000,date:"2026-10-08",memorial:true,at:[7,-5],lead:34,dx:0});s.addPayout(a.id,{amount:250,date:"2026-10-08"});}catch(e){console.warn(e)}}}

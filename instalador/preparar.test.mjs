@@ -18,7 +18,7 @@ const debe = [
   'motor/pnl-sesion.mjs',
   'motor/pine-algo.mjs',
   'motor/pine/ai-profit-camp-algo.pine',
-  'motor/pine/smart-money-algo.pine',
+  'motor/granja-flores.mjs',
   'acceso/navegador-granja.mjs',
   'motor/pine/manifest.json',
   'motor/sonidos/clic-burbuja.wav',

@@ -137,6 +137,13 @@ export function manejar(q, r, deps) {
       }
     }
   }
+  if (q.method === 'GET' && (q.url === '/granja-flores.mjs' || q.url.startsWith('/granja-flores.mjs?'))) {
+    const archivo = path.join(deps.ROOT, 'motor', 'granja-flores.mjs');
+    if (fs.existsSync(archivo)) {
+      r.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
+      return fs.createReadStream(archivo).pipe(r);
+    }
+  }
   if (q.method === 'GET' && (q.url === '/propfarm-logo.png' || q.url.startsWith('/propfarm-logo.png?'))) {
     const logo = path.join(deps.ROOT, 'assets', 'propfarm-logo.png');
     if (fs.existsSync(logo)) {

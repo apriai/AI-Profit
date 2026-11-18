@@ -16,6 +16,9 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Pantalla de carga.** Al abrir sale «Cargando Profito…», con las fotos del instalador en otro orden, el logo y el paso en curso: Encendiendo servidor, Conectando TradingView, Abriendo granja. Se cierra sola cuando la granja ya está en pantalla. Si pasa cerca de un minuto, dice qué sigue pendiente.
 ### Corregido
 - **El ojo de los algoritmos vuelve a mostrar y ocultar.** `POST /api/algo-tv` lo respondía el atajo de `/order` con «ruta desconocida» y el clic no hacía nada. Ahora esa ruta llega a `fijar`.
+- **La flor sale en una instalación nueva.** La barra lee la cuenta en TradingView (`/api/colchon/accounts`). La flor solo miraba `accounts.json` y, si todavía no había saldo, no plantaba nada. Ahora usa la misma lista que la barra. Si el saldo aún no llegó, la flor usa el inicio del plan (25K o 50K).
+### Cambiado
+- **Solo queda Profito Algoritmo.** Se quitó Smart Money Algo (antes Smart Money Structure). Si Profito lo había puesto en el gráfico, lo quita una vez y no toca órdenes ni posiciones. Ai Profit Camp Algo pasa a llamarse Profito Algoritmo en la granja y en el título del indicador. El script guardado se actualiza con `save/next` en la sesión de TradingView de esa persona.
 ### Notas
 - No abre, no mueve y no cierra órdenes. `orders.mjs` sigue apagado.
 
