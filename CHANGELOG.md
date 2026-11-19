@@ -10,6 +10,17 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.30] — 2026-11-19
+### Corregido
+- **Si el objetivo ya se pasó, no se manda otra orden a mercado.** Se mueve el límite que ya va ligado a la entrada, para que la salida siga dentro del bracket. Si ese movimiento no se confirma, el stop sigue y no se da por cerrado.
+- **Las dos llamadas exigen la cuenta que se iba a operar.** Si hay una lectura de todas las cuentas en curso, se espera a que termine. Si no termina, no se opera.
+- **Una orden vieja del historial no se adopta.** Solo cuenta una orden que no estaba antes de esta apertura. Si la llamada de la orden se corta, la respuesta vuelve enseguida y un vigilante sigue mirando en segundo plano.
+- **Si el bróker no crea el stop, la granja lo dice en voz alta** y deja el botón «Poner stop», que solo manda la orden cuando se pulsa.
+- **La vista previa, mientras sale la orden, se queda con el último dibujo.** No acumula una cola toda la operación.
+- **Con el panel de operar abierto, o con un trade en curso, no se cambia de cuenta para leer saldos.** El barrido de todas las cuentas espera a que se cierre el panel y termine el trade. Al cerrar el trade, el saldo de esa cuenta sí se lee.
+### Notas
+- No cambia los dólares de las estrategias. La lista para probarlo en demo está en `docs/PRUEBA-EN-DEMO.md`.
+
 ## [0.10.29] — 2026-11-19
 ### Cambiado
 - **Abrir usa dos llamadas a DevTools.** La primera solo lee: cuenta activa, lista, posición del símbolo, bid/ask/last y el contrato del gráfico. Si se corta, se puede repetir. La segunda relee la cuenta, que siga plano y que el contrato sea el mismo; si algo cambió, no envía y lo dice. Entonces manda la orden a mercado con el stop y el objetivo calculados con el bid y el ask de ese momento. Esa segunda llamada no se reintenta. Si se corta, no se manda otra: se relee por el id y, si la posición apareció, se adopta y se avisa.

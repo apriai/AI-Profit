@@ -3,6 +3,7 @@
 // {"ok":false,"err":["ruta desconocida"]} y el ojo de los algoritmos no hace nada.
 import fs from 'node:fs';
 import path from 'node:path';
+import { acctGuard } from './colchon.mjs';
 
 export function manejar(q, r, deps) {
   if (deps.propiasH(q, r)) return;
@@ -79,7 +80,13 @@ export function manejar(q, r, deps) {
         else if (q.url.startsWith('/api/colchon/strategies')) out = deps.colchon.strategies();
         else if (q.url.startsWith('/api/colchon/accounts')) out = await deps.colchon.accounts();
         else if (q.url.startsWith('/api/colchon/check')) out = await deps.colchon.check();
+        else if (q.url.startsWith('/api/colchon/panel') && q.method === 'POST') {
+          acctGuard.panelAbierto = !!(j && j.abierto);
+          if (!acctGuard.panelAbierto && typeof acctGuard.alCerrarPanel === 'function') { try { acctGuard.alCerrarPanel(); } catch {} }
+          out = { ok: true, abierto: !!acctGuard.panelAbierto };
+        }
         else if (q.url.startsWith('/api/colchon/start') && q.method === 'POST') out = await deps.colchon.start(j);
+        else if (q.url.startsWith('/api/colchon/poner-stop') && q.method === 'POST') out = await deps.colchon.ponerStop();
         else if (q.url.startsWith('/api/colchon/stop') && q.method === 'POST') out = await deps.colchon.stop(j);
         else out = { ok: false, err: 'ruta desconocida' };
       } catch (e) { out = { ok: false, err: String(e.message || e) }; }

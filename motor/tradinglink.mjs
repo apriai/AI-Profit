@@ -3,7 +3,7 @@
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
 import * as orders from './orders.mjs';
 import { negocio } from './negocio.mjs';
-import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, diaFarm, fueraDeSesion, cdpEvaluator, PAGE, acctGuard, encolarSiOcupado, js } from './colchon.mjs';
+import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, diaFarm, fueraDeSesion, cdpEvaluator, PAGE, acctGuard, puedeRecorrerCuentas, encolarUltimo, js } from './colchon.mjs';
 import { attachReporte } from './tv-reporte.mjs';
 import { createVistaPrevia } from './tv-vista-previa.mjs';
 import { estrategiasPropias } from './estrategias-propias.mjs';
@@ -119,8 +119,9 @@ async function cycle() {
     if (acctGuard.testActive) { acctGuard.saldoPendiente = true; cycling = false; return; }
     // Un trade en marcha o un arranque en curso (acctGuard.testActive) cuenta como ocupado: no se inicia
     // un recorrido nuevo de todas las cuentas ni de solo fondeadas. La lectura de la cuenta activa sigue.
-    const operando = colchon.status().state === 'running' || acctGuard.testActive;
-    // lectura completa (cambia de cuenta) SOLO si: sin pausa, sin prueba colchon ni arranque, y sin posiciones/ordenes en la cuenta activa (si las hay, se salta y se reintenta en 5 min)
+    const operando = !puedeRecorrerCuentas();
+    if (operando && !pausa && Date.now() - lastFull >= FULL_MS) acctGuard.barridoPendiente = true;
+    // lectura completa (cambia de cuenta) SOLO si: sin pausa, sin panel de operar, sin prueba, y sin posiciones/ordenes
     const full = !pausa && Date.now() - lastFull >= FULL_MS && !operando;
     // Con pausa-lectura.flag NO se recorren las evaluaciones, pero las FONDEADAS (LFF) se siguen leyendo cada 5 min
     // (mismas protecciones: sin posición/orden abierta, TradingView en segundo plano, sin prueba colchón ni arranque) para evaluar la quema de $1,000.
@@ -147,9 +148,18 @@ async function cycle() {
 }
 const vistaCola = [];
 acctGuard.alLiberar = () => {
-  const jobs = vistaCola.splice(0);
-  for (const j of jobs) { try { j(); } catch {} }
   if (acctGuard.saldoPendiente) { acctGuard.saldoPendiente = false; cycle(); }
+};
+acctGuard.alCerrarPanel = () => {
+  if (!acctGuard.barridoPendiente || !puedeRecorrerCuentas()) return;
+  acctGuard.barridoPendiente = false;
+  cycle();
+};
+acctGuard.alSoltarEnvio = () => {
+  const jobs = vistaCola.splice(0);
+  const ultimo = jobs.pop();
+  for (const v of jobs) { try { v.soltar && v.soltar({ ok: false, reemplazado: true }); } catch {} }
+  if (ultimo) { try { ultimo(); } catch {} }
 };
 
 // ---- Solo lectura para la granja: historial de trades, informes y luces de conexión ----
@@ -336,8 +346,8 @@ try {
 } catch (e) { console.log('reporte: no arrancó; el motor sigue.', e && e.message); }
 // Vista previa del panel: solo dibuja. No abre, no modifica y no cierra órdenes, y no repone reportes.
 const vistaPrevia = createVistaPrevia({
-  cotizar: () => encolarSiOcupado(vistaCola, async () => { const E = await cdpEvaluator(9222); try { return await E.evaluate(js.lastPrice); } finally { try { E.close(); } catch {} } }),
-  dibujar: expr => encolarSiOcupado(vistaCola, async () => { const E = await cdpEvaluator(9222); try { return await E.evaluate(expr); } finally { try { E.close(); } catch {} } }),
+  cotizar: () => encolarUltimo(vistaCola, async () => { const E = await cdpEvaluator(9222); try { return await E.evaluate(js.lastPrice); } finally { try { E.close(); } catch {} } }),
+  dibujar: expr => encolarUltimo(vistaCola, async () => { const E = await cdpEvaluator(9222); try { return await E.evaluate(expr); } finally { try { E.close(); } catch {} } }),
 });
 function roundTrips(ex) { const by = {}; for (const x of [...ex].sort((a, b) => a.time - b.time)) (by[x.symbol] ||= []).push(x);
   const out = []; for (const [sym, l] of Object.entries(by)) { const pv = PV(sym); let pos = 0, cash = 0, t0 = null, q = 0, first = null, comm = 0, commOk = true, entry = 0;
