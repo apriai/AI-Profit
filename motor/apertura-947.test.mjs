@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
-import { apiDriver, bracketSeguro, createColchon, frenaEscaneo, js, lineaLatencia, lineaTiempos, precioEntrada, ptsFor, roundTick, PANEL_PAUSA_MS } from './colchon.mjs';
+import { apiDriver, bracketSeguro, createColchon, detallePrecio, frenaEscaneo, js, lineaLatencia, lineaPrecio, lineaTiempos, precioEntrada, ptsFor, roundTick, PANEL_PAUSA_MS } from './colchon.mjs';
 import { manejar } from './rutas-api.mjs';
 
 const slPts = ptsFor(600, 'MNQ', 20);
@@ -72,15 +72,22 @@ function fakePage() {
     },
     async orders() { return stops.filter(o => o.status === 6).map(o => ({ ...o })); },
     async ordersHistory() { return hist.map(o => ({ ...o })); },
-    async allExecutions() { return execs.map(x => ({ ...x })); },
+    async allExecutions() { if (globalThis.__execThrow) throw new Error('fallo-ejecuciones'); return execs.map(x => ({ ...x })); },
     async symbolInfo(sy) { if (/ES/.test(sy)) throw new Error('no'); return { name: sy }; },
     async placeOrder(o) {
       ordenes.push({ ...o });
-      if (globalThis.__rechazo) { hist.push({ symbol: o.symbol, type: 2, side: o.side, qty: o.qty, status: 5, time: Date.now(), message: { text: 'Not enough funds' } }); return {}; }
+      if (globalThis.__rechazo) { hist.push({ id: 'R1', symbol: o.symbol, type: 2, side: o.side, qty: o.qty, status: 5, time: Date.now(), message: { text: 'Not enough funds' } }); return {}; }
+      if (globalThis.__trabajando) {
+        hist.push({ id: 'W1', symbol: o.symbol, type: 2, side: o.side, qty: o.qty, status: 6, time: Date.now() });
+        execs.push({ id: 'E1', symbol: o.symbol, side: o.side, qty: o.qty, price: 10, time: Date.now() });
+        execs.push({ id: 'E2', symbol: o.symbol, side: -o.side, qty: o.qty, price: 9, time: Date.now() });
+        return { orderId: 'W1' };
+      }
+      if (globalThis.__muda) return { orderId: 'Z1' };
       if (globalThis.__cerrarYa) {
-        execs.push({ symbol: o.symbol, side: o.side, qty: o.qty, price: 27727.75, time: Date.now() });
-        execs.push({ symbol: o.symbol, side: -o.side, qty: o.qty, price: 27726.75, time: Date.now() });
-        hist.push({ symbol: o.symbol, type: 2, side: o.side, qty: o.qty, status: 2, time: Date.now(), avgPrice: 27727.75 });
+        execs.push({ id: 'NEW1', symbol: o.symbol, side: o.side, qty: o.qty, price: 27727.75, time: Date.now() });
+        execs.push({ id: 'NEW2', symbol: o.symbol, side: -o.side, qty: o.qty, price: 27726.75, time: Date.now() });
+        hist.push({ id: 'M1', symbol: o.symbol, type: 2, side: o.side, qty: o.qty, status: 2, time: Date.now(), avgPrice: 27727.75 });
         return { orderId: 'M1' };
       }
       if (globalThis.__mostrarEnMs) globalThis.__mostrarEn = Date.now() + globalThis.__mostrarEnMs;
@@ -97,7 +104,7 @@ function fakePage() {
   };
   const win = {
     TradingView: { bottomWidgetBar: { _widgetControllers: new Map([['paper_trading', { _trading: { activeBroker: () => ab, _ordersService: { activeOrders: () => stops.filter(o => o.status === 6) } } }]]) } },
-    TradingViewApi: { _activeChartWidgetWV: { value: () => ({ symbol: () => globalThis.__sym || 'CME_MINI:MNQ1!', _chartWidget: { model: () => ({ mainSeries: () => ({ symbol: () => globalThis.__sym || 'CME_MINI:MNQ1!', symbolInfo: () => ({ front_contract: 'MNQZ2026' }), quotes: () => (globalThis.__sinCota ? {} : { bid: globalThis.__bid ?? px - 0.25, ask: globalThis.__ask ?? px, last: globalThis.__last ?? px }), bars: () => ({ last: () => ({ value: [0, 0, 0, 0, globalThis.__bar ?? px] }) }) }) }) } }) } },
+    TradingViewApi: { _activeChartWidgetWV: { value: () => ({ symbol: () => globalThis.__sym || 'CME_MINI:MNQ1!', _chartWidget: { model: () => ({ mainSeries: () => ({ symbol: () => globalThis.__sym || 'CME_MINI:MNQ1!', symbolInfo: () => ({ front_contract: 'MNQZ2026' }), quotes: () => (globalThis.__sinCota ? {} : { bid: globalThis.__bid ?? px - 0.25, ask: globalThis.__ask ?? px, last: globalThis.__last ?? px, askTime: globalThis.__askTime ?? null, bidTime: globalThis.__bidTime ?? null, lastTime: globalThis.__lastTime ?? null }), bars: () => ({ last: () => ({ value: [0, 0, 0, 0, globalThis.__bar ?? px] }) }) }) }) } }) } },
   };
   const doc = {
     get visibilityState() { return 'hidden'; },
@@ -105,17 +112,17 @@ function fakePage() {
     querySelector: s => /accountName/.test(s) ? { get innerText() { return accs.find(a => a.id === cur).name; } } : null,
   };
   const evaluate = async expr => new Function('window', 'document', 'performance', 'return (' + expr + ')')(win, doc, performance);
-  return { evaluate, ordenes, cierres: () => cierres, setPx: v => { px = v; } };
+  return { evaluate, ordenes, execs, hist, cierres: () => cierres, setPx: v => { px = v; } };
 }
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'tl-947-'));
 const logFile = path.join(tmp, 'colchon.log');
 const allow = path.join(tmp, 'no-allow.json');
-function limpiar() { for (const k of ['__cerrarYa', '__rechazo', '__sinCota', '__mostrarEn', '__mostrarEnMs', '__ask', '__bid', '__bar', '__sym']) delete globalThis[k]; }
-function motor(pg) {
+function limpiar() { for (const k of ['__cerrarYa', '__rechazo', '__sinCota', '__mostrarEn', '__mostrarEnMs', '__ask', '__bid', '__bar', '__sym', '__askTime', '__execThrow', '__muda', '__trabajando']) delete globalThis[k]; }
+function motor(pg, extra = {}) {
   const marcas = [];
   const ev = async expr => { marcas.push(expr.includes('placeOrder') ? 'place' : expr.includes('symbolInfo') ? 'preparar' : expr.includes('q.ask') ? 'cotizacion' : expr.includes('ordersHistory') ? 'visto' : 'otro'); return pg.evaluate(expr); };
-  const k = createColchon(apiDriver(ev), { pollMs: 40, logFile, ignoreClock: true, noTicks: true, flatConfirm: { reads: 1, ms: 0 }, realAllowFile: allow, fuente: { modo: 'broker', frescoMs: 5000, pollMs: 40 }, fillWaitMs: 800 });
+  const k = createColchon(apiDriver(ev), { pollMs: 40, logFile, ignoreClock: true, noTicks: true, flatConfirm: { reads: 1, ms: 0 }, realAllowFile: allow, fuente: { modo: 'broker', frescoMs: 5000, pollMs: 40 }, fillWaitMs: 800, ...extra });
   return { k, marcas };
 }
 function antesDeOrden(marcas) {
@@ -123,9 +130,23 @@ function antesDeOrden(marcas) {
   return (i < 0 ? marcas : marcas.slice(0, i)).filter(x => x !== 'otro');
 }
 
+assert.match(pagina, /p==="aviso"/);
+assert.match(go, /r\.closed/);
+assert.match(go, /setPhase\("aviso"/);
+const aviso = pagina.match(/else if\(p==="aviso"\)\{[^}]+\}/)[0];
+assert.doesNotMatch(aviso, /Bloqueado/);
+assert.doesNotMatch(aviso, /Todas las cuentas Lucid/);
+assert.match(aviso, /Se llenó y se cerró/);
+const marca = 1_700_000_000_000;
+assert.equal(detallePrecio('long', { ask: fill, askTime: marca - 250, bid: fill - 0.25 }, marca).fuente, 'ask');
+assert.equal(detallePrecio('long', { ask: fill, askTime: marca - 250, bid: fill - 0.25 }, marca).edadMs, 250);
+assert.equal(detallePrecio('long', { bid: fill }).fuente, 'lado opuesto');
+assert.equal(detallePrecio('short', { ask: fill }).fuente, 'lado opuesto');
+assert.equal(lineaPrecio({ fuente: 'ask', precio: fill, edadMs: 40, recalculado: true }), `PRECIO: ask ${fill} · edad 40 ms · recalculado sí`);
+
 limpiar();
 {
-  const pg = fakePage(); globalThis.__ask = 27727.75; globalThis.__bid = 27727.5; globalThis.__bar = 27724.25; pg.setPx(27727.75);
+  const pg = fakePage(); globalThis.__ask = 27727.75; globalThis.__bid = 27727.5; globalThis.__bar = 27724.25; globalThis.__askTime = Date.now() - 180; pg.setPx(27727.75);
   const { k, marcas } = motor(pg);
   const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 20, strategyId: 'rascacielo', accountId: '1', accountName: 'Paper Trading', tClick: Date.now() - 15 });
   assert.equal(r.ok, true, r.err);
@@ -137,6 +158,7 @@ limpiar();
   assert.equal(pg.cierres(), 0);
   const texto = fs.readFileSync(logFile, 'utf8');
   assert.match(texto, /TIEMPOS: click→servidor \d+ ms · preparar \d+ ms · cotización \d+ ms · placeOrder \d+ ms · posición \d+ ms · total \d+ ms/);
+  assert.match(texto, /PRECIO: ask 27727\.75 · edad \d+ ms · recalculado sí/);
   await k.stop({ flatten: false });
 }
 
@@ -197,6 +219,68 @@ limpiar();
   await k.stop({ flatten: false });
 }
 
+limpiar();
+{
+  const pg = fakePage(); globalThis.__mostrarEnMs = 700; globalThis.__ask = 20000;
+  const { k, marcas } = motor(pg, { fillWaitMs: 120, adoptMs: 2500 });
+  const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 1, strategyId: 'rascacielo', accountId: '1', accountName: 'Paper Trading', tClick: Date.now() });
+  assert.equal(r.ok, true, r.err);
+  assert.equal(marcas.filter(x => x === 'place').length, 1);
+  assert.equal(k.status().state, 'running');
+  await k.stop({ flatten: false });
+}
+limpiar();
+{
+  const pg = fakePage(); globalThis.__muda = true; globalThis.__ask = 20000;
+  pg.execs.push({ id: 'V1', symbol: 'CME_MINI:MNQ1!', side: 1, qty: 1, price: 1, time: 0 });
+  pg.execs.push({ id: 'V2', symbol: 'CME_MINI:MNQ1!', side: -1, qty: 1, price: 2 });
+  const { k, marcas } = motor(pg, { fillWaitMs: 150, adoptMs: 200 });
+  const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 1, accountId: '1', accountName: 'Paper Trading', tClick: Date.now() });
+  assert.notEqual(r.closed, true);
+  assert.doesNotMatch(String(r.err), /se llenó y se cerró/);
+  assert.equal(marcas.filter(x => x === 'place').length, 1);
+}
+limpiar();
+{
+  const pg = fakePage(); globalThis.__cerrarYa = true; globalThis.__ask = 27727.75; globalThis.__bar = 27724.25;
+  pg.execs.push({ id: 'OLD1', symbol: 'CME_MINI:MNQ1!', side: 1, qty: 1, price: 1, time: Date.now() });
+  pg.execs.push({ id: 'OLD2', symbol: 'CME_MINI:MNQ1!', side: -1, qty: 1, price: 2, time: Date.now() });
+  const { k } = motor(pg);
+  const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 1, accountId: '1', accountName: 'Paper Trading', tClick: Date.now() });
+  assert.equal(r.closed, true);
+  assert.match(r.err, /entrada 27727\.75 salida 27726\.75/);
+  assert.doesNotMatch(r.err, /entrada 1/);
+}
+limpiar();
+{
+  const pg = fakePage(); globalThis.__rechazo = true; globalThis.__ask = 20000;
+  pg.execs.push({ id: 'OLD1', symbol: 'CME_MINI:MNQ1!', side: 1, qty: 1, price: 10, time: Date.now() });
+  pg.execs.push({ id: 'OLD2', symbol: 'CME_MINI:MNQ1!', side: -1, qty: 1, price: 9, time: Date.now() });
+  const { k, marcas } = motor(pg);
+  const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 1, accountId: '1', accountName: 'Paper Trading', tClick: Date.now() });
+  assert.match(r.err, /RECHAZADA/);
+  assert.doesNotMatch(String(r.err), /se llenó y se cerró/);
+  assert.equal(marcas.filter(x => x === 'place').length, 1);
+}
+limpiar();
+{
+  const pg = fakePage(); globalThis.__trabajando = true; globalThis.__ask = 20000;
+  const { k, marcas } = motor(pg, { fillWaitMs: 80, adoptMs: 350 });
+  const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 1, accountId: '1', accountName: 'Paper Trading', tClick: Date.now() });
+  assert.match(r.err, /sigue en el bróker/);
+  assert.doesNotMatch(String(r.err), /se llenó y se cerró/);
+  assert.equal(marcas.filter(x => x === 'place').length, 1);
+}
+limpiar();
+{
+  const pg = fakePage(); globalThis.__execThrow = true; globalThis.__muda = true; globalThis.__ask = 20000;
+  const { k, marcas } = motor(pg, { fillWaitMs: 120, adoptMs: 200 });
+  const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 1, accountId: '1', accountName: 'Paper Trading', tClick: Date.now() });
+  assert.notEqual(r.closed, true);
+  assert.match(String(r.err), /No pude leer las ejecuciones/);
+  assert.match(fs.readFileSync(logFile, 'utf8'), /No pude leer las ejecuciones: fallo-ejecuciones/);
+  assert.equal(marcas.filter(x => x === 'place').length, 1);
+}
 limpiar();
 {
   let n = 0;

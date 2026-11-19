@@ -10,6 +10,16 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.27] — 2026-11-19
+### Corregido
+- **Si la posición llega tarde, se vigila hasta un minuto y se gestiona.** Ya no se da por terminada a los 14 s con «se llenó y no aparece la posición». Si aparece dentro de ese minuto, entra al bucle de siempre. No se reenvía la orden.
+- **Una ejecución vieja o sin hora no cuenta como este trade.** Hace falta marca de tiempo, y se descartan los ids que ya existían antes de enviar. Un rechazo o una orden que sigue trabajando se mira antes de decir que se abrió y se cerró.
+- **Si no se pueden leer las ejecuciones, el registro lo dice.** No se inventa un «no se llenó» ni un cierre.
+- **El registro dice de qué precio salió el bracket** (ask, bid, último o el lado opuesto), la edad de la cotización y si hubo que recalcularlo.
+- **«Se llenó y se cerró» se muestra como aviso**, no bajo el título Bloqueado ni con el texto de las cuentas Lucid.
+### Notas
+- Después del fill, el stop se mueve como antes. La orden sigue siendo una sola.
+
 ## [0.10.26] — 2026-11-19
 ### Corregido
 - **La orden de las 9:47 ya no se da por no llenada cuando el bróker sí la llenó.** El SL y el TP de la orden a mercado salían del cierre de la vela. En Rascacielo, con 20 MNQ, el objetivo son 2.5 pts. Ese día el fill fue 27727.75 y el cierre de la vela iba unos 3.5 pts más abajo, así que el límite de venta nacía en 27726.75, ya por debajo del precio, y Tradovate lo ejecutó en el mismo segundo (−$52.50 brutos y −$20 de comisión). Profito miró 6 s si había posición abierta, no la vio y escribió «no se llenó». Ahora el bracket se calcula con el precio vivo (ask en compra, bid en venta) justo antes de enviar, en la misma orden. Si el SL o el TP quedarían dentro del precio, se recalculan y, si siguieran dentro, no se envía nada. Si la orden se abre y se cierra en esa ventana, el registro dice «se llenó y se cerró» con los precios, y no se vuelve a enviar.
