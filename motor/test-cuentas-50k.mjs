@@ -167,19 +167,21 @@ function textoEnPagina(strategy, scale) {
 }
 const plano = getStrategy('evaluacion-simple');
 const t25 = textoEnPagina(plano, 1), t50 = textoEnPagina(plano, 2);
-assert(t25.includes('SL −$630') && t25.includes('TP +$630') && !t25.includes('$1,260'), 'texto Evaluación 25K');
+assert(t25.includes('SL −$630') && t25.includes('TP +$630') && !t25.includes('$1,260') && !t25.includes('entra a mercado') && !t25.includes('Solo sube'), 'texto Evaluación 25K');
 assert(t50.includes('SL −$1,260') && t50.includes('TP +$1,260') && !t50.includes('$630'), 'texto Evaluación 50K');
 const dd = getStrategy('dos-disparos');
 const d25 = textoEnPagina(dd, 1), d50 = textoEnPagina(dd, 2);
-assert(d25.includes('SL −$300') && d25.includes('TP +$630') && d25.includes('2 intentos'), 'texto dos disparos 25K');
+assert(d25.includes('SL −$300') && d25.includes('TP +$630') && d25.includes('2 intentos') && !d25.includes('entra a mercado') && !d25.includes('Solo sube'), 'texto dos disparos 25K');
 assert(d50.includes('SL −$600') && d50.includes('TP +$1,260') && !d50.includes('$300'), 'texto dos disparos 50K');
 const beTxt = textoEnPagina(getStrategy('prueba-be'), 2);
 assert(beTxt.includes('+$30') && beTxt.includes('+3 ticks') && !beTxt.includes('+6 ticks'), 'Fast BE 50K dobla el disparo y deja los ticks');
+assert(beTxt.includes('Se mueve una sola vez.') && !beTxt.includes('entra a mercado'), 'Fast BE solo muestra el texto corto y que se mueve una vez');
 const col = textoEnPagina(getStrategy('dia-minimo-colchon'), 2);
 assert(col.includes('SL −$1,200') && col.includes('TP +$3,200') && col.includes('$200'), 'texto colchón 50K');
+assert(col.includes('Solo sube, nunca baja.') && !col.includes('entra a mercado'), 'el colchón no repite el párrafo largo');
 const propiaVista = { id: 'propia-abc123', name: 'Mía', propia: true, params: { SL_USD: 400, TP_USD: 800, STEPS: [{ trigger: 100, lock: 50 }] } };
 const p25 = textoEnPagina(propiaVista, 1), p50 = textoEnPagina(propiaVista, 2);
-assert(p25.includes('SL −$400') && p25.includes('TP +$800') && p25.includes('+$100') && !p25.includes('duplica'), 'propia 25K muestra lo guardado');
+assert(p25.includes('SL −$400') && p25.includes('TP +$800') && p25.includes('+$100') && p25.includes('Solo sube, nunca baja.') && !p25.includes('duplica') && !p25.includes('entra a mercado'), 'propia 25K muestra lo guardado');
 assert(p50.includes('SL −$800') && p50.includes('TP +$1,600') && p50.includes('+$200') && !p50.includes('duplica'), 'propia 50K muestra el doble, sin aviso');
 
 // Aunque el servidor haya mandado escala 1, un saldo de 50K reescribe el texto.

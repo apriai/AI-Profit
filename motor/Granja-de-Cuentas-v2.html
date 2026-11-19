@@ -5683,40 +5683,26 @@ function textoCuentaHtml(){
   const money=n=>{const x=Number(n);if(!Number.isFinite(x))return "—";const r=Math.round(x*100)/100;return "$"+r.toLocaleString("en-US",{maximumFractionDigits:Number.isInteger(r)?0:2})};
   const sl=money(P.SL_USD), tp=money(P.TP_USD);
   const op="Operación: SL −"+sl+" / TP +"+tp;
-  const entra="Operación: entra a mercado con SL −"+sl+" y TP +"+tp+".";
-  let short, description;
+  let short;
   const steps=Array.isArray(P.STEPS)?P.STEPS:null;
   if(steps&&steps.length&&steps.some(st=>st&&st.lockTicks!=null)){
-    const st0=steps[0], tk=st0.lockTicks, tr=money(st0.trigger), pts=Math.round(tk*25)/100;
+    const st0=steps[0], tk=st0.lockTicks, tr=money(st0.trigger);
     const nom=s.name?s.name+". ":"";
-    short=nom+op+"\n+"+tr+" → stop a entrada +"+tk+" ticks (cubre la comisión)";
-    description=nom+entra+" AI: +"+tr+" → el stop sube a la entrada +"+tk+" ticks de ganancia ("+pts+" pts), para cubrir al menos la comisión. Se mueve una sola vez.";
+    short=nom+op+"\n+"+tr+" → stop a entrada +"+tk+" ticks (cubre la comisión)\nSe mueve una sola vez.";
   }else if(steps&&steps.length){
     const bits=steps.map(st=>st.lock===0?("+"+money(st.trigger)+" → protege $0 (entrada)"):("+"+money(st.trigger)+" → protege "+money(st.lock)));
-    const bitsD=steps.map(st=>st.lock===0?("+"+money(st.trigger)+" → el stop sube a la entrada (sin pérdida)"):("+"+money(st.trigger)+" → protege "+money(st.lock)));
-    short=op+"\n"+bits.join("\n");
-    description=entra+" AI: "+bitsD.join("; ")+". Solo sube, nunca baja.";
+    short=op+"\n"+bits.join("\n")+"\nSolo sube, nunca baja.";
   }else if(P.NET_USD!=null){
     let lock=null; try{lock=lockU(sym, qty||8, P)}catch(e){}
     const net=money(P.NET_USD);
     const move=lock!=null?("+"+money(lock)+" → protege ~"+net+" netos"):("protege ~"+net+" netos");
     const nom=(s.name||"Colchón")+". ";
-    short=nom+op+"\n"+move;
-    description=nom+entra+" AI: "+move+". Solo sube, nunca baja.";
+    short=nom+op+"\n"+move+"\nSolo sube, nunca baja.";
   }else{
     short=op+"\nAI: el stop no se mueve";
-    let pref="";
-    if(s.id==="dos-disparos") pref="Dos disparos · 1:2. ";
-    description=pref+entra+" AI: el stop no se mueve; termina en TP, en SL o si la cierras tú.";
-    if(s.id==="dos-disparos"){
-      short=op+"\nAI: el stop no se mueve; hasta 2 intentos al día";
-      description+=" Hasta 2 intentos al día (el segundo lo abres tú; el motor no reentra solo).";
-    }
+    if(s.id==="dos-disparos") short=op+"\nAI: el stop no se mueve; hasta 2 intentos al día";
   }
-  const shortHtml=String(short||"").split("\n").map(esc).join("<br>");
-  const descHtml=String(description||"").split("\n").map(esc).join("<br>");
-  if(!description||description===short) return shortHtml;
-  return shortHtml+'<br><span style="opacity:.72">'+descHtml+"</span>";
+  return String(short||"").split("\n").map(esc).join("<br>");
 }
 const QS=[[5,"#3ddc84"],[8,"#ffd86b"],[11,"#ffad61"],[15,"#e565aa"],[20,"#ff2a3d"]],qHx=h=>[1,3,5].map(i=>parseInt(h.substr(i,2),16)),qCol=(e,maxE=20)=>{const S=QS.map(([v,c])=>[Math.max(1,Math.round(v*maxE/20)),c]);if(e<=S[0][0])return qHx(S[0][1]);for(let i=1;i<S.length;i++){if(e<=S[i][0]){const a=S[i-1],b=S[i],t=(e-a[0])/(b[0]-a[0]),A=qHx(a[1]),B=qHx(b[1]);return A.map((v,j)=>Math.round(v+(B[j]-v)*t))}}return qHx(S[S.length-1][1])},qRgb=c=>"rgb("+c.join(",")+")";
 /* Tinte ambiental de riesgo: --risk (0..1) sube con los contratos (>5 hasta el maximo de la cuenta). Solo mientras el selector esta visible. */
@@ -6267,7 +6253,7 @@ function hook(){const G=window.__granja&&window.__granja.pet;if(!G||!G.renderer|
  if(cfg.kind!=="perro"||cfg.body!==A.perro.b||cfg.accent!==A.perro.a){try{applyPet(G,cfg)}catch(err){console.warn("mascota",err)}}
  (function lab(){const p=window.__pet.screen();if(p&&cfg.name){tag.textContent=cfg.name;tag.style.left=p.x+"px";tag.style.top=(p.y-8)+"px";tag.style.display="block"}else tag.style.display="none";requestAnimationFrame(lab)})()}
 setTimeout(hook,600);})();</script>
-<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.31</div>
+<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.32</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/api/version",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
 <script>/* 0.7.0: Profito duerme al abrir (granja en pausa), riega con laptop durante un trade, y etiquetas de cuentas con saldo y etapa. Solo visual: no toca el motor de trading. */
 (function(){

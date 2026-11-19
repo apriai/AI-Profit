@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.32] — 2026-11-19
+### Cambiado
+- **La explicación bajo Estrategia ya no se repite.** Solo queda el texto corto. Si el stop se mueve una vez (Fast Breakeven) se añade «Se mueve una sola vez.» Si es un colchón o tiene escalones, «Solo sube, nunca baja.» Si el stop no se mueve, el texto corto queda igual. Los dólares siguen saliendo de la cuenta, 25K o 50K.
+### Notas
+- No cambia la orden ni el motor.
+
 ## [0.10.31] — 2026-11-19
 ### Corregido
 - **El resumen usa el mismo P&L que el historial.** Al cerrarse la posición se lee la ida y vuelta de las ejecuciones del bróker (hasta ~3 s si tardan). El número es el de la fila, ya con la comisión. Solo si no se puede leer se queda el P&L aproximado. El motivo sale del precio de salida: a 1 pt del stop protegido es Stop loss, a 1 pt del objetivo es Take profit.

@@ -69,6 +69,8 @@ assert.match(t25, /Evaluación con rascacielos/);
 assert.match(t25, /SL −\$630/);
 assert.match(t25, /TP \+\$630/);
 assert.match(t25, /\+\$112 → protege ~\$100 netos/);
+assert.match(t25, /Solo sube, nunca baja\./);
+assert.doesNotMatch(t25, /entra a mercado|opacity:\.72/);
 assert.match(t50, /SL −\$1,260/);
 assert.match(t50, /TP \+\$1,260/);
 assert.match(t50, /\+\$212 → protege ~\$200 netos/);
