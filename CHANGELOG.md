@@ -10,6 +10,14 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.33] — 2026-11-19
+### Corregido
+- **Si tras el objetivo no se puede releer la posición, no se da por cerrada.** Se reintenta unas veces y, si sigue fallando, la operación continúa con aviso.
+- **Una salida parcial en el objetivo dice cuánto queda:** «Salida parcial en el objetivo: quedan N».
+- **Si falta una de las dos marcas de tiempo, esa diferencia no se inventa.**
+### Notas
+- No cambia los dólares de las estrategias. No hay instalador nuevo: Josue sigue probando el de 0.10.32.
+
 ## [0.10.32] — 2026-11-19
 ### Corregido
 - **Si el objetivo solo cierra una parte, la operación sigue** con lo que queda en la cuenta.

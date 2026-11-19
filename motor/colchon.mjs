@@ -12,7 +12,7 @@ export const SIZES = { NQ: 2, MNQ: 20 }; const PT_USD = { NQ: 20, MNQ: 2 }; expo
 // Una línea de tiempos de la apertura. No toca el disco: quien llama la escribe sin esperar.
 export function lineaTiempos(m = {}) {
   const n = v => v == null || !Number.isFinite(Number(v)) ? '—' : Math.max(0, Math.round(Number(v))) + 'ms';
-  const d = (a, b) => (Number.isFinite(Number(a)) && Number.isFinite(Number(b))) ? Number(b) - Number(a) : null;
+  const d = (a, b) => (a == null || b == null || !Number.isFinite(Number(a)) || !Number.isFinite(Number(b))) ? null : Number(b) - Number(a);
   const num = v => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; };
   const clic = num(m.clic), llegada = num(m.llegada), enviado = num(m.enviado) || clic;
   const verif = d(llegada, m.llamada1Inicio);
@@ -575,14 +575,24 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
         }
         const pnl = salida != null && pos.entry != null ? Math.round((salida - pos.entry) * s * (PT_USD[symbol] || 0) * (qtyCerrada || Math.min(pos.qty, qty)) * 100) / 100 : null;
         if (salida != null) {
-          const queda = await estado(symbol, orderId, pos.id);
-          const resto = queda.pos && queda.pos.side === side ? queda.pos.qty : 0;
-          if (!(resto > 0)) {
-            last.open = { tpHit: true, ref: pos.entry, tp: plan.tp, price: pos.price, salida, salidaReal: pnl, qty: qtyCerrada || Math.min(pos.qty, qty), orderId, pedirSaldo: true, alerta: null };
-            return `ok market ${qtyCerrada || Math.min(pos.qty, qty)} @${pos.entry} objetivo ya pasado: el límite ligado salió a ${salida}`;
+          let queda = null;
+          for (let i = 0; i < 3; i++) {
+            if (i) await sleep(120);
+            const leo = await estado(symbol, orderId, pos.id);
+            if (leo && !leo.err) { queda = leo; break; }
           }
-          st = queda;
-          pos = queda.pos;
+          if (!queda) {
+            tpFallo = 'Salida en el objetivo, pero no pude releer la posición. Se sigue como abierta.';
+          } else {
+            const resto = queda.pos && queda.pos.side === side ? queda.pos.qty : 0;
+            if (!(resto > 0)) {
+              last.open = { tpHit: true, ref: pos.entry, tp: plan.tp, price: pos.price, salida, salidaReal: pnl, qty: qtyCerrada || Math.min(pos.qty, qty), orderId, pedirSaldo: true, alerta: null };
+              return `ok market ${qtyCerrada || Math.min(pos.qty, qty)} @${pos.entry} objetivo ya pasado: el límite ligado salió a ${salida}`;
+            }
+            st = queda;
+            pos = queda.pos;
+            tpFallo = `Salida parcial en el objetivo: quedan ${resto}`;
+          }
         } else {
           const movio = !!(mov && (mov.ok || mov.ya || mov.verified != null));
           tpFallo = movio
@@ -604,8 +614,8 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
         ? 'HAY MÁS DE UN STOP ligado a esta posición. No se manda otro. Revisa TradingView.'
         : !visto.ok
           ? 'NO VEO EL STOP de esta operación. Se sigue intentando. No se toca ninguna otra orden.'
-          : parcial ? `Llenado parcial: hay ${pos.qty} de ${qty}. El bracket de la orden sigue. No se manda otra orden.` : (dudoso ? 'La orden tardó en confirmarse. La posición se adoptó con el bracket que ya traía.' : null);
-      const alerta = ((res && res.corte) ? 'La llamada se cortó. No se reenvía la orden. Se adopta la posición que apareció. ' : '') + (tpFallo ? tpFallo + ' ' : '') + (baseAlerta || '');
+          : parcial && !(tpFallo && /^Salida parcial en el objetivo: quedan /.test(tpFallo)) ? `Llenado parcial: hay ${pos.qty} de ${qty}. El bracket de la orden sigue. No se manda otra orden.` : (dudoso ? 'La orden tardó en confirmarse. La posición se adoptó con el bracket que ya traía.' : null);
+      const alerta = [res && res.corte ? 'La llamada se cortó. No se reenvía la orden. Se adopta la posición que apareció.' : '', tpFallo || '', baseAlerta || ''].filter(Boolean).join(' ');
       last.open = {
         ref: pos.entry, sl: plan ? plan.sl : (res && res.sl), tp: plan ? plan.tpPlace : (res && res.tp),
         orderId: orderId || null, posId: pos.id, slObjetivo: plan ? plan.sl : (res && res.sl), slOk: visto.ok && !visto.doble,

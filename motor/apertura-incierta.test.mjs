@@ -10,7 +10,7 @@ process.env.COLCHON_DUDA_MS = '700';
 function pagina(opts = {}) {
   const book = opts.book || { front: 'MNQZ2026', bid: (opts.live ?? 27727.75) - 0.25, ask: opts.live ?? 27727.75, live: opts.live ?? 27727.75, chart: opts.chart ?? 27720 };
   if (!book.account) book.account = '1';
-  let px = book.live, nid = 1, lecturas = 0;
+  let px = book.live, nid = 1, lecturas = 0, falloTrasSalida = 0;
   const positions = opts.positions || [], orders = [], hist = [], execs = [], placed = [], closes = [], reduces = [];
   const ab = {
     _brokerMetainfo: { id: opts.broker || 'paper', title: 'Paper Trading' },
@@ -25,6 +25,7 @@ function pagina(opts = {}) {
     },
     async positions() {
       lecturas++;
+      if (falloTrasSalida > 0) { falloTrasSalida--; throw new Error('relectura'); }
       if (opts.throwAlways || (opts.throwN && lecturas <= opts.throwN)) throw new Error('tv ocupado');
       if (opts.revealAt && lecturas < opts.revealAt) return [];
       return positions.filter(p => p && Number(p.qty) !== 0).map(p => ({ ...p, lastPrice: opts.noLast ? null : px }));
@@ -99,6 +100,7 @@ function pagina(opts = {}) {
         if (cruza) {
           let q = Math.min(Math.abs(Number(x.qty) || p.qty), Math.abs(Number(p.qty)));
           if (Number(opts.leaveQty) > 0 && p.qty > Number(opts.leaveQty)) q = p.qty - Number(opts.leaveQty);
+          if (opts.falloRelectura) falloTrasSalida = 40;
           execs.push({ id: x.id + 'f', orderId: x.id, parentId: x.parentId, symbol: p.symbol, side: x.side, qty: q, price: px, time: Date.now() });
           hist.push({ id: x.id, parentId: x.parentId, symbol: p.symbol, type: 1, side: x.side, qty: q, status: 2, limitPrice: x.limitPrice });
           p.qty -= q;
@@ -138,7 +140,9 @@ const dormir = ms => new Promise(r => setTimeout(r, ms));
   ok(info.linea === 'TIEMPOS: clic->servidor 12ms, verificaciones 80ms, llamada1 140ms, placeOrder 90ms, confirmado 210ms, total 532ms', info.linea);
   ok(info.total === 532 && info.detalle.startsWith('TIEMPOS detalle:'), 'el detalle no sustituye a la línea');
   const sinClic = lineaTiempos({ clic: null, llegada: 5000, fin: 5500 });
-  ok(sinClic.total === 500, 'sin clic el total sale de la llegada al servidor (' + sinClic.total + ')'); }
+  ok(sinClic.total === 500, 'sin clic el total sale de la llegada al servidor (' + sinClic.total + ')');
+  const hueco = lineaTiempos({ clic: 1000, llegada: null, llamada1Inicio: 2000, fin: 2000 });
+  ok(hueco.linea.includes('verificaciones —'), 'si falta un extremo, la diferencia es nula (' + hueco.linea + ')'); }
 const htmlGran = fs.readFileSync(new URL('./Granja-de-Cuentas-v2.html', import.meta.url), 'utf8');
 ok(!htmlGran.includes('Poner stop') && !htmlGran.includes('alarmaStop') && !htmlGran.includes('poner-stop'), 'no hay alarma ni botón de poner stop');
 ok(htmlGran.includes('if(!accId){setPhase("blocked","Elige una cuenta");return}') && !htmlGran.includes('accId||(activa'), 'sin cuenta elegida no se opera la cuenta activa de TradingView');
@@ -363,7 +367,14 @@ ok(objetivo.tpReached && objetivo.sl == null, 'si el precio ya pasó el objetivo
   const pg = pagina({ book, fillPx: 27727.75, leaveQty: 8 });
   const k = createColchon(apiDriver(pg.evaluate), { pollMs: 40, logFile: '/tmp/apertura-parcial.log', ignoreClock: true, flatConfirm: { reads: 3, ms: 1000 }, noTicks: true });
   const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 20, strategyId: 'rascacielo' });
-  ok(r.ok && !r.closed && k.status().state === 'running' && pg.positions[0] && pg.positions[0].qty === 8 && pg.orders.some(o => o.type === 3), 'si el objetivo solo cierra una parte, la operación sigue (' + (r.err || k.status().state) + ')');
+  ok(r.ok && !r.closed && k.status().state === 'running' && pg.positions[0] && pg.positions[0].qty === 8 && pg.orders.some(o => o.type === 3) && /Salida parcial en el objetivo: quedan 8/.test(String(k.status().alerta)), 'si el objetivo solo cierra una parte, la operación sigue (' + k.status().alerta + ')');
+  await k.stop({ flatten: false }); }
+
+{ const book = { front: 'MNQZ2026', bid: 27739.75, ask: 27740, live: 27740, chart: 27720 };
+  const pg = pagina({ book, fillPx: 27727.75, falloRelectura: true });
+  const k = createColchon(apiDriver(pg.evaluate), { pollMs: 40, logFile: '/tmp/apertura-relectura.log', ignoreClock: true, flatConfirm: { reads: 3, ms: 5000 }, noTicks: true });
+  const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 20, strategyId: 'rascacielo' });
+  ok(!r.closed && k.status().state === 'running' && /no pude releer la posición/.test(String(k.status().alerta || r.alerta)), 'si la relectura falla, no se da por cerrada (' + (k.status().alerta || r.err) + ')');
   await k.stop({ flatten: false }); }
 
 { const pg = pagina({ rejectForeign: true });
