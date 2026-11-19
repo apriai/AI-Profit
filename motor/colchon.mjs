@@ -9,6 +9,11 @@ import { dataDir, TV_CLI, TV_PKG } from './rutas.mjs';
 const DIR = dataDir();
 export const CFG = { SL_USD: 600, TP_USD: 1600, NET_USD: 100, SLIP_TICKS: 1, TRIGGER_EXTRA_USD: 15, POLL_MS: 500 };
 export const SIZES = { NQ: 2, MNQ: 20 }; const PT_USD = { NQ: 20, MNQ: 2 }; export const TICK = 0.25;
+// Holgura mínima: ni el stop ni el objetivo pueden quedar a menos de 2 ticks del lado del libro que los dispararía.
+export const HOLGURA_TICKS = 2;
+// Si el objetivo de la estrategia es corto (Rascacielo son 2,5 pts), el límite de entrada queda al menos
+// 8 ticks (2,00 pts) más allá del lado contrario del libro, para que un deslizamiento normal no lo cruce al entrar.
+export const TP_FRENTE_TICKS = 8;
 export const ptsFor = (usd, symbol, qty) => Math.round(usd / (PT_USD[symbol] * qty) / TICK) * TICK;
 export const DEFAULT = { symbol: 'MNQ', qty: 20 }; // SIZES = tope 25K; 50K y la fondeada usan maxQtyFor (hasta 40 MNQ / 4 NQ). $/tick: MNQ 0.50, NQ 5
 // colchón en puntos: nunca a menos de 1 tick del punto de disparo (+$160)
@@ -64,7 +69,8 @@ export function planAlAbrir({ side, entry, price, steps, slPts, tpPts, usdPerPoi
   const pnl = Number(usdPerPoint) > 0 ? Math.round((px - en) * s * Number(usdPerPoint) * 100) / 100 : null;
   const tpReached = Number.isFinite(tp) && (s === 1 ? px >= tp - 1e-9 : px <= tp + 1e-9);
   const list = Array.isArray(steps) ? steps : [];
-  const safe = lock => s === 1 ? lock < px - 1e-9 : lock > px + 1e-9;
+  const hol = HOLGURA_TICKS * TICK;
+  const safe = lock => s === 1 ? lock <= px - hol + 1e-9 : lock >= px + hol - 1e-9;
   let chosen = null;
   if (pnl != null && !tpReached) {
     for (let k = list.length - 1; k >= 0; k--) {
@@ -85,6 +91,25 @@ export function planAlAbrir({ side, entry, price, steps, slPts, tpPts, usdPerPoi
     nextStep: chosen ? chosen.index + 1 : 0,
     locked: !!(chosen && chosen.index + 1 >= list.length),
   };
+}
+// Precios del bracket que viaja CON la orden a mercado. Referencia: ask si es compra, bid si es venta.
+export function bracketEntrada({ side, bid, ask, slPts, tpPts }) {
+  const s = side === 'short' || side === -1 ? -1 : 1;
+  const b = Number(bid), a = Number(ask);
+  if (!Number.isFinite(b) || !Number.isFinite(a) || !(a >= b) || !(b > 0)) return { ok: false, error: 'sin bid/ask' };
+  const hol = HOLGURA_TICKS * TICK, frente = TP_FRENTE_TICKS * TICK;
+  if (s === 1) {
+    const sl = roundTick(a - slPts);
+    if (!(sl <= b - hol + 1e-9)) return { ok: false, error: 'el stop quedaría del lado malo del bid' };
+    const tp = roundTick(Math.max(a + tpPts, b + frente, a + hol));
+    if (!(tp >= a + hol - 1e-9)) return { ok: false, error: 'el objetivo quedaría del lado malo del ask' };
+    return { ok: true, sl, tp, ref: a };
+  }
+  const sl = roundTick(b + slPts);
+  if (!(sl >= a + hol - 1e-9)) return { ok: false, error: 'el stop quedaría del lado malo del ask' };
+  const tp = roundTick(Math.min(b - tpPts, a - frente, b - hol));
+  if (!(tp <= b - hol + 1e-9)) return { ok: false, error: 'el objetivo quedaría del lado malo del bid' };
+  return { ok: true, sl, tp, ref: b };
 }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -177,7 +202,7 @@ async function tvPos(ab,root){var l=[];tvPos.lastErr=null;try{l=await ab.positio
 async function tvAllOrders(t,ab){var l=[];try{l=(tvWv(t._ordersService.activeOrders())||[]).slice()}catch(e){}try{(await ab.orders()||[]).forEach(function(o){if(o&&!l.some(function(x){return x&&String(x.id)===String(o.id)}))l.push(o)})}catch(e){}return l}
 function tvStopOrder(t,pos,extra){var l=[];try{l=(tvWv(t&&t._ordersService&&t._ordersService.activeOrders())||[]).slice()}catch(e){}(extra||[]).forEach(function(o){if(o&&!l.some(function(x){return x&&String(x.id)===String(o.id)}))l.push(o)});
  var sc=function(o){return (pos&&Math.abs(Number(o.qty))===Math.abs(Number(pos.qty))?2:0)+(o.parentId!=null?1:0)};
- var c=l.filter(function(o){return o&&(o.type===3||o.type===4)&&(o.status===6||o.status===4)&&(!pos||(tvRoot(o.symbol)===tvRoot(pos.symbol)&&o.side===-pos.side))});c.sort(function(a,b){return sc(b)-sc(a)});return c[0]||null}
+ var c=l.filter(function(o){return o&&(o.type===3||o.type===4)&&(o.status===6||o.status===4)&&o.parentId!=null&&(!pos||(tvRoot(o.symbol)===tvRoot(pos.symbol)&&o.side===-pos.side))});c.sort(function(a,b){return sc(b)-sc(a)});return c[0]||null}
 function tvNoPosBrackets(ab){try{var f=ab._brokerMetainfo&&ab._brokerMetainfo.configFlags;if(f&&f.supportPositionBrackets===false)return true}catch(e){}try{var m=ab.accountMetainfo&&ab.accountMetainfo();m=tvWv(m);if(m&&m.config&&m.config.supportPositionBrackets===false)return true}catch(e){}return false}
 function tvChartPx(){try{return window.TradingViewApi._activeChartWidgetWV.value()._chartWidget.model().mainSeries().bars().last().value[4]}catch(e){return null}}
 `;
@@ -219,6 +244,54 @@ export const js = {
     return {ok:v===PX,verified:v,ret:r===undefined?'undefined':r,err:er,sendMs:Math.round(T1-T0),confirmMs:Math.round(performance.now()-T1)}})()`,
   lastPrice: `(function(){try{var ms=window.TradingViewApi._activeChartWidgetWV.value()._chartWidget.model().mainSeries();var b=ms.bars().last();var fr=null;try{var si=ms.symbolInfo&&ms.symbolInfo();fr=si&&si.front_contract||null}catch(e){}return {symbol:ms.symbol(),price:b.value[4],front:fr}}catch(e){return {error:e.message}}})()`,
   place: o => `(async function(){${PAGE}var ab=tvBroker(tvTrading());if(!tvBrokerId(ab))return {error:'No active broker'};var r=await ab.placeOrder(${JSON.stringify(o)});return {ok:r!==false,orderId:r&&(r.orderId||r.id)||null}})()`,
+  // Una sola llamada: lee la posición, el bid/ask y el contrato, y solo entonces manda la orden CON el bracket.
+  // Si la lectura falla o ya hay posición en ese símbolo, no envía nada. El script lleva placeOrder: no se reintenta.
+  abrir: (root, side, qty, slPts, tpPts, front) => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t);if(!tvBrokerId(ab))return {sent:false,error:'No active broker'};
+    var R=${JSON.stringify(root)},SIDE=${Number(side)},QTY=${Number(qty)},SLP=${Number(slPts)},TPP=${Number(tpPts)},FRENTE_GUARDADO=${JSON.stringify(front || null)};
+    var HOL=${HOLGURA_TICKS},FRENTE=${TP_FRENTE_TICKS},TICK=0.25,rnd=function(x){return Math.round(x/TICK)*TICK};
+    var pos;try{pos=await tvPos(ab,R)}catch(e){return {sent:false,error:'lectura'}}
+    if(tvPos.lastErr)return {sent:false,error:'no pude leer la posición. No se cierra nada y no se envía la orden',detail:tvPos.lastErr};
+    if(pos)return {sent:false,error:'ya hay posicion',side:pos.side===1?'long':'short',qty:Math.abs(Number(pos.qty))};
+    var ms,q=null,fr=null,symChart=null;try{ms=window.TradingViewApi._activeChartWidgetWV.value()._chartWidget.model().mainSeries();symChart=ms.symbol();q=ms.quotes&&ms.quotes();var si=ms.symbolInfo&&ms.symbolInfo();fr=si&&si.front_contract||null}catch(e){return {sent:false,error:'sin grafico'}}
+    if(tvRoot(symChart)!==R)return {sent:false,error:'el chart está en '+symChart};
+    var bid=q&&Number(q.bid),ask=q&&Number(q.ask);
+    if(!isFinite(bid)||!isFinite(ask)||ask<bid||bid<=0)return {sent:false,error:'sin bid/ask'};
+    var sl,tp,ref;if(SIDE===1){sl=rnd(ask-SLP);tp=rnd(Math.max(ask+TPP,bid+FRENTE*TICK,ask+HOL*TICK));ref=ask;if(!(sl<=bid-HOL*TICK+1e-9))return {sent:false,error:'el stop quedaría del lado malo del bid',bid:bid,ask:ask};if(!(tp>=ask+HOL*TICK-1e-9))return {sent:false,error:'el objetivo quedaría del lado malo del ask',bid:bid,ask:ask}}
+    else{sl=rnd(bid+SLP);tp=rnd(Math.min(bid-TPP,ask-FRENTE*TICK,bid-HOL*TICK));ref=bid;if(!(sl>=ask+HOL*TICK-1e-9))return {sent:false,error:'el stop quedaría del lado malo del ask',bid:bid,ask:ask};if(!(tp<=bid-HOL*TICK+1e-9))return {sent:false,error:'el objetivo quedaría del lado malo del bid',bid:bid,ask:ask}}
+    var idBroker=tvBrokerId(ab),base=symChart.indexOf(':')>=0?symChart.replace(/[^:]*$/,''):'';
+    // El guardado solo se acepta si el chart, leído en ESTA llamada, trae el mismo contrato. Si rodó o no coincide, manda el chart.
+    var frente=fr||null,rollover=!!(FRENTE_GUARDADO&&frente&&String(FRENTE_GUARDADO)!==String(frente));
+    if(!frente){frente=null}
+    var dt=frente?base+String(frente).replace(/^.*:/,''):null,lista=[symChart];
+    if(dt&&/\\d!$/.test(symChart))lista=String(idBroker).toLowerCase()==='paper'?[symChart,dt]:[dt,symChart];
+    var sym=null;if(typeof ab.symbolInfo==='function'){for(var i=0;i<lista.length&&!sym;i++){try{var inf=await Promise.race([ab.symbolInfo(lista[i]),new Promise(function(z){setTimeout(function(){z(null)},5000)})]);if(inf)sym=lista[i]}catch(e){}}}
+    else sym=symChart;
+    if(!sym)return {sent:false,error:'sin simbolo',front:fr||null,rollover:rollover};
+    var r;try{r=await ab.placeOrder({symbol:sym,side:SIDE,type:2,qty:QTY,stopLoss:sl,takeProfit:tp})}catch(e){return {sent:true,dudoso:true,error:String(e&&e.message||e),sl:sl,tp:tp,bid:bid,ask:ask,front:fr||null,rollover:rollover}}
+    if(r===false)return {sent:false,error:'el bróker no aceptó la orden',sl:sl,tp:tp,bid:bid,ask:ask,front:fr||null,rollover:rollover};
+    return {sent:true,orderId:r&&(r.orderId||r.id)?String(r.orderId||r.id):null,sl:sl,tp:tp,ref:ref,bid:bid,ask:ask,symbol:sym,front:fr||null,rollover:rollover}})()`,
+  // Posición de ESTE símbolo y solo las órdenes cuyo parentId es esta posición o esta orden de entrada.
+  estado: (root, orderId, posId) => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t),R=${JSON.stringify(root)},OID=${JSON.stringify(orderId || '')},PID=${JSON.stringify(posId || '')};
+    var pos=null,err=null;try{pos=await tvPos(ab,R)}catch(e){err=String(e&&e.message||e)}
+    if(tvPos.lastErr)err=tvPos.lastErr;
+    var kids=[];try{kids=await tvAllOrders(t,ab)}catch(e){}
+    var liga=function(o){if(!o)return false;var p=o.parentId!=null?String(o.parentId):'';return (OID&&(String(o.id)===OID||p===OID))||(PID&&p===PID)||(pos&&p===String(pos.id))};
+    var map=function(o){return {id:String(o.id),parentId:o.parentId!=null?String(o.parentId):null,type:o.type,side:o.side,qty:Math.abs(Number(o.qty)||0),status:o.status,stopPrice:o.stopPrice!=null?o.stopPrice:null,limitPrice:o.limitPrice!=null?o.limitPrice:null}};
+    var ordenes=kids.filter(liga).map(map);
+    var h=[];try{h=(await ab.ordersHistory())||[]}catch(e){}
+    var ex=[];try{if(typeof ab.allExecutions==='function')ex=(await ab.allExecutions())||[]}catch(e){}
+    var hist=h.filter(function(o){return o&&(String(o.id)===OID||(o.parentId!=null&&String(o.parentId)===OID))}).map(map);
+    var mercado=h.filter(function(o){return o&&Number(o.type)===2&&tvRoot(o.symbol)===R}).map(map);
+    var execs=ex.filter(function(x){return x&&tvRoot(x.symbol)===R&&(String(x.orderId||x.id)===OID||(x.parentId!=null&&String(x.parentId)===OID)||hist.some(function(o){return String(o.id)===String(x.orderId||'')}))}).map(function(x){return {id:String(x.id),orderId:x.orderId!=null?String(x.orderId):null,side:+x.side,qty:Math.abs(+x.qty),price:+x.price,time:+x.time}});
+    return {err:err,pos:pos?{id:String(pos.id),side:pos.side===1?'long':'short',qty:Math.abs(Number(pos.qty)||0),entry:pos.avgPrice,price:pos.lastPrice!=null?pos.lastPrice:null}:null,ordenes:ordenes,hist:hist,execs:execs,mercado:mercado}})()`,
+  cerrarQty: (root, side, qty) => `(async function(){${PAGE}var ab=tvBroker(tvTrading());if(!tvBrokerId(ab))return {error:'No active broker'};
+    var R=${JSON.stringify(root)},SIDE=${Number(side)},QTY=${Number(qty)};
+    var pos;try{pos=await tvPos(ab,R)}catch(e){return {error:'lectura'}}
+    if(!pos)return {error:'sin posicion',flat:true};
+    var q=Math.min(QTY,Math.abs(Number(pos.qty)||0));if(!(q>0))return {error:'cantidad'};
+    var r;try{r=await ab.placeOrder({symbol:pos.symbol,side:-SIDE,type:2,qty:q})}catch(e){return {error:String(e&&e.message||e),qty:q}}
+    if(r===false)return {error:'no aceptado',qty:q};
+    return {ok:true,orderId:r&&(r.orderId||r.id)?String(r.orderId||r.id):null,qty:q}})()`,
   // Espera el fill. Una posición que nace y muere en la ventana, o una lectura que falla, no es "no se llenó".
   // status 2 = llena, 5 = rechazada, 6 = trabajando. No cierra nada.
   fill: (root, side, qty, tradeSymbol, waitMs = 6000) => `(async function(){${PAGE}var ab=tvBroker(tvTrading()),R=${JSON.stringify(root)},SIDE=${Number(side)},QTY=${Number(qty)},SYM=${JSON.stringify(tradeSymbol || '')},WAIT=${Number(waitMs) > 0 ? Number(waitMs) : 6000};
@@ -249,10 +322,9 @@ export const js = {
     if(!noPB&&typeof ab.editPositionBrackets==='function'){try{var r1=await ab.editPositionBrackets(String(p.id),b);if(r1!==false)via='editPositionBrackets';else err='edit false'}catch(e){err=String(e&&e.message||e)}}
     var kids=[];try{kids=await tvAllOrders(t,ab)}catch(e){}
     var has=function(tp){return kids.some(function(o){return o&&o.type===tp&&(o.status===6||o.status===4)&&o.side===-s&&tvRoot(o.symbol)===R})};
-    var sym=p.symbol,q=Math.abs(Number(p.qty));
-    if(sl!=null&&!has(3)&&!has(4)){try{var rs=await ab.placeOrder({symbol:sym,side:-s,type:3,qty:q,stopPrice:sl,parentId:String(p.id),parentType:2});if(rs===false)err=(err?err+'; ':'')+'stop no aceptado';else via=via||'placeOrder'}catch(e){err=String(e&&e.message||e)}}
-    if(tp!=null&&!has(1)){try{var rt=await ab.placeOrder({symbol:sym,side:-s,type:1,qty:q,limitPrice:tp,parentId:String(p.id),parentType:2});if(rt===false)err=(err?err+'; ':'')+'objetivo no aceptado';else via=via||'placeOrder'}catch(e){err=String(e&&e.message||e)}}
-    return {ok:!!via,via:via,sl:sl,tp:tp,entry:entry,error:err}})()`,
+    if(sl!=null&&!has(3)&&!has(4))err=(err?err+'; ':'')+'sin stop ligado: no se crea una orden suelta';
+    if(tp!=null&&!has(1))err=(err?err+'; ':'')+'sin objetivo ligado: no se crea una orden suelta';
+    return {ok:!!via&&(sl==null||has(3)||has(4))&&(tp==null||has(1)),via:via,sl:sl,tp:tp,entry:entry,error:err}})()`,
   accountId: `(function(){${PAGE}var ab=tvBroker(tvTrading());try{return String(tvWv(ab.currentAccount()))}catch(e){return null}})()`,
   modify: (root, price, waitMs = 3000) => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t);if(!tvBrokerId(ab))return {error:'No active broker'};var R=${JSON.stringify(root)},PX=${Number(price)};var p=await tvPos(ab,R);if(!p)return {error:'sin posicion'};
     // Paper: editPositionBrackets (reenviando el TP). Tradovate (supportPositionBrackets:false): modifyOrder sobre la orden stop hija, con tope de 3 s. Siempre la MISMA orden; nunca cancela ni recrea.
@@ -273,7 +345,7 @@ export const js = {
     return tries.length?{ok:false,error:'no verificado: '+JSON.stringify(tries),tries:tries}:{error:'no-stop-found'}})()`,
   // TP tras el fill: MISMA orden límite hija (type 1). Paper: editPositionBrackets reenviando el SL actual. Tradovate: modifyOrder limitPrice (tope 3 s). Nunca cancela ni recrea.
   modifyTp: (root, price, waitMs = 3000) => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t);if(!tvBrokerId(ab))return {error:'No active broker'};var R=${JSON.stringify(root)},PX=${Number(price)};var p=await tvPos(ab,R);if(!p)return {error:'sin posicion'};
-    var findTp=async function(p2){var l=[];try{l=(await tvAllOrders(t,ab))||[]}catch(e){}return l.find(function(o){return o&&o.type===1&&(o.status===6||o.status===4)&&o.side===-p2.side&&tvRoot(o.symbol)===tvRoot(p2.symbol)})};
+    var findTp=async function(p2){var l=[];try{l=(await tvAllOrders(t,ab))||[]}catch(e){}return l.find(function(o){return o&&o.type===1&&(o.status===6||o.status===4)&&o.parentId!=null&&o.side===-p2.side&&tvRoot(o.symbol)===tvRoot(p2.symbol)})};
     var lo=await findTp(p),cur=lo&&lo.limitPrice!=null?lo.limitPrice:(p.takeProfit!=null?p.takeProfit:null),tries=[],T0=performance.now();
     if(cur===PX)return {ok:true,ya:true,verified:PX,orderId:lo?String(lo.id):null,tries:[]};
     var readTp=async function(){var p2=await tvPos(ab,R);if(!p2)return null;var o2=await findTp(p2);return o2&&o2.limitPrice!=null?o2.limitPrice:(p2.takeProfit!=null?p2.takeProfit:null)};
@@ -299,6 +371,11 @@ export const TICK_JS = root => `(function(){${PAGE}if(window.__colchonTickU){try
   window.__colchonTickU=function(){U.forEach(function(u){try{u()}catch(e){}});window.__colchonTickU=null};return {ok:true,fuentes:src}})()`;
 // escrituras: se evalúan UNA sola vez (nunca se reintentan)
 export const WRITE = /placeOrder|modifyOrder|editPositionBrackets|closePosition|cancelOrder|createEditOrderContext|setCurrentAccount/;
+// Un script con placeOrder (o cualquier escritura) no se reintenta jamás: ni por desconexión ni por tiempo agotado.
+export function reintentaEvaluate(expr, err) {
+  if (WRITE.test(String(expr || ''))) return false;
+  return /disconnect|closed|WebSocket|ECONN|not open/i.test(String(err && err.message || err));
+}
 // Conexión CDP persistente (chrome-remote-interface, dependencia de tradingview-mcp). Inyectable para tests.
 export async function cdpEvaluator(port = 9222) {
   const { createRequire } = await import('node:module');
@@ -310,14 +387,22 @@ export async function cdpEvaluator(port = 9222) {
   const connect = async () => { client = await CDP({ port, target: tgt.id }); await client.Runtime.enable(); client.on('disconnect', () => { client = null; });
     client.on('Runtime.bindingCalled', m => { if (m.name === '__colchonTick' && onTick) { try { onTick(JSON.parse(m.payload)); } catch {} } }); };
   const once = async expr => { if (!client) await connect(); const r = await client.Runtime.evaluate({ expression: expr, awaitPromise: true, returnByValue: true, timeout: 5000 }); if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text); return r.result.value; };
-  const evaluate = async expr => { try { return await once(expr); } catch (e) { if (WRITE.test(expr) || !/disconnect|closed|WebSocket|ECONN|not open/i.test(String(e.message))) throw e; client = null; return once(expr); } };
+  const evaluate = async expr => { try { return await once(expr); } catch (e) { if (!reintentaEvaluate(expr, e)) throw e; client = null; return once(expr); } };
   const ticker = { async start(root, fn) { onTick = fn; if (!client) await connect(); try { await client.Runtime.addBinding({ name: '__colchonTick' }); } catch {} return once(TICK_JS(root)); },
     async stop() { onTick = null; try { if (client) await once('(function(){if(window.__colchonTickU)window.__colchonTickU();return true})()'); } catch {} } };
   return { evaluate, ticker, close: () => client && client.close() };
 }
 
 export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
-  const last = { pos: null }; const rereadMs = o.rereadMs ?? 800, uiWaitMs = o.uiWaitMs ?? 3000, apiWaitMs = o.apiWaitMs ?? 3000;
+  const last = { pos: null, open: null }; const rereadMs = o.rereadMs ?? 800, uiWaitMs = o.uiWaitMs ?? 3000, apiWaitMs = o.apiWaitMs ?? 3000;
+  let frenteCache = { symbol: null, front: null, at: 0 };
+  const estado = async (symbol, orderId, posId) => { try { return await evaluate(js.estado(symbol, orderId || '', posId || '')); } catch (e) { return { err: String(e.message || e), pos: null, ordenes: [], hist: [], execs: [] }; } };
+  const stopLigado = (st, side) => {
+    const hol = HOLGURA_TICKS * TICK, px = st && st.pos && st.pos.price != null ? st.pos.price : null;
+    const stops = ((st && st.ordenes) || []).filter(x => x.type === 3 && x.stopPrice != null);
+    const bueno = px == null ? [] : stops.filter(x => side === 'long' ? x.stopPrice <= px - hol + 1e-9 : x.stopPrice >= px + hol - 1e-9);
+    return { stops, ok: stops.length === 1 && bueno.length === 1, doble: stops.length > 1 };
+  };
   return {
     kind: 'api', ticker, lastOpen: () => last.open || null,
     async working(symbol) { const r = await evaluate(js.working(symbol)); if (!r || r.error) throw new Error((r && r.error) || 'working'); return r.orders; },
@@ -329,67 +414,115 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
     async stop() { return last.pos ? last.pos.stop : null; },
     async lastPrice() { try { const r = await evaluate(js.lastPrice); return r && typeof r.price === 'number' ? r.price : null; } catch { return null; } },
     async openBracket({ side, symbol, qty, slPts, tpPts, steps }) {
-      let lp = await evaluate(js.lastPrice); if (lp.error) return 'error: ' + lp.error;
-      const cs = String(lp.symbol).replace(/^.*:/, ''), chartRoot = /^MNQ/.test(cs) ? 'MNQ' : /^NQ/.test(cs) ? 'NQ' : cs;
-      if (chartRoot !== symbol) return `error: el chart está en ${lp.symbol}; pon ${symbol}1! en el chart`;
-      // Tradovate exige contrato fechado; si el chart aún no trae front_contract, reintentar unos segundos
-      if (!lp.front && /\d!$/.test(String(lp.symbol || ''))) {
-        for (let i = 0; i < 8 && !lp.front; i++) {
-          await new Promise(z => setTimeout(z, 250));
-          const again = await evaluate(js.lastPrice);
-          if (again && !again.error) lp = again;
+      last.open = null;
+      const s = side === 'long' ? 1 : -1;
+      const front = frenteCache.symbol === symbol && Date.now() - frenteCache.at < 5 * 60 * 1000 ? frenteCache.front : null;
+      let res;
+      try { res = await evaluate(js.abrir(symbol, s, qty, slPts, tpPts, front)); }
+      catch (e) { res = { dudoso: true, corte: true, error: String(e.message || e) }; }
+      if (res && res.front) frenteCache = { symbol, front: res.front, at: Date.now() };
+      if (res && res.sent === false) return 'error: ' + (res.error || 'no enviada');
+      let orderId = res && res.orderId ? String(res.orderId) : '';
+      const enviada = !!(res && (res.sent || res.corte));
+      const dudoso = !!(res && (res.dudoso || res.corte)) || !orderId;
+      const dudaMs = Number(process.env.COLCHON_DUDA_MS) > 0 ? Number(process.env.COLCHON_DUDA_MS) : 45000;
+      const espera = dudoso ? dudaMs : (Number(process.env.COLCHON_FILL_MS) > 0 ? Number(process.env.COLCHON_FILL_MS) : 6000);
+      const paso = dudoso ? 400 : 150;
+      const t0 = Date.now();
+      let st = null, vio = false;
+        const salidaDeEsta = x => {
+        const hist = (x && x.hist) || [], execs = (x && x.execs) || [];
+        const hijos = hist.filter(o => orderId && String(o.parentId) === orderId);
+        const ids = new Set(hijos.map(o => String(o.id)));
+        return execs.find(e => e.side === -s && e.orderId && ids.has(String(e.orderId))) || null;
+      };
+      while (Date.now() - t0 < espera) {
+        st = await estado(symbol, orderId, null);
+        if (res && res.corte && !orderId && Array.isArray(st.mercado)) {
+          const cands = st.mercado.filter(o => Number(o.status) === 2 && Number(o.side) === s);
+          if (cands.length === 1) orderId = String(cands[0].id);
+        }
+        const q = st.pos ? st.pos.qty : 0;
+        if (st.pos && st.pos.side !== side) {
+          last.open = { dudoso: true, pedirSaldo: true, alerta: 'Apareció una posición del otro lado. No se toca. Revisa TradingView.' };
+          return 'error: ' + last.open.alerta;
+        }
+        if (q >= qty) { vio = true; break; }
+        if (q > 0 && Date.now() - t0 >= 3000) { vio = true; break; }
+        const rechazada = orderId && (st.hist || []).some(o => String(o.id) === orderId && Number(o.status) === 5);
+        if (rechazada && !q) return 'error: la orden no se llenó (RECHAZADA por TradingView)';
+        if (!q && orderId && salidaDeEsta(st) && Date.now() - t0 >= 2500) {
+          last.open = { yaPlana: true, orderId, pedirSaldo: true };
+          return 'error: la orden sí se llenó y ya no hay posición (salida de esta orden). No se envió ninguna orden de cierre.';
+        }
+        await sleep(paso);
+      }
+      if (!vio && enviada) {
+        const extra = Date.now() + 2500;
+        let salida = null;
+        while (Date.now() < extra) {
+          st = await estado(symbol, orderId, null);
+          if (st.pos && st.pos.side === side && st.pos.qty > 0) { vio = true; break; }
+          if (!st.pos) salida = salidaDeEsta(st) || salida;
+          await sleep(200);
+        }
+        if (!vio && salida && orderId) {
+          last.open = { yaPlana: true, orderId, pedirSaldo: true };
+          return 'error: la orden sí se llenó y ya no hay posición (salida de esta orden). No se envió ninguna orden de cierre.';
         }
       }
-      const ts = await evaluate(js.tradeSymbol(lp.symbol, lp.front));
-      if (!ts || ts.error) {
-        if (!lp.front && /\d!$/.test(String(lp.symbol || ''))) return 'error: Tradovate no acepta el continuo ' + lp.symbol + ' y aún no tengo el contrato fechado (front_contract). Espera 1–2 s con ' + symbol + '1! en el chart e inténtalo de nuevo.';
-        return 'error: ' + ((ts && ts.error) || 'sin símbolo del bróker');
+      if (!vio) {
+        const alerta = (res && res.corte)
+          ? 'La llamada se cortó. No se reenvía la orden. No apareció posición de esta orden. Revisa TradingView.'
+          : 'No pude confirmar el fill. Miré ' + Math.round((Date.now() - t0) / 1000) + ' s y no apareció posición de esta orden. No se cerró nada. Revisa TradingView.';
+        last.open = { dudoso: true, pedirSaldo: true, alerta, orderId: orderId || null };
+        return 'error: ' + alerta;
       }
-      const s = side === 'long' ? 1 : -1, px = lp.price;
-      // Sin SL/TP en la orden a mercado: esos precios salían del cierre de la vela. Con un objetivo
-      // de 2.5 pts, si el fill queda del otro lado, el bróker abre y cierra en el mismo segundo.
-      const o = { symbol: ts.symbol, side: s, type: 2, qty };
-      const r = await evaluate(js.place(o)); if (r.error) return 'error: ' + r.error; if (r.ok === false) return 'error: el bróker no aceptó la orden';
-      const waitMs = Number(process.env.COLCHON_FILL_MS) > 0 ? Number(process.env.COLCHON_FILL_MS) : 6000;
-      let f = await evaluate(js.fill(symbol, s, qty, ts.symbol, waitMs));
-      const adoptar = async () => {
-        let pos = null;
-        try { pos = await evaluate(js.position(symbol)); } catch (e) { pos = { transient: String(e.message || e) }; }
-        // Solo el precio del bróker decide si un escalón o el objetivo ya se cumplieron. El cierre de la vela no.
-        const confiable = !!(pos && !pos.error && !pos.transient && pos.priceSrc === 'broker' && pos.entry != null && pos.price != null);
-        const entry = (confiable ? pos.entry : null) || (f && f.entry) || px;
-        const vivo = confiable ? pos.price : entry;
-        const plan = planAlAbrir({ side, entry, price: vivo, steps, slPts, tpPts, usdPerPoint: (PT_USD[symbol] || 0) * qty });
-        if (plan.tpReached) {
-          const cerrado = await evaluate(js.flatten(symbol));
-          if (cerrado && cerrado.ok !== false && !cerrado.error) {
-            last.open = { tpHit: true, ref: entry, tp: plan.tp, price: vivo };
-            return `ok market ${qty} ${ts.symbol} @${entry} objetivo ya pasado (${plan.tp}): cierre a mercado · fill visto en ${((f.ms || 0) / 1000).toFixed(2)} s`;
+      const pos = st.pos;
+      const plan = (pos.price != null) ? planAlAbrir({ side, entry: pos.entry, price: pos.price, steps, slPts, tpPts, usdPerPoint: (PT_USD[symbol] || 0) * pos.qty }) : null;
+      if (plan && plan.tpReached) {
+        let cr = null;
+        try { cr = await evaluate(js.cerrarQty(symbol, s, Math.min(pos.qty, qty))); } catch (e) { cr = { error: String(e.message || e) }; }
+        let salida = null;
+        if (cr && cr.orderId) {
+          const fin = Date.now() + 2000;
+          while (Date.now() < fin && salida == null) {
+            const e3 = await estado(symbol, cr.orderId, pos.id);
+            const ex = (e3.execs || []).find(x => String(x.orderId) === String(cr.orderId));
+            if (ex && Number.isFinite(ex.price)) salida = ex.price; else await sleep(150);
           }
         }
-        const a = await evaluate(js.adopt(symbol, plan.sl, plan.tpPlace));
-        const puesto = a && a.ok && plan.step && a.sl === plan.sl;
-        last.open = {
-          ref: (a && a.entry) || entry, sl: a ? a.sl : plan.sl, tp: a ? a.tp : plan.tpPlace,
-          step: puesto ? plan.nextStep : 0, locked: puesto ? plan.locked : false,
-          paso: puesto ? { paso: plan.step.n, disparoUSD: plan.step.triggerUsd, protegeUSD: plan.step.lockUsd, precio: plan.sl, enSeg: 0, confirmado: true, saltados: plan.stepIndex } : null,
-        };
-        const nota = puesto ? ` · paso ${plan.step.n} ya alcanzado, stop en ${plan.sl}` : '';
-        const pendiente = a && a.ok ? '' : ` · SL/TP no quedaron puestos (${(a && a.error) || 'revisa TradingView'}). No se cierra la posición`;
-        return `ok market ${qty} ${ts.symbol} @${(a && a.entry) || entry} SL ${a && a.sl != null ? a.sl : '—'} TP ${a && a.tp != null ? a.tp : '—'}${nota}${pendiente} · fill visto en ${((f.ms || 0) / 1000).toFixed(2)} s`;
-      };
-      if (f && f.filled && f.open) return adoptar();
-      if (!(f && f.filled) && (f && f.uncertain || !f)) {
-        for (let i = 0; i < 4; i++) {
-          if (i) await new Promise(z => setTimeout(z, 200));
-          let p = null; try { p = await evaluate(js.position(symbol)); } catch (e) { p = { transient: String(e.message || e) }; }
-          if (p && !p.error && !p.transient && p.entry != null) { f = { filled: true, open: true, entry: p.entry, ms: f && f.ms }; return adoptar(); }
-        }
-        return 'error: no pude confirmar si la orden se llenó. No se cierra nada. Revisa la cuenta en TradingView.';
+        const pnl = salida != null && pos.entry != null ? Math.round((salida - pos.entry) * s * (PT_USD[symbol] || 0) * (cr && cr.qty || 0) * 100) / 100 : null;
+        const okCierre = !!(cr && cr.ok && salida != null);
+        last.open = { tpHit: okCierre, ref: pos.entry, tp: plan.tp, price: pos.price, salida, salidaReal: pnl, qty: cr && cr.qty, orderId, pedirSaldo: true, alerta: okCierre ? null : 'El objetivo ya estaba pasado y el cierre de ESTA cantidad no se confirmó. No se tocó el resto.' };
+        if (!okCierre) return 'error: ' + last.open.alerta;
+        return `ok market ${cr.qty} @${pos.entry} objetivo ya pasado: salida ${salida}`;
       }
-      if (f.filled && f.alreadyFlat) return 'error: la orden sí se llenó y ya no hay posición. No se envió ninguna orden de cierre.';
-      if (!f.filled) return `error: la orden no se llenó${f.status === 5 ? ' (RECHAZADA por TradingView)' : ''}: ${f.message || 'sin posición tras 6 s'}`;
-      return adoptar();
+      let visto = { ok: false, stops: [], doble: false };
+      const hasta = Date.now() + 1000;
+      do {
+        const e2 = await estado(symbol, orderId, pos.id);
+        visto = stopLigado(e2.pos ? e2 : { ...e2, pos }, side);
+        if (visto.ok || visto.doble) break;
+        if (Date.now() >= hasta) break;
+        await sleep(150);
+      } while (Date.now() < hasta);
+      const parcial = pos.qty < qty;
+      const baseAlerta = visto.doble
+        ? 'HAY MÁS DE UN STOP ligado a esta posición. No se manda otro. Revisa TradingView.'
+        : !visto.ok
+          ? 'NO VEO EL STOP de esta operación. Se sigue intentando. No se toca ninguna otra orden.'
+          : parcial ? `Llenado parcial: hay ${pos.qty} de ${qty}. El bracket de la orden sigue. No se manda otra orden.` : (dudoso ? 'La orden tardó en confirmarse. La posición se adoptó con el bracket que ya traía.' : null);
+      const alerta = ((res && res.corte) ? 'La llamada se cortó. No se reenvía la orden. Se adopta la posición que apareció. ' : '') + (baseAlerta || '');
+      last.open = {
+        ref: pos.entry, sl: plan ? plan.sl : (res && res.sl), tp: plan ? plan.tpPlace : (res && res.tp),
+        orderId: orderId || null, posId: pos.id, slObjetivo: plan ? plan.sl : (res && res.sl), slOk: visto.ok && !visto.doble,
+        alerta, step: plan && plan.step ? plan.nextStep : 0, locked: !!(plan && plan.step && plan.locked),
+        paso: plan && plan.step ? { paso: plan.step.n, disparoUSD: plan.step.triggerUsd, protegeUSD: plan.step.lockUsd, precio: plan.sl, enSeg: 0, confirmado: false, saltados: plan.stepIndex } : null,
+        parcial, qtyVista: pos.qty, dudoso, pedirSaldo: dudoso || parcial,
+      };
+      const nota = plan && plan.step ? ` · paso ${plan.step.n} ya alcanzado: el ajuste mueve el stop a ${plan.sl}` : '';
+      return `ok market ${pos.qty} @${pos.entry} SL ${res && res.sl != null ? res.sl : '—'} TP ${res && res.tp != null ? res.tp : '—'}${nota}${alerta ? ' · ' + alerta : ''}`;
     },
     // TP: api (tope 3 s) -> relectura por id. Misma orden; nunca cancela ni recrea.
     async modifyTp(price, symbol) {
@@ -504,7 +637,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
         // guarda de flat: 3 lecturas vacías seguidas, ≥1 s desde la primera y sin órdenes hijas SL/TP activas
         if (!pos && S.openAt != null) {
           S.emptyN = (S.emptyN || 0) + 1; S.emptySince = S.emptySince || Date.now();
-          let kids = []; try { kids = driver.working ? (await driver.working(c.symbol)).filter(o => o.parentId != null || o.type === 3 || o.type === 1) : []; } catch { kids = [{ id: '?' }]; }
+          let kids = []; try { kids = driver.working ? (await driver.working(c.symbol)).filter(o => { const liga = (S.posId && String(o.parentId) === String(S.posId)) || (S.orderId && String(o.parentId) === String(S.orderId)); return liga && (o.type === 3 || o.type === 1); }) : []; } catch { kids = [{ id: '?' }]; }
           const need = opts.flatConfirm ?? { reads: 3, ms: 1000 };
           if (S.emptyN === 1) ev('flat_contador', { lecturasVacias: S.emptyN, msDesdePrimera: Date.now() - S.emptySince, necesita: need, sltpActivas: kids });
           if (S.emptyN < need.reads || Date.now() - S.emptySince < need.ms || kids.length) {
@@ -512,18 +645,33 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
             await sleep(wait); continue; }
           ev('flat_decidido', { lecturasVacias: S.emptyN, msDesdePrimera: Date.now() - S.emptySince });
         } else if (pos && S.emptyN) { ev('anomalia', { kind: 'lectura_vacia_transitoria', lecturas: S.emptyN }); log(`lectura vacía transitoria (${S.emptyN}): la posición sigue`); S.emptyN = 0; S.emptySince = null; }
-        if (pos && pos.entry != null && paper && !S.ajusteHecho && S.ref != null) {
-          S.ajusteHecho = true; const sd2 = c.side === 'long' ? 1 : -1, slN = roundTick(pos.entry - sd2 * S.slPts), tpN = roundTick(pos.entry + sd2 * S.tpPts), slA = sl0, tpA = S.tpRef;
-          const rec = { ref: S.ref, fill: pos.entry, slAntes: slA, slNuevo: slN, tpAntes: tpA, tpNuevo: tpN, stopId: pos.stopId ?? null };
-          if (slA === slN && tpA === tpN) { rec.ok = true; rec.nada = true; }
+        if (pos && pos.entry != null && paper && !S.ajusteHecho && S.ref != null && pos.price != null) {
+          S.ajusteHecho = true;
+          const plan = planAlAbrir({ side: c.side, entry: pos.entry, price: pos.price, steps: S.steps, slPts: S.slPts, tpPts: S.tpPts, usdPerPoint: pv });
+          const slN = plan.sl, tpN = plan.tpPlace, slA = sl0, tpA = S.tpRef;
+          const rec = { ref: S.ref, fill: pos.entry, slAntes: slA, slNuevo: slN, tpAntes: tpA, tpNuevo: tpN, stopId: pos.stopId ?? null, paso: plan.step ? plan.step.n : null };
+          if (plan.step) { S.step = plan.nextStep; st.step = plan.nextStep; S.locked = plan.locked; if (slN != null) S.lockPrice = slN; S.slObjetivo = slN; }
+          if ((slA === slN || slN == null) && (tpA === tpN || tpN == null)) { rec.ok = slN != null; rec.nada = true; }
           else { const t0 = Date.now();
-            rec.sl = slA === slN ? { ok: true, ya: true } : await driver.modifyStop(slN, c.symbol);
-            rec.tp = driver.modifyTp ? await driver.modifyTp(tpN, c.symbol) : { ok: false, err: 'sin modifyTp' };
-            rec.ok = !!(rec.sl.ok && rec.tp.ok); rec.seg = Math.round((Date.now() - t0) / 100) / 10; }
-          S.tpPrice = tpN; S.ajuste = rec; ev('ajuste_brackets', rec);
-          log(rec.nada ? `Fill ${pos.entry} = referencia: SL/TP ya correctos` : `Ajuste por fill ${pos.entry} (ref ${S.ref}): SL ${slA}→${slN} ${rec.sl.ok ? 'OK' : 'FALLO'} · TP ${tpA}→${tpN} ${rec.tp.ok ? 'OK' : 'FALLO'} (${rec.seg} s)`);
-          if (!rec.ok) { S.alerta = `Ajuste SL/TP al fill no verificado (SL ${slN}, TP ${tpN}): revisa TradingView. No se canceló nada.`; ev('notificacion', { texto: S.alerta }); }
+            rec.sl = slN == null || slA === slN ? { ok: slN != null, ya: true } : await driver.modifyStop(slN, c.symbol);
+            rec.tp = tpN == null ? { ok: true, ya: true } : (driver.modifyTp ? await driver.modifyTp(tpN, c.symbol) : { ok: false, err: 'sin modifyTp' });
+            rec.ok = !!(rec.sl && rec.sl.ok && rec.tp && rec.tp.ok); rec.seg = Math.round((Date.now() - t0) / 100) / 10;
+            await sleep(1000);
+            let dobles = [];
+            try { const w = driver.working ? await driver.working(c.symbol) : []; dobles = w.filter(o => o.type === 3 && ((S.posId && String(o.parentId) === String(S.posId)) || (S.orderId && String(o.parentId) === String(S.orderId)))); } catch { dobles = []; }
+            if (dobles.length > 1) { rec.doble = true; S.alerta = 'HAY MÁS DE UN STOP ligado a esta posición. No se manda otro. Revisa TradingView.'; ev('notificacion', { texto: S.alerta }); }
+          }
+          if (tpN != null) S.tpPrice = tpN; S.ajuste = rec; if (rec.sl && rec.sl.ok && slN != null) S.slOk = true;
+          ev('ajuste_brackets', rec);
+          log(rec.nada ? `Fill ${pos.entry} = referencia: SL/TP ya correctos` : `Ajuste por fill ${pos.entry} (ref ${S.ref}): SL ${slA}→${slN} ${rec.sl && rec.sl.ok ? 'OK' : 'FALLO'} · TP ${tpA}→${tpN} ${rec.tp && rec.tp.ok ? 'OK' : 'FALLO'} (${rec.seg || 0} s)`);
+          if (!rec.ok || slN == null) { S.slOk = false; S.alerta = S.alerta || `NO VEO EL STOP tras el ajuste (SL ${slN == null ? 'inseguro' : slN}). Se sigue intentando. No se toca ninguna otra orden.`; ev('notificacion', { texto: S.alerta }); }
           if (!rec.nada) { await sleep(wait); continue; }
+        }
+        if (pos && S.slOk === false && S.slObjetivo != null && Date.now() - (S.slIntento || 0) > 1000) {
+          S.slIntento = Date.now();
+          const rsl = await driver.modifyStop(S.slObjetivo, c.symbol);
+          if (rsl && rsl.ok) { S.slOk = true; if (S.alerta && /NO VEO EL STOP/.test(S.alerta)) S.alerta = null; }
+          else S.alerta = 'NO VEO EL STOP de esta operación. Se sigue intentando. No se toca ninguna otra orden.';
         }
         const sl = sl0;
         if (pos && S.openAt == null) { S.openAt = Date.now(); log('Posición abierta (fill visto)'); }
@@ -549,6 +697,11 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
           S.closeAt = Date.now(); log('Sin posición: fin del loop (' + S.reason + ')'); break; }
         if (d.action === 'skip') { st.step = d.step + 1; S.step = st.step; log(`paso ${d.step + 1}: el SL ya está más ajustado, se salta`); }
         if (d.action === 'modify') { const stp = c.steps[d.step];
+          const hol = HOLGURA_TICKS * TICK, pxv = pos.price;
+          if (pxv != null && (c.side === 'long' ? d.price > pxv - hol + 1e-9 : d.price < pxv + hol - 1e-9)) {
+            if (!S.holguraAvisada) { S.holguraAvisada = true; S.alerta = 'El stop del escalón queda a menos de 2 ticks del precio. No se mueve hasta que haya hueco. No se toca ninguna otra orden.'; log(S.alerta); }
+            await sleep(wait); continue;
+          }
           log(`[${c.strategy.name}] paso ${stp.n}/${c.steps.length}: P&L $${pos.pnl} (${pos.pnlSrc}) >= $${stp.triggerUsd}: SL ${sl} -> ${d.price} (protege +$${stp.lockUsd}${c.P.NET_USD ? ` ≈ +$${c.P.NET_USD} netos` : ''})${d.step > st.step ? ` · salto de ${d.step - (st.step ?? 0)} escalón(es)` : ''}`);
           ev('disparo', { paso: stp.n, pnl: pos.pnl, fuente: pos.pnlSrc, disparoUSD: stp.triggerUsd, precio: d.price, slAntes: sl });
           if (paper) { const t0 = Date.now(); const r = await driver.modifyStop(d.price, c.symbol); let v = r.verified, confirmMs = r.confirmMs ?? null;
@@ -589,11 +742,11 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
     if (S.reason === 'sl' && S.lockTarget != null && !S.locked) { S.locked = true; S.lockPrice = S.lockTarget; S.sl = S.lockTarget; S.lockPending = false; } // salió por stop en el precio del colchón
     if (S.reason === 'sl' && S.lockTarget != null) S.sl = S.lockTarget;
     const pnlSL = S.sl != null && S.entry != null ? Math.round((S.sl - S.entry) * (S.side === 'long' ? 1 : -1) * PT_USD[S.symbol] * S.qty * 100) / 100 : null;
-    const SP = S.P || (S.strategy && getStrategy(S.strategy.id) || getStrategy()).params; const pnlFinal0 = S.reason === 'tp' ? SP.TP_USD : S.reason === 'sl' ? pnlSL : S.pnl; const usaBroker = pnlFinal0 == null && typeof S.pnlBroker === 'number'; const pnlFinal = usaBroker ? S.pnlBroker : pnlFinal0;
+    const SP = S.P || (S.strategy && getStrategy(S.strategy.id) || getStrategy()).params; const pnlFinal0 = S.salidaReal != null ? S.salidaReal : S.reason === 'tp' ? SP.TP_USD : S.reason === 'sl' ? pnlSL : S.pnl; const usaBroker = pnlFinal0 == null && typeof S.pnlBroker === 'number'; const pnlFinal = usaBroker ? S.pnlBroker : pnlFinal0;
     last = { fin: new Date().toISOString(), cuenta: S.account && S.account.name, modo: S.mode, direccion: S.side === 'long' ? 'COMPRA' : 'VENTA', tamano: `${S.qty} ${S.symbol}`, motivo: { tp: 'Take profit', sl: 'Stop loss', stop: 'Detenido manualmente', flat: 'Posición cerrada', error: 'Error' }[S.reason] || S.reason || '—',
-      ajusteFill: S.ajuste || null, estrategia: S.strategy ? S.strategy.name : null, estrategiaId: S.strategy ? S.strategy.id : null, ...tiempos(), entrada: S.entry, pnlFinalUSD: pnlFinal, pnlFinalAprox: usaBroker ? false : !(S.reason === 'tp' || S.reason === 'sl'), colchonMovido: S.locked, slColchon: S.lockPrice, pasos: (S.pasos || []).map(p => ({ paso: p.paso, disparoUSD: p.disparoUSD, protegeUSD: p.protegeUSD, precio: p.precio, enSeg: p.enSeg, confirmado: p.confirmado, saltados: p.saltados, latenciaSeg: p.latencia ? Math.round(p.latencia.totalDesdeLecturaMs / 10) / 100 : null })), probabilidadNecesaria: S.qty ? breakEvenFor(S.symbol, S.qty, SP) : null, pasosTotal: S.steps ? S.steps.length : null, colchonUSD: S.qty ? ((S.pasos && S.pasos.length) ? S.pasos[S.pasos.length - 1].protegeUSD : (SP.STEPS ? null : lockUsdFor(S.symbol, S.qty, SP))) : null, disparoUSD: S.qty && !SP.STEPS ? triggerUsdFor(S.symbol, S.qty, SP) : null, latencia: S.latency || null, fuenteModo: S.fuenteModo || null, fuenteLider: S.fuenteLider || null, fuentes: S.fuentesStats || null, alerta: S.alerta || null, inicio: S.startedAt, error: S.error };
+      ajusteFill: S.ajuste || null, estrategia: S.strategy ? S.strategy.name : null, estrategiaId: S.strategy ? S.strategy.id : null, ...tiempos(), entrada: S.entry, salida: S.salidaPrecio ?? null, pnlFinalUSD: pnlFinal, pnlFinalAprox: usaBroker ? false : !(S.reason === 'tp' || S.reason === 'sl'), colchonMovido: S.locked, slColchon: S.lockPrice, pasos: (S.pasos || []).map(p => ({ paso: p.paso, disparoUSD: p.disparoUSD, protegeUSD: p.protegeUSD, precio: p.precio, enSeg: p.enSeg, confirmado: p.confirmado, saltados: p.saltados, latenciaSeg: p.latencia ? Math.round(p.latencia.totalDesdeLecturaMs / 10) / 100 : null })), probabilidadNecesaria: S.qty ? breakEvenFor(S.symbol, S.qty, SP) : null, pasosTotal: S.steps ? S.steps.length : null, colchonUSD: S.qty ? ((S.pasos && S.pasos.length) ? S.pasos[S.pasos.length - 1].protegeUSD : (SP.STEPS ? null : lockUsdFor(S.symbol, S.qty, SP))) : null, disparoUSD: S.qty && !SP.STEPS ? triggerUsdFor(S.symbol, S.qty, SP) : null, latencia: S.latency || null, fuenteModo: S.fuenteModo || null, fuenteLider: S.fuenteLider || null, fuentes: S.fuentesStats || null, alerta: S.alerta || null, inicio: S.startedAt, error: S.error };
     S.summary = last; try { fs.writeFileSync(path.join(path.dirname(logFile), 'colchon-resumen.json'), JSON.stringify(last, null, 2)); } catch {}
-    ev('fin_trade', last); try { const dd = path.dirname(logFile), rd = path.join(dd, 'reportes'); fs.mkdirSync(rd, { recursive: true }); fs.writeFileSync(path.join(rd, diaFarm() + '.md'), buildReport(dd, diaFarm())); } catch {}
+    ev('fin_trade', last); try { const f = colchonHooks.despuesDeOperar; if (typeof f === 'function') f({ motivo: S.reason }); } catch {} try { const dd = path.dirname(logFile), rd = path.join(dd, 'reportes'); fs.mkdirSync(rd, { recursive: true }); fs.writeFileSync(path.join(rd, diaFarm() + '.md'), buildReport(dd, diaFarm())); } catch {}
     log(`DURACIÓN ${last.duracionSeg == null ? '?' : sg(last.duracionSeg * 1000)} (${last.abiertaET ?? '?'} → ${last.cerradaET ?? '?'}, ±${sg(poll)})${last.colchonTrasSeg != null ? ` · colchón a los ${sg(last.colchonTrasSeg * 1000)}` : ''}`);
     if (last.pasos.length) log('PASOS ' + last.pasos.map(p => `#${p.paso} +$${p.protegeUSD} a los ${p.enSeg ?? '?'} s`).join(' · '));
     log('RESUMEN', JSON.stringify(last));
@@ -620,16 +773,16 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
           await Promise.race([Promise.resolve(acctGuard.fullRead).catch(() => {}), sleep(2500)]);
         }
         let r; try { r = await this._start(args); } catch (e) { r = { ok: false, err: String(e.message || e) }; }
-        if (!r || !r.ok) { acctGuard.testActive = false; if (S.state === 'running') { S.state = 'error'; S.error = S.error || (r && r.err) || 'No se pudo iniciar'; } }
+        if (!r || (!r.ok && !r.watching)) { liberarPrueba(); if (S.state === 'running') { S.state = 'error'; S.error = S.error || (r && r.err) || 'No se pudo iniciar'; } }
         return r || { ok: false, err: 'No se pudo iniciar' };
-      } catch (e) { acctGuard.testActive = false; if (S.state === 'running') S.state = 'error'; return { ok: false, err: String(e.message || e) }; }
+      } catch (e) { liberarPrueba(); if (S.state === 'running') S.state = 'error'; return { ok: false, err: String(e.message || e) }; }
     },
     async _start({ side = 'long', symbol = DEFAULT.symbol, qty, accountId, strategyId, confirmReal } = {}) {
       const strat = getStrategy(strategyId == null || strategyId === '' ? DEFAULT_STRATEGY : strategyId); if (!strat) return { ok: false, err: `Estrategia desconocida: ${strategyId}` };
       if (!['long', 'short'].includes(side) || !(symbol in SIZES)) return { ok: false, err: 'Parámetros inválidos' };
       qty = qty == null || qty === '' ? ((strat.params.DEFAULT_QTY || {})[symbol] ?? (symbol === DEFAULT.symbol ? DEFAULT.qty : 1)) : Number(qty);
       if (!Number.isInteger(qty) || qty < 1) return { ok: false, err: `Cantidad inválida: ${symbol} entre 1 y ${maxQtyFor(symbol, {})}` };
-      let switched = null, chosen = null;
+      let switched = null, chosen = null, chk = null;
       if (accountId != null && accountId !== '') {
         const l = await this.accounts(); if (!l.ok) return { ok: false, err: l.err };
         const a = l.accounts.find(x => x.id === String(accountId)); if (!a) return { ok: false, err: 'Cuenta no encontrada' }; chosen = a;
@@ -638,10 +791,9 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
         if (a.real && confirmReal !== true) return { ok: false, blocked: true, needConfirm: true, err: `CUENTA REAL · ${a.realLabel}: falta confirmación` };
         if (!a.current && S.state === 'running') return { ok: false, err: 'Hay una prueba en marcha: no se cambia de cuenta' };
         if (!a.current) { const sw = await (await D()).switchAccount(a.id, a.name); if (!sw || !sw.ok) return { ok: false, err: 'No se pudo activar la cuenta ' + a.name + ': ' + ((sw && sw.error) || '?') }; switched = { name: a.name, ms: sw.ms }; }
-        const chk0 = await check(); if (chk0.account.name !== a.name) return { ok: false, err: `La cuenta activa es ${chk0.account.name}, no ${a.name}: no se opera` };
-        try { const p0 = await (await D()).position(symbol); if (p0) return { ok: false, err: `Ya hay una posición de ${symbol} en ${a.name}: no se opera` }; } catch {}
+        chk = await check(); if (chk.account.name !== a.name) return { ok: false, err: `La cuenta activa es ${chk.account.name}, no ${a.name}: no se opera` };
       }
-      const chk = await check();
+      if (!chk) chk = await check();
       if (chk.real && confirmReal !== true) return { ok: false, blocked: true, needConfirm: true, err: `CUENTA REAL · ${chk.realLabel}: falta confirmación (confirmReal)` };
       const exec = chk.paper || (chk.real && confirmReal === true);
       if (accountId != null && accountId !== '' && !exec) return { ok: false, blocked: true, err: chk.msg };
@@ -657,10 +809,14 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
       const drv = await D(); try { S.accountId = drv.accountId ? await drv.accountId() : null; } catch { S.accountId = null; }
       if (accountId && S.accountId && S.accountId !== String(accountId)) { S.state = 'error'; S.error = 'La cuenta activa no es la elegida: no se opera'; log(S.error); return { ok: false, err: S.error, status: S }; }
       const op = await drv.openBracket({ ...c, slPts, tpPts }); log('open ->', op);
-      { const lo = drv.lastOpen ? drv.lastOpen() : null; Object.assign(S, { ajusteHecho: !!(lo && (lo.tpHit || lo.sl != null || lo.tp != null)), ajuste: null, slPts, tpPts, ref: lo ? lo.ref : null, tpRef: lo ? lo.tp : null, step: lo && lo.step ? lo.step : 0, locked: !!(lo && lo.locked), lockPrice: lo && lo.step ? lo.sl : null, tpPrice: lo ? lo.tp : null }); if (lo && lo.paso) S.pasos = [lo.paso]; if (lo && lo.tpHit) { S.entry = lo.ref; S.openAt = Date.now(); S.closeAt = Date.now(); S.tpPrice = lo.tp; S.reason = 'tp'; S.state = 'done'; log(`Objetivo ya pasado al confirmar el fill (${lo.tp}): cierre a mercado`); summarize(); acctGuard.testActive = false; return { ok: true, closed: 'tp', status: S }; } }
-      // Si la apertura queda en duda, no se aplana: cerrar aquí fue un cierre en el mismo segundo.
-      if (String(op).startsWith('error')) { S.state = 'error'; S.error = op; S.reason = 'error'; summarize(); return { ok: false, err: op, status: S }; }
-      loopP = loop(c, true).finally(() => { acctGuard.testActive = false; });
+      const lo = drv.lastOpen ? drv.lastOpen() : null;
+      Object.assign(S, { ajusteHecho: false, ajuste: null, slPts, tpPts, ref: lo ? lo.ref : null, tpRef: lo ? lo.tp : null, step: lo && lo.step ? lo.step : 0, locked: !!(lo && lo.locked), lockPrice: lo && lo.step ? lo.sl : null, tpPrice: lo ? lo.tp : null, slOk: !!(lo && lo.slOk), slObjetivo: lo ? (lo.slObjetivo ?? null) : null, orderId: lo ? (lo.orderId || null) : null, posId: lo ? (lo.posId || null) : null, alerta: (lo && lo.alerta) || null, salidaReal: lo ? (lo.salidaReal ?? null) : null, salidaPrecio: lo ? (lo.salida ?? null) : null });
+      if (lo && lo.paso) S.pasos = [lo.paso];
+      if (lo && lo.tpHit) { S.entry = lo.ref; S.openAt = Date.now(); S.closeAt = Date.now(); S.tpPrice = lo.tp; S.reason = 'tp'; S.state = 'done'; log(`Objetivo ya pasado: cierre de ${lo.qty} a ${lo.salida} (precio real, no el del objetivo)`); summarize(); liberarPrueba(); return { ok: true, closed: 'tp', status: S }; }
+      if (String(op).startsWith('error')) { S.state = 'error'; S.error = op; S.reason = 'error'; S.alerta = (lo && lo.alerta) || op; summarize(); return { ok: false, err: op, status: S }; }
+      loopP = loop(c, true).finally(() => { liberarPrueba(); });
+      if (lo && lo.pedirSaldo) { try { const f = colchonHooks.despuesDeOperar; if (typeof f === 'function') f({ motivo: 'apertura' }); } catch {} }
+      if (lo && !lo.slOk) return { ok: false, watching: true, alerta: S.alerta, status: S };
       return { ok: true, status: S };
     },
     async stop({ flatten = false } = {}) { stopReq = true; if (flatten && (S.mode === 'paper' || S.mode === 'real')) log('flatten ->', await (await D()).flatten(S.symbol)); await loopP; return { ok: true, status: S }; },
@@ -702,7 +858,24 @@ export const js_readAccounts = (all, only = null) => `(async function(){${PAGE}v
 // Exclusión mutua entre la lectura de todas las cuentas (cambia de cuenta) y una prueba (fija su cuenta):
 // - con una prueba activa (o arrancando) solo se lee la cuenta activa, sin cambiar nada;
 // - una prueba que arranca espera como máximo ~2.5 s a una lectura completa en curso y luego sigue.
-export const acctGuard = { testActive: false, fullRead: null };
+export const acctGuard = { testActive: false, fullRead: null, saldoPendiente: false, alLiberar: null };
+// Al soltar la prueba se avisa para que corra lo que quedó en cola (saldo, vista previa). No se tira.
+export function liberarPrueba() {
+  acctGuard.testActive = false;
+  const fn = acctGuard.alLiberar;
+  if (typeof fn === 'function') { try { fn(); } catch {} }
+}
+// Si hay una orden en curso, el trabajo espera en `cola` y se ejecuta al drenarla. Si no, corre ya.
+export function encolarSiOcupado(cola, trabajo) {
+  if (!acctGuard.testActive) return Promise.resolve().then(trabajo);
+  return new Promise(resolve => {
+    cola.push(() => Promise.resolve().then(trabajo).then(resolve, e => resolve({ ok: false, error: String(e && e.message || e) })));
+  });
+}
+export function drenarCola(cola) {
+  const jobs = cola.splice(0);
+  return Promise.all(jobs.map(j => Promise.resolve().then(j)));
+}
 export async function readAccounts({ all = false, only = null, evaluate = null } = {}) {
   if (all && acctGuard.testActive) all = false;
   let c = null; const ev = evaluate || (c = await cdpEvaluator()).evaluate;

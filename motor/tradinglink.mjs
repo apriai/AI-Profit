@@ -3,7 +3,7 @@
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
 import * as orders from './orders.mjs';
 import { negocio } from './negocio.mjs';
-import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, diaFarm, fueraDeSesion, cdpEvaluator, PAGE, acctGuard, js } from './colchon.mjs';
+import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, diaFarm, fueraDeSesion, cdpEvaluator, PAGE, acctGuard, encolarSiOcupado, js } from './colchon.mjs';
 import { attachReporte } from './tv-reporte.mjs';
 import { createVistaPrevia } from './tv-vista-previa.mjs';
 import { estrategiasPropias } from './estrategias-propias.mjs';
@@ -113,9 +113,10 @@ let cycling = false;
 async function cycle() {
   if (cycling) return; cycling = true;
   try {
-    // Saldos por la API interna de TradingView (sin clics): la cuenta activa cada 30 s; todas las cuentas cada 5 min
-    // (nunca si hay posiciones/órdenes abiertas ni durante una prueba colchón, para no cambiar de cuenta en mitad de un trade).
+    // Saldos por la API interna de TradingView (sin clics): la cuenta activa cada 2 min; todas las cuentas cada 5 min.
+    // Mientras arranca o corre una operación no se abre otra conexión: el saldo se refresca al cerrar y si la apertura quedó en duda.
     const pausa = fs.existsSync(path.join(DIR, 'pausa-lectura.flag'));
+    if (acctGuard.testActive) { acctGuard.saldoPendiente = true; cycling = false; return; }
     // Un trade en marcha o un arranque en curso (acctGuard.testActive) cuenta como ocupado: no se inicia
     // un recorrido nuevo de todas las cuentas ni de solo fondeadas. La lectura de la cuenta activa sigue.
     const operando = colchon.status().state === 'running' || acctGuard.testActive;
@@ -144,6 +145,12 @@ async function cycle() {
   console.log(new Date().toLocaleTimeString(), state.error || Object.values(state.accounts).map(a => `${a.id} ${a.type} $${a.balance}`).join(' · '));
   cycling = false;
 }
+const vistaCola = [];
+acctGuard.alLiberar = () => {
+  const jobs = vistaCola.splice(0);
+  for (const j of jobs) { try { j(); } catch {} }
+  if (acctGuard.saldoPendiente) { acctGuard.saldoPendiente = false; cycle(); }
+};
 
 // ---- Solo lectura para la granja: historial de trades, informes y luces de conexión ----
 const maskId = t => String(t ?? '').replace(/\b([A-Za-z][A-Za-z0-9]{3})[A-Za-z0-9]{4,}([A-Za-z0-9]{3})\b/g, '$1…$2');
@@ -317,6 +324,7 @@ async function brokerExecs() { if (execCache.v && (Date.now() - execCache.at < 2
     if (v) execCache = { at: Date.now(), v }; } catch {} finally { try { E && E.close(); } catch {} }
   return execCache.v; }
 // Al terminar una prueba, si el bucle no tiene P&L final, el motor pide aqui el P&L bruto real de las ejecuciones del broker (solo lectura).
+colchonHooks.despuesDeOperar = () => { readAccounts({ all: false }).then(r => { if (!r || !r.accounts) return; for (const a of r.accounts) if (debeGuardarSaldo(a)) save({ id: a.name, f: [['Account Balance', String(a.balance)], ['Equity', String(a.equity ?? a.balance)], ['Profit', String(a.profit ?? 0)]] }); }).catch(() => {}); };
 colchonHooks.pnlFinalBroker = async ({ openAt, side, cuenta }) => { try { execCache.at = 0; const b = await brokerExecs(); if (!b || !b.ex) return null; if (cuenta && b.cuenta && String(b.cuenta) !== String(cuenta)) return null; const dir = side === 'long' ? 'COMPRA' : 'VENTA';
   const rt = roundTrips(b.ex).filter(t => t.direccion === dir && Date.parse(t.at) >= openAt - 2000 && Date.parse(t.abierta) >= openAt - 30000).sort((x, y) => Date.parse(x.at) - Date.parse(y.at)); const t = rt[rt.length - 1]; return t && typeof t.pnlBruto === 'number' ? t.pnlBruto : null; } catch { return null; } };
 // Reporte de trades en TradingView: solo el cierre que acaba de confirmarse. No barre el historial ni repone dibujos.
@@ -328,8 +336,8 @@ try {
 } catch (e) { console.log('reporte: no arrancó; el motor sigue.', e && e.message); }
 // Vista previa del panel: solo dibuja. No abre, no modifica y no cierra órdenes, y no repone reportes.
 const vistaPrevia = createVistaPrevia({
-  cotizar: async () => { const E = await cdpEvaluator(9222); try { return await E.evaluate(js.lastPrice); } finally { try { E.close(); } catch {} } },
-  dibujar: async (expr) => { const E = await cdpEvaluator(9222); try { return await E.evaluate(expr); } finally { try { E.close(); } catch {} } },
+  cotizar: () => encolarSiOcupado(vistaCola, async () => { const E = await cdpEvaluator(9222); try { return await E.evaluate(js.lastPrice); } finally { try { E.close(); } catch {} } }),
+  dibujar: expr => encolarSiOcupado(vistaCola, async () => { const E = await cdpEvaluator(9222); try { return await E.evaluate(expr); } finally { try { E.close(); } catch {} } }),
 });
 function roundTrips(ex) { const by = {}; for (const x of [...ex].sort((a, b) => a.time - b.time)) (by[x.symbol] ||= []).push(x);
   const out = []; for (const [sym, l] of Object.entries(by)) { const pv = PV(sym); let pos = 0, cash = 0, t0 = null, q = 0, first = null, comm = 0, commOk = true, entry = 0;
@@ -354,7 +362,7 @@ http.createServer((q, r) => manejar(q, r, {
   algoTv: () => algoTv, textoVersion, ROOT, HTML,
 })).listen(PORT, '127.0.0.1', () => console.log(`Granja: http://localhost:${PORT}`));
 let lastFull = 0, lastFunded = 0, lastBusy = Date.now(); const FULL_MS = EVERY_MS, QUIET_MS = 5 * 60 * 1000;
-cycle(); setInterval(cycle, 30 * 1000);
+cycle(); setInterval(cycle, 120 * 1000);
 
 const guardarHist = () => { for (const d of new Set([diaFarm(), diaFarm(Date.now() - 36e5)])) tradesDe(d).catch(() => {}); };
 setInterval(guardarHist, 3 * 60 * 1000);

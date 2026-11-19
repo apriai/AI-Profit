@@ -10,6 +10,15 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.28] — 2026-11-19
+### Corregido
+- **La orden a mercado vuelve a salir con el stop y el objetivo pegados.** Los precios salen del bid y del ask de ese momento, no del cierre de la vela. El stop queda a la distancia de la estrategia desde el ask (compra) o el bid (venta). Si el objetivo es corto, queda al menos 8 ticks (2,00 puntos) más allá del lado contrario del libro, para que un deslizamiento normal no lo cruce al entrar. Ni el stop ni el objetivo se mandan a menos de 2 ticks del precio que los dispararía.
+- **Después del fill, el mismo bracket se mueve al precio real de entrada.** Si un escalón ya se alcanzó, el stop se mueve a ese nivel. No se crean órdenes sueltas. Si no se ve el stop, no se dice que salió bien: queda un aviso y se sigue intentando.
+- **Si la llamada se corta, no se reenvía.** Se vuelve a leer la posición y las órdenes de ese id. Si la posición apareció, se adopta con el bracket que ya trae y se avisa. El contrato en caché solo vale si el gráfico, leído en esa misma llamada, trae el mismo. Si rodó, se usa el nuevo.
+- **El saldo de la cuenta activa se lee cada 2 minutos**, y una vez más al cerrar un trade o si la apertura quedó en duda. Una lectura o una vista previa que coinciden con la orden no se tiran: quedan en cola y corren al terminar.
+### Notas
+- No cambia los dólares de las estrategias. No cierra otras posiciones ni otras cuentas. No hay cierre a las 16:45.
+
 ## [0.10.27] — 2026-11-19
 ### Corregido
 - **Si el precio ya llegó a un escalón al confirmar el fill, el stop nace en ese escalón.** Se usa el escalón más alto ya alcanzado cuyo stop todavía queda del lado bueno del precio vivo. La gestión sigue desde el siguiente. Si ese stop ya quedó cruzado, no se pone. Si el precio ya pasó el objetivo, la operación se cierra a mercado: en estas estrategias el trade termina en el objetivo, y un límite ya cruzado no se puede dejar puesto.
