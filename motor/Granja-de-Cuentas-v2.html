@@ -5756,17 +5756,15 @@ else if(p==="choose"){setAwake(true);if(sym!=="MNQ"){sym="MNQ";qty=defQ(sym)}car
  qi.oninput=upd;[qi].forEach(x=>x.onclick=e=>e.stopPropagation());["pointerdown","mousedown","touchstart"].forEach(ev=>qi.addEventListener(ev,e=>e.stopPropagation()));upd();
  card.querySelectorAll("[data-s]").forEach(b=>{b.onclick=e=>{e.stopPropagation();go(b.dataset.s)};b.addEventListener("pointerenter",()=>{pvSide=b.dataset.s;vistaPreviaPedir()})});const bs=card.querySelector(".bs");if(bs)bs.addEventListener("pointerleave",()=>{pvSide=null;vistaPreviaSoltar()})}
 else if(p==="aviso"){setAwake(false);card.innerHTML=`<div class=h>Se llenó y se cerró</div><div class=msg>${extra||"La orden se llenó y ya no hay posición."}</div>`;card.style.display="block";setTimeout(()=>phase==="aviso"&&setPhase("off"),6000)}
-else if(p==="blocked"){setAwake(false);card.innerHTML=`<div class=h>Bloqueado</div><div class="msg no">${extra||chk.msg}</div><div class=msg>Todas las cuentas Lucid se pueden operar, aunque el nombre no empiece por LFE o LFF. Paper y demo también. Hace falta que la cuenta esté activa en TradingView y, si es real, confirmarla.</div>`;card.style.display="block";setTimeout(()=>phase==="blocked"&&setPhase("off"),6000)}
+else if(p==="blocked"){setAwake(false);card.innerHTML=`<div class=h>Bloqueado</div><div class="msg no">${extra||chk.msg}</div><div class=msg>Todas las cuentas Lucid se pueden operar, aunque el nombre no empiece por LFE o LFF. Paper y demo también. Hace falta que la cuenta esté activa en TradingView.</div>`;card.style.display="block";setTimeout(()=>phase==="blocked"&&setPhase("off"),6000)}
 else if(p==="running"){setAwake(true);bub.textContent="Operando…";bub.style.display="block"}
 else if(p==="summary"){setAwake(false);bub.textContent="Prueba terminada";bub.style.display="block"}
 else if(p==="off"){prevBot=null;setTimeout(()=>{const b=pill()&&pill().querySelector("b");if(b&&b.textContent==="Durmiendo")b.textContent=S()&&S().botEnabled()?"Activo":"Pausado"},50);live.style.display="none"}}
 async function go(side){vistaPreviaSoltar();const tClick=Date.now();card.querySelectorAll("button").forEach(b=>b.disabled=true);
  if(!accId){setPhase("blocked","Elige una cuenta");return}const sa=accs&&accs.ok&&accs.accounts.find(a=>String(a.id)===String(accId));
- if(!sa||!sa.name){setPhase("blocked","Elige una cuenta");return}let cr=false;
- if(sa.real){if(!(window.__tlRealGate&&await window.__tlRealGate.confirm())){setPhase("choose");card.querySelectorAll("button").forEach(b=>b.disabled=false);return}cr=true}
- const enviar=function(conf,t0){return J("/api/colchon/start",{side:side,symbol:sym,qty:qty,accountId:accId,accountName:sa.name,strategyId:stratId,confirmReal:!!conf,tClick:t0})};
- let r=await enviar(cr,tClick);
- if(!r.ok&&r.needConfirm){if(!(window.__tlRealGate&&await window.__tlRealGate.confirm())){setPhase("choose");card.querySelectorAll("button").forEach(b=>b.disabled=false);return}r=await enviar(true,Date.now())}
+ if(!sa||!sa.name){setPhase("blocked","Elige una cuenta");return}
+ const enviar=function(t0){return J("/api/colchon/start",{side:side,symbol:sym,qty:qty,accountId:accId,accountName:sa.name,strategyId:stratId,tClick:t0})};
+ let r=await enviar(tClick);
  if(!r.ok&&r.closed){setPhase("aviso",r.err||"se llenó y se cerró");return}
  if(!r.ok){if(r.waitingLectura){setPhase("choose");const m=card.querySelector("[data-m]");if(m){m.className="msg";m.style.display="";m.textContent=r.err||"esperando lectura…"}return}setPhase("blocked",r.err||"No se pudo iniciar");return}setPhase("running");poll()}
 function latHTML(l){if(!l)return'<div class=lat>Latencia: aún no se movió el SL.</div>';return`<div class=lat>Método <b>${l.metodo==="api"?"API":"UI (clics)"}</b>${l.via&&l.via!=="ui"?" · "+l.via:""}<br>Leer <b>${ms(l.leerMs)}</b> · Modificar <b>${ms(l.modificarMs)}</b> · Confirmar <b>${ms(l.confirmarMs)}</b>${l.metodo==="ui"?`<br>Intento API <b>${ms(l.apiIntentoMs)}</b> · UI <b>${ms(l.uiMs)}</b>`:""}<br>Total <b>${ms(l.totalDesdeLecturaMs)}</b> <span style="opacity:.55">(+ hasta ${ms(l.maxRetrasoPorPollMs)} entre lecturas)</span></div>`}
@@ -5951,23 +5949,9 @@ const luz=(k,ok,t)=>{const i=lz.querySelector(`[data-k=${k}]`);if(i){i.className
 async function conn(){let c=null;try{c=await (await fetch("/api/colchon/conexion",{cache:"no-store"})).json()}catch(e){}
  if(!c){luz("servidor",0,"El servidor no responde");luz("tradingview",0,"Sin datos");luz("tradovate",0,"Sin datos");return}
  luz("servidor",1,"Servidor activo (puerto 8787)");luz("tradingview",c.tradingview,c.tradingview?"TradingView conectado (CDP 9222)":"TradingView sin CDP 9222 — ábrelo con abrir-tradingview.bat");
- luz("tradovate",c.tradovate,c.tradovate?`Tradovate conectado${c.cuenta?" · "+c.cuenta:""}`:`Tradovate no conectado${c.broker?" (bróker: "+c.broker+")":""}`);
- realNow=!!c.real}
+ luz("tradovate",c.tradovate,c.tradovate?`Tradovate conectado${c.cuenta?" · "+c.cuenta:""}`:`Tradovate no conectado${c.broker?" (bróker: "+c.broker+")":""}`)}
 conn();setInterval(conn,5000);
 
-// Aviso de cuenta real al despertar al agente (una vez por sesión del navegador)
-const RK="tl_real_ok";let realNow=false;
-const mo=document.createElement("div");mo.id="tlRealModal";mo.innerHTML='<div class=box role=dialog aria-modal=true><h3>Cuenta real</h3><p>Esta cuenta opera con dinero real. ¿Continuar?</p><div class=bt><button data-no>Cancelar</button><button data-ok>Continuar</button></div></div>';document.body.appendChild(mo);
-let res=null;const close=v=>{mo.classList.remove("open");if(res){const r=res;res=null;r(v)}};
-mo.querySelector("[data-no]").onclick=()=>close(false);mo.querySelector("[data-ok]").onclick=()=>{sessionStorage.setItem(RK,"1");close(true)};
-mo.addEventListener("pointerdown",e=>e.stopPropagation());mo.addEventListener("click",e=>{e.stopPropagation();if(e.target===mo)close(false)});
-document.addEventListener("keydown",e=>{if(e.key==="Escape"&&mo.classList.contains("open"))close(false)});
-const ask=()=>new Promise(r=>{res=r;mo.classList.add("open");mo.querySelector("[data-ok]").focus()});
-window.__tlRealGate={ok:()=>!realNow||sessionStorage.getItem(RK)==="1",
- ask:async()=>{if(await ask()){const p=document.getElementById("botToggle");p&&p.click()}},
- confirm:async()=>sessionStorage.getItem(RK)==="1"||ask(),
- reset:()=>sessionStorage.removeItem(RK),
- refresh:async()=>{try{await conn()}catch(e){}try{const c=await (await fetch("/api/colchon/check",{cache:"no-store"})).json();if(c&&c.real)realNow=true}catch(e){}return realNow}};
 // 4) Historial de trades
 const v=document.getElementById("tradesView");let dia=null;
 const mk=c=>{c=String(c??"");const m=c.match(/^([A-Za-z0-9]{4})[A-Za-z0-9…]*?([0-9A-Za-z]{3})$/);return c.length>8&&m?m[1]+"…"+m[2]:c};async function list(){v.classList.remove("det");let d;try{d=await (await fetch("/api/colchon/trades"+(dia?"?dia="+dia:""),{cache:"no-store"})).json()}catch(e){v.innerHTML='<button class=close>×</button><h2>📈 Historial de trades</h2><p>No pude leer los trades.</p>';v.querySelector(".close").onclick=()=>v.classList.remove("open");return}

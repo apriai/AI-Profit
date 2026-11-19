@@ -48,7 +48,9 @@ assert.doesNotMatch(go, /\/api\/colchon\/check/);
 assert.match(go, /Elige una cuenta/);
 assert.match(go, /accountName:sa\.name/);
 assert.match(go, /tClick/);
-assert.match(go, /needConfirm/);
+assert.doesNotMatch(go, /__tlRealGate|needConfirm|tlRealModal/);
+assert.doesNotMatch(pagina, /Esta cuenta opera con dinero real/);
+assert.match(go, /\/api\/colchon\/start/);
 assert.match(pagina, /\/api\/colchon\/panel/);
 assert.match(pagina, /pulsoPanel\(false\)/);
 assert.match(link, /frenaEscaneo/);
@@ -287,12 +289,13 @@ limpiar();
   let n = 0;
   const k = createColchon(apiDriver(async () => { n++; throw new Error('no debía leer TradingView'); }), { logFile, ignoreClock: true, realAllowFile: allow, noTicks: true });
   const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 1, accountId: '9', accountName: 'LFE02500000000001', confirmReal: false, tClick: Date.now() });
-  assert.equal(r.needConfirm, true);
-  assert.match(r.err, /falta confirmación/);
-  assert.equal(n, 0);
+  assert.notEqual(r.needConfirm, true);
+  assert.doesNotMatch(String(r.err), /falta confirmación/);
+  assert.ok(n > 0, 'BUY/SELL de una cuenta real sale sin ventana y sí llama a TradingView');
+  const antes = n;
   const r2 = await k.start({ side: 'long', symbol: 'MNQ', qty: 1, tClick: Date.now() });
   assert.match(r2.err, /Elige una cuenta/);
-  assert.equal(n, 0);
+  assert.equal(n, antes, 'sin cuenta no llama a TradingView');
 }
 
 const llamadas = [];

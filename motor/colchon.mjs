@@ -752,7 +752,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
         return r || { ok: false, err: 'No se pudo iniciar' };
       } catch (e) { acctGuard.testActive = false; if (S.state === 'running') S.state = 'error'; return { ok: false, err: String(e.message || e) }; }
     },
-    async _start({ side = 'long', symbol = DEFAULT.symbol, qty, accountId, accountName, strategyId, confirmReal, tClick } = {}) {
+    async _start({ side = 'long', symbol = DEFAULT.symbol, qty, accountId, accountName, strategyId, tClick } = {}) {
       const tServer = Date.now();
       const tiempos = { clickServidor: tClick != null && Number.isFinite(+tClick) ? tServer - +tClick : null };
       const strat = getStrategy(strategyId == null || strategyId === '' ? DEFAULT_STRATEGY : strategyId); if (!strat) return { ok: false, err: `Estrategia desconocida: ${strategyId}` };
@@ -765,7 +765,6 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
       if (nombrePedido) {
         const hint0 = accountHintFor(nombrePedido), max0 = maxQtyFor(symbol, hint0);
         if (qty > max0) return { ok: false, err: `Cantidad inválida: ${symbol} entre 1 y ${max0}` };
-        if (!isPaper(nombrePedido) && realAllowed(nombrePedido, allow()) && confirmReal !== true) return { ok: false, blocked: true, needConfirm: true, err: `CUENTA REAL · ${realLabel(nombrePedido)}: falta confirmación` };
       }
       const tPrep = Date.now(); let prep;
       try { prep = await (await D()).preparar(accountId || '', nombrePedido, symbol); }
@@ -775,8 +774,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
       const brokerTxt = [prep.broker, prep.brokerId].filter(Boolean).join(' ');
       const paper = isPaper(name, brokerTxt), real = !paper && realAllowed(name, allow());
       const chk = { account: { name: name || null, broker: brokerTxt, api: true }, paper, real, realLabel: real ? realLabel(name) : null, msg: paper ? 'Paper/Demo OK' : real ? `CUENTA REAL · ${realLabel(name)}` : (name ? 'No pude leer esa cuenta de TradingView' : 'No veo la cuenta en TradingView') };
-      if (real && confirmReal !== true) return { ok: false, blocked: true, needConfirm: true, err: `CUENTA REAL · ${chk.realLabel}: falta confirmación (confirmReal)` };
-      const exec = paper || (real && confirmReal === true);
+      const exec = paper || real;
       if ((desdePanel || (accountId != null && accountId !== '')) && !exec) return { ok: false, blocked: true, err: chk.msg };
       if (accountId && prep.accountId && String(prep.accountId) !== String(accountId)) return { ok: false, err: 'La cuenta activa no es la elegida: no se opera' };
       const hint = accountHintFor(name);
@@ -786,8 +784,8 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
       stopReq = false;
       log(`Inicio [${strat.name}] ${side === 'long' ? 'COMPRA' : 'VENTA'} ${qty} ${symbol} · SL -$${P.SL_USD} (${slPts} pts) · TP +$${P.TP_USD} (${tpPts} pts) · ${P.STEPS ? (!c.steps.length ? 'stop fijo (sin movimientos)' : 'escalones ' + c.steps.map(x => `+$${x.triggerUsd}→+$${x.lockUsd} (${x.lockPts} pts)`).join(' · ')) : `colchón +$${lockUsdFor(symbol, qty, P)} (${lockPtsFor(symbol, qty, P)} pts, ≈ +$${P.NET_USD} netos), disparo +$${triggerUsdFor(symbol, qty, P)} (${triggerPtsFor(symbol, qty, P)} pts)`} · cuenta ${chk.account.name || '?'}${strat.params.SCALE_BY_SIZE ? ' · plan ' + accountPlanSize(hint) : ''} -> ${chk.msg}`);
       if (prep.switchedMs != null) log(`Cuenta cambiada a ${name} por API (${(prep.switchedMs / 1000).toFixed(2)} s, verificada)`);
-      if (chk.real) log(`CUENTA REAL · ${chk.realLabel} · confirmada por el usuario`);
-      if (!exec) { log('BLOQUEADO: solo Paper/Demo o cuenta real permitida y confirmada. No se envía ninguna orden.'); S.state = 'blocked'; return { ok: false, blocked: true, err: chk.msg, status: S }; }
+      if (chk.real) log(`CUENTA REAL · ${chk.realLabel} · sin confirmación (desactivada)`);
+      if (!exec) { log('BLOQUEADO: solo Paper/Demo o cuenta real permitida. No se envía ninguna orden.'); S.state = 'blocked'; return { ok: false, blocked: true, err: chk.msg, status: S }; }
       const drv = await D(); S.accountId = prep.accountId || null;
       const marcas = {};
       const op = await drv.openBracket({ ...c, slPts, tpPts, tradeSymbol: prep.tradeSymbol, fillWaitMs: opts.fillWaitMs, adoptMs: opts.adoptMs, marcar: m => Object.assign(marcas, m) });

@@ -14,6 +14,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 ### Corregido
 - **El resumen usa el mismo P&L que el historial.** Al cerrarse la posición se lee la ida y vuelta de las ejecuciones del bróker (hasta ~3 s si tardan). El número es el de la fila, ya con la comisión. Solo si no se puede leer se queda el P&L aproximado. El motivo sale del precio de salida: a 1 pt del stop protegido es Stop loss, a 1 pt del objetivo es Take profit.
 - **Detener y cerrar, con el trade abierto, cierra al momento.** Ya no pregunta.
+- **BUY y SELL no preguntan si la cuenta es real.** La orden sale directo. El servidor sigue comprobando la cuenta. El registro dice «sin confirmación (desactivada)».
 ### Notas
 - No cambia cómo se abre la orden ni cómo se mueve el stop.
 
