@@ -449,28 +449,29 @@ return {ok:true, visible:!!D.visible, studyId:uno[0].id};
 })()`;
 }
 
-// Una vez por vela y dirección. Si el círculo se apaga y vuelve en la misma vela, no se repite.
-export function decidirToque(vistos, lectura) {
+// Cada vez que el círculo pasa de apagado a encendido en la vela en curso.
+// Si sigue encendido, no se repite. Al cambiar de vela se olvida lo anterior.
+export function decidirToque(estado, lectura) {
   const nada = { tocar: false, lado: null, barra: null };
-  if (!Array.isArray(vistos)) return nada;
+  if (!estado || typeof estado !== 'object' || Array.isArray(estado) || estado instanceof Set) return nada;
   if (!lectura || lectura.ok !== true) return nada;
   if (lectura.visible === false || !lectura.enGrafico) return nada;
   const barra = lectura.barra;
   if (barra == null || barra === '') return nada;
-  const lados = [];
-  if (lectura.alcista) lados.push('alcista');
-  if (lectura.bajista) lados.push('bajista');
-  if (!lados.length) return { tocar: false, lado: null, barra };
-  let toco = false;
-  let lado = null;
-  for (const l of lados) {
-    const clave = String(barra) + '|' + l;
-    if (vistos.includes(clave)) continue;
-    vistos.push(clave);
-    if (vistos.length > 240) vistos.splice(0, vistos.length - 200);
-    if (!toco) { toco = true; lado = l; }
+  if (String(estado.barra) !== String(barra)) {
+    estado.barra = barra;
+    estado.alcista = false;
+    estado.bajista = false;
   }
-  return { tocar: toco, lado, barra };
+  const alcista = !!lectura.alcista;
+  const bajista = !!lectura.bajista;
+  const subeAlcista = alcista && !estado.alcista;
+  const subeBajista = bajista && !estado.bajista;
+  estado.alcista = alcista;
+  estado.bajista = bajista;
+  const tocar = subeAlcista || subeBajista;
+  const lado = subeAlcista ? 'alcista' : (subeBajista ? 'bajista' : null);
+  return { tocar, lado, barra };
 }
 
 // Lee Alcista/Bajista en la última vela (la que se está formando). No toca órdenes ni la cuenta.
@@ -614,7 +615,7 @@ export function crearAlgoTv({
     }
     return memoria.fase === 'instalando' || memoria.fase === 'listos' ? memoria.fase : null;
   }
-  const vistosSenal = [];
+  const estadoSenal = { barra: null, alcista: false, bajista: false };
   let senal = { seq: 0, barra: null, lado: null };
   let senalEnCurso = false;
   function estado() {
@@ -626,7 +627,7 @@ export function crearAlgoTv({
     senalEnCurso = true;
     try {
       const r = await evaluar(exprSenal({ nombre: ALGO_NOMBRE }));
-      const d = decidirToque(vistosSenal, r || {});
+      const d = decidirToque(estadoSenal, r || {});
       if (d.tocar) senal = { seq: senal.seq + 1, barra: d.barra, lado: d.lado };
     } catch { /* el gráfico a veces no deja leer el estudio; no suena y no se cae */ }
     finally { senalEnCurso = false; }

@@ -1,4 +1,4 @@
-// La señal del círculo suena una vez por vela y dirección, y no toca órdenes.
+// La señal suena cada vez que el círculo aparece en la vela en curso, y no toca órdenes.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -6,17 +6,21 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { decidirToque, exprSenal, crearAlgoTv, ALGO_NOMBRE, PINE_DIR } from './pine-algo.mjs';
 
-const vistos = [];
+const est = { barra: null, alcista: false, bajista: false };
 const barra = 1700000000;
-assert.equal(decidirToque(vistos, { ok: true, visible: true, enGrafico: 1, barra, alcista: true, bajista: false }).tocar, true);
-assert.equal(decidirToque(vistos, { ok: true, visible: true, enGrafico: 1, barra, alcista: false, bajista: false }).tocar, false, 'si se apaga no suena');
-assert.equal(decidirToque(vistos, { ok: true, visible: true, enGrafico: 1, barra, alcista: true, bajista: false }).tocar, false, 'si vuelve en la misma vela no se repite');
-assert.equal(decidirToque(vistos, { ok: true, visible: true, enGrafico: 1, barra, alcista: false, bajista: true }).lado, 'bajista');
-assert.equal(decidirToque(vistos, { ok: true, visible: true, enGrafico: 1, barra: barra + 60, alcista: true }).tocar, true, 'la vela siguiente sí suena');
-assert.equal(decidirToque(vistos, { ok: true, visible: false, enGrafico: 1, barra: barra + 120, alcista: true }).tocar, false, 'oculto no suena');
-assert.equal(decidirToque(vistos, { ok: true, visible: true, enGrafico: 0, barra: barra + 120, alcista: true }).tocar, false, 'sin estudio no suena');
-assert.equal(decidirToque(vistos, { ok: false, visible: true, enGrafico: 1, barra: barra + 180, alcista: true }).tocar, false, 'un fallo del gráfico no suena');
-assert.equal(decidirToque(new Set([barra + '|alcista']), { ok: true, visible: true, enGrafico: 1, barra, alcista: true }).tocar, false, 'un Set no es el anillo y no rompe');
+const en = (extra) => ({ ok: true, visible: true, enGrafico: 1, barra, alcista: false, bajista: false, ...extra });
+assert.equal(decidirToque(est, en({ alcista: true })).tocar, true);
+assert.equal(decidirToque(est, en({ alcista: true })).tocar, false, 'si el círculo sigue, no se repite');
+assert.equal(decidirToque(est, en()).tocar, false, 'si se apaga no suena');
+assert.equal(decidirToque(est, en({ alcista: true })).tocar, true, 'si vuelve en la misma vela, suena otra vez');
+assert.equal(decidirToque(est, en({ alcista: true })).tocar, false);
+assert.equal(decidirToque(est, en({ bajista: true })).lado, 'bajista', 'el otro círculo, al aparecer, también suena');
+assert.equal(decidirToque(est, en({ barra: barra + 60, alcista: true })).tocar, true, 'la vela siguiente empieza de cero');
+assert.equal(decidirToque(est, { ok: true, visible: false, enGrafico: 1, barra: barra + 120, alcista: true }).tocar, false, 'oculto no suena');
+assert.equal(decidirToque(est, { ok: true, visible: true, enGrafico: 0, barra: barra + 120, alcista: true }).tocar, false, 'sin estudio no suena');
+assert.equal(decidirToque(est, { ok: false, visible: true, enGrafico: 1, barra: barra + 180, alcista: true }).tocar, false, 'un fallo del gráfico no suena');
+assert.equal(decidirToque(est, en({ barra: barra + 60, alcista: true })).tocar, false, 'el fallo no cuenta como que el círculo se apagó');
+assert.equal(decidirToque(new Set(), en({ alcista: true })).tocar, false, 'un estado que no es objeto no rompe');
 
 function pagina(estudio, visible) {
   const study = estudio || {
@@ -82,6 +86,8 @@ const tv = crearAlgoTv({
     if (n === 1) return { ok: true, visible: true, enGrafico: 1, barra, alcista: true, bajista: false };
     if (n === 2) return { ok: true, visible: true, enGrafico: 1, barra, alcista: false, bajista: false };
     if (n === 3) return { ok: true, visible: true, enGrafico: 1, barra, alcista: true, bajista: false };
+    if (n === 4) return { ok: true, visible: true, enGrafico: 1, barra, alcista: true, bajista: false };
+    if (n === 5) return { ok: true, visible: true, enGrafico: 1, barra: barra + 60, alcista: true, bajista: false };
     throw new Error('chart interno');
   },
 });
@@ -91,9 +97,13 @@ assert.equal(uno.senal.lado, 'alcista');
 const dos = await tv.oirSenal();
 assert.equal(dos.senal.seq, 1, 'apagarse no suma otro aviso');
 const tres = await tv.oirSenal();
-assert.equal(tres.senal.seq, 1, 'reaparecer en la misma vela no suma otro aviso');
+assert.equal(tres.senal.seq, 2, 'reaparecer en la misma vela suma otro aviso');
 const cuatro = await tv.oirSenal();
-assert.equal(cuatro.senal.seq, 1, 'un fallo no tira el motor ni suena');
+assert.equal(cuatro.senal.seq, 2, 'seguir encendido no suma otro aviso');
+const cinco = await tv.oirSenal();
+assert.equal(cinco.senal.seq, 3, 'la vela nueva vuelve a sonar');
+const seis = await tv.oirSenal();
+assert.equal(seis.senal.seq, 3, 'un fallo no tira el motor ni suena');
 
 const html = fs.readFileSync(new URL('./Granja-de-Cuentas-v2.html', import.meta.url), 'utf8');
 const motor = fs.readFileSync(new URL('./tradinglink.mjs', import.meta.url), 'utf8');
