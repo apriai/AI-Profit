@@ -13,6 +13,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 ## [0.10.30] — 2026-11-19
 ### Corregido
 - **El reajuste al fill espera a que aparezcan el SL y el TP.** La posición puede verse en menos de un segundo, antes de que TradingView liste las órdenes hijas. Mientras faltan, no se reajusta y no se marca como hecho: se vuelve a mirar cada ~150 ms, hasta 2 s desde que se vio la posición. El paso, si toca, se mueve en cuanto el stop existe. Cuando están las dos, el reajuste sigue en orden (SL y después TP) y no baja un stop ya protegido. Si a los 2 s siguen sin verse, se dejan como se enviaron y el registro dice «Ajuste por fill omitido», sin aviso en pantalla. El fallo de un reajuste que sí se intentó también queda solo en el registro. Cuando aparecen, se anota «SL/TP visibles a los … ms».
+- **El sonido de Profito Algoritmo no suena por barras viejas al cambiar el marco de TradingView.** Al cambiar de marco o de símbolo, o en la primera lectura, solo reanuda el estado y no suena. Una barra más vieja que la ya vista en ese marco se ignora. En la vela en curso sigue sonando cada vez que el círculo pasa de apagado a encendido. Cada sonido y cada reanudación quedan en el registro.
 ### Notas
 - La orden sigue siendo una sola. No cambia cómo se decide el paso.
 

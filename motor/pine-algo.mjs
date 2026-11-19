@@ -450,7 +450,9 @@ return {ok:true, visible:!!D.visible, studyId:uno[0].id};
 }
 
 // Cada vez que el círculo pasa de apagado a encendido en la vela en curso.
-// Si sigue encendido, no se repite. Al cambiar de vela se olvida lo anterior.
+// Si sigue encendido, no se repite. Al cambiar de vela (más nueva) se olvida lo anterior.
+// Un cambio de marco o de símbolo, o la primera lectura, solo reanuda: no suena.
+// Una barra más vieja que la ya vista en ese marco no suena ni borra el estado.
 export function decidirToque(estado, lectura) {
   const nada = { tocar: false, lado: null, barra: null };
   if (!estado || typeof estado !== 'object' || Array.isArray(estado) || estado instanceof Set) return nada;
@@ -458,8 +460,25 @@ export function decidirToque(estado, lectura) {
   if (lectura.visible === false || !lectura.enGrafico) return nada;
   const barra = lectura.barra;
   if (barra == null || barra === '') return nada;
+  const res = lectura.resolucion != null ? String(lectura.resolucion) : '';
+  const sim = lectura.simbolo != null ? String(lectura.simbolo) : '';
+  const clave = res + '\n' + sim;
+  const t = Number(barra);
+  const tiempo = Number.isFinite(t) ? t : null;
+  if (estado.clave == null || estado.clave !== clave) {
+    estado.clave = clave;
+    estado.resolucion = res;
+    estado.simbolo = sim;
+    estado.barra = barra;
+    estado.maxBarra = tiempo;
+    estado.alcista = !!lectura.alcista;
+    estado.bajista = !!lectura.bajista;
+    return { tocar: false, lado: null, barra, rebaseline: true, resolucion: res, simbolo: sim };
+  }
+  if (tiempo != null && estado.maxBarra != null && tiempo < estado.maxBarra) return { tocar: false, lado: null, barra, ignorada: true, resolucion: res, simbolo: sim };
   if (String(estado.barra) !== String(barra)) {
     estado.barra = barra;
+    if (tiempo != null) estado.maxBarra = tiempo;
     estado.alcista = false;
     estado.bajista = false;
   }
@@ -471,7 +490,7 @@ export function decidirToque(estado, lectura) {
   estado.bajista = bajista;
   const tocar = subeAlcista || subeBajista;
   const lado = subeAlcista ? 'alcista' : (subeBajista ? 'bajista' : null);
-  return { tocar, lado, barra };
+  return { tocar, lado, barra, resolucion: res, simbolo: sim };
 }
 
 // Lee Alcista/Bajista en la última vela (la que se está formando). No toca órdenes ni la cuenta.
@@ -543,6 +562,9 @@ function plotEn(info, idx){
 }
 try{
   var c=chart();
+  var res='', sim='';
+  try{ if(c&&typeof c.resolution==='function') res=String(c.resolution()||''); }catch(eR){}
+  try{ if(c&&typeof c.symbol==='function') sim=String(c.symbol()||''); }catch(eS){}
   var lista=[];
   if(c&&typeof c.getAllStudies==='function'){
     var raw=[]; try{raw=c.getAllStudies()||[]}catch(e){raw=[]}
@@ -556,7 +578,7 @@ try{
     for(var n=0;n<lista.length;n++){ if(lista[n].id&&id&&lista[n].id===id){ lista[n].src=src; ya=true; } }
     if(!ya) lista.push({id:id, src:src});
   }
-  if(!lista.length) return {ok:true, enGrafico:0, visible:false, barra:null, alcista:false, bajista:false};
+  if(!lista.length) return {ok:true, enGrafico:0, visible:false, barra:null, alcista:false, bajista:false, resolucion:res, simbolo:sim};
   var elegido=null;
   for(var p=0;p<lista.length;p++){
     var item=lista[p];
@@ -564,12 +586,12 @@ try{
     if(oculto(c, item.src, item.id)) continue;
     elegido=item; break;
   }
-  if(!elegido) return {ok:true, enGrafico:lista.length, visible:false, barra:null, alcista:false, bajista:false};
+  if(!elegido) return {ok:true, enGrafico:lista.length, visible:false, barra:null, alcista:false, bajista:false, resolucion:res, simbolo:sim};
   var mi=null; try{ mi=elegido.src&&elegido.src.metaInfo&&elegido.src.metaInfo(); }catch(e6){}
   var ix=indices(mi||{});
   var info=elegido.src?ultimo(elegido.src):null;
-  if(!info||info.time==null) return {ok:true, enGrafico:lista.length, visible:true, barra:null, alcista:false, bajista:false};
-  return {ok:true, enGrafico:lista.length, visible:true, barra:info.time, alcista:plotEn(info, ix.al), bajista:plotEn(info, ix.ba)};
+  if(!info||info.time==null) return {ok:true, enGrafico:lista.length, visible:true, barra:null, alcista:false, bajista:false, resolucion:res, simbolo:sim};
+  return {ok:true, enGrafico:lista.length, visible:true, barra:info.time, alcista:plotEn(info, ix.al), bajista:plotEn(info, ix.ba), resolucion:res, simbolo:sim};
 }catch(e){ return {ok:false}; }
 })()`;
 }
@@ -628,7 +650,11 @@ export function crearAlgoTv({
     try {
       const r = await evaluar(exprSenal({ nombre: ALGO_NOMBRE }));
       const d = decidirToque(estadoSenal, r || {});
-      if (d.tocar) senal = { seq: senal.seq + 1, barra: d.barra, lado: d.lado };
+      if (d.rebaseline) log(`Señal Profito Algoritmo: marco reanudado (${d.resolucion || '?'} ${d.simbolo || '?'}, barra ${d.barra})`);
+      if (d.tocar) {
+        senal = { seq: senal.seq + 1, barra: d.barra, lado: d.lado };
+        log(`Señal Profito Algoritmo: barra ${d.barra} · ${d.resolucion || '?'} · ${d.lado}`);
+      }
     } catch { /* el gráfico a veces no deja leer el estudio; no suena y no se cae */ }
     finally { senalEnCurso = false; }
     return estado();
