@@ -4,11 +4,24 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
-import { decidirToque, exprSenal, crearAlgoTv, ALGO_NOMBRE, PINE_DIR } from './pine-algo.mjs';
+import { decidirToque, exprSenal, crearAlgoTv, ALGO_NOMBRE, PINE_DIR, barraEnMs, duracionMarcoMs } from './pine-algo.mjs';
+
+assert.equal(duracionMarcoMs('5'), 5 * 60 * 1000);
+assert.equal(duracionMarcoMs('30S'), 30 * 1000);
+assert.equal(duracionMarcoMs('1H'), 3600000);
+assert.equal(duracionMarcoMs('1D'), 86400000);
+assert.equal(duracionMarcoMs('W'), 7 * 86400000);
+assert.equal(duracionMarcoMs('M'), 30 * 86400000);
+assert.equal(duracionMarcoMs('raro'), null);
 
 const est = { barra: null, alcista: false, bajista: false };
 const barra = 1700000000;
-const en = (extra) => ({ ok: true, visible: true, enGrafico: 1, barra, alcista: false, bajista: false, resolucion: '1', simbolo: 'MNQ1!', ...extra });
+const dentro = b => barraEnMs(b) + 5000;
+const en = (extra = {}) => {
+  const b = extra.barra != null ? extra.barra : barra;
+  const ahora = extra.ahora != null ? extra.ahora : dentro(b);
+  return { ok: true, visible: true, enGrafico: 1, alcista: false, bajista: false, resolucion: '1', simbolo: 'MNQ1!', ...extra, barra: b, ahora };
+};
 assert.equal(decidirToque(est, en({ alcista: true })).tocar, false, 'la primera lectura solo reanuda');
 assert.equal(est.alcista, true);
 assert.equal(decidirToque(est, en({ alcista: true })).tocar, false, 'si el círculo sigue, no se repite');
@@ -23,12 +36,35 @@ assert.equal(decidirToque(est, { ok: true, visible: false, enGrafico: 1, barra: 
 assert.equal(decidirToque(est, { ok: true, visible: true, enGrafico: 0, barra: barra + 120, alcista: true }).tocar, false, 'sin estudio no suena');
 assert.equal(decidirToque(est, { ok: false, visible: true, enGrafico: 1, barra: barra + 180, alcista: true }).tocar, false, 'un fallo del gráfico no suena');
 assert.equal(decidirToque(est, en({ barra: barra + 60, alcista: true })).tocar, false, 'el fallo no cuenta como que el círculo se apagó');
-assert.equal(decidirToque(est, en({ barra: barra, resolucion: '5', simbolo: 'MNQ1!', alcista: true })).tocar, false, 'cambiar de marco con el círculo ya encendido no suena');
-assert.equal(decidirToque(est, en({ barra: barra - 120, resolucion: '5', simbolo: 'MNQ1!', alcista: true })).tocar, false, 'una barra más vieja, después de una más nueva, no suena');
-assert.equal(est.barra, barra, 'la barra vieja no borra la vela ya vista');
-assert.equal(est.alcista, true, 'la barra vieja no apaga el círculo ya visto');
-assert.equal(decidirToque(est, en({ barra: barra + 300, resolucion: '5', simbolo: 'MNQ1!', alcista: true })).tocar, true, 'la vela en curso del marco nuevo sí suena');
+assert.equal(decidirToque(est, en({ barra, resolucion: '5', simbolo: 'MNQ1!', alcista: true })).tocar, false, 'cambiar de marco con el círculo ya encendido no suena');
+assert.equal(decidirToque(est, en({ barra: barra - 120, resolucion: '5', simbolo: 'MNQ1!', alcista: true, ahora: dentro(barra) })).tocar, false, 'una barra más vieja no suena');
+assert.equal(est.alcista, false, 'la vela pasada no deja el círculo marcado');
+assert.equal(est.barra, null, 'la vela pasada no se queda como la vela actual');
+{
+  const viva5 = barra + 300, a5 = dentro(viva5);
+  assert.equal(decidirToque(est, en({ barra: viva5, resolucion: '5', simbolo: 'MNQ1!', alcista: true, ahora: a5 })).tocar, false, 'tras el cambio, la primera lectura estable no suena todavía');
+  assert.equal(decidirToque(est, en({ barra: viva5, resolucion: '5', simbolo: 'MNQ1!', alcista: true, ahora: a5 + 1100 })).tocar, true, 'un segundo en la misma vela en vivo ya puede sonar');
+}
 assert.equal(decidirToque(new Set(), en({ alcista: true })).tocar, false, 'un estado que no es objeto no rompe');
+
+// HERO 3:10:50 PM ET, marco de 5 min: 2:45 y 3:00 ya cerraron. La vela en vivo es la de 3:10.
+{
+  const b245 = 1795107900, b300 = 1795108800, b310 = 1795109400;
+  const ahora = barraEnMs(b310) + 50 * 1000;
+  const e = { barra: null, alcista: false, bajista: false };
+  const lec = (b, extra) => ({ ok: true, visible: true, enGrafico: 1, simbolo: 'CME_MINI:MNQZ2026', resolucion: '5', barra: b, ahora, alcista: true, bajista: false, ...extra });
+  assert.equal(decidirToque(e, { ...lec(b310, { resolucion: '1', alcista: false }) }).tocar, false);
+  assert.equal(decidirToque(e, lec(b245)).tocar, false, 'reanudar en 2:45 no suena');
+  assert.equal(decidirToque(e, lec(b300)).pasada, true, 'la vela de 3:00 ya está cerrada');
+  assert.equal(decidirToque(e, lec(b300)).tocar, false);
+  assert.equal(e.alcista, false, 'la vela pasada no bloquea la de las 3:10');
+  const a310 = barraEnMs(b310) + 50 * 1000;
+  assert.equal(decidirToque(e, lec(b310, { ahora: a310 })).tocar, false, 'la vela en vivo espera a quedarse quieta');
+  assert.equal(decidirToque(e, lec(b310, { ahora: a310 + 1100 })).tocar, true, 'ya estable, el círculo encendido suena');
+  assert.equal(decidirToque(e, lec(b310, { ahora: a310 + 1200, alcista: false })).tocar, false);
+  assert.equal(decidirToque(e, lec(b310, { ahora: a310 + 1300 })).tocar, true, 'al volver a encenderse en la misma vela suena otra vez');
+  assert.equal(decidirToque(e, lec(b310, { ahora: a310 + 1400, simbolo: 'CME_MINI:NQZ2026' })).tocar, false, 'cambiar de símbolo no suena');
+}
 
 function pagina(estudio, visible) {
   const study = estudio || {
@@ -91,7 +127,8 @@ assert.match(expr, /getStudyById/);
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'senal-algo-'));
 const lineas = [];
 let n = 0;
-const base = { ok: true, visible: true, enGrafico: 1, resolucion: '1', simbolo: 'MNQ1!' };
+const tLive = barraEnMs(barra) + 5000;
+const base = { ok: true, visible: true, enGrafico: 1, resolucion: '1', simbolo: 'MNQ1!', ahora: tLive };
 const tv = crearAlgoTv({
   dir,
   pineDir: PINE_DIR,
@@ -102,11 +139,12 @@ const tv = crearAlgoTv({
     if (n === 2) return { ...base, barra, alcista: false, bajista: false };
     if (n === 3) return { ...base, barra, alcista: true, bajista: false };
     if (n === 4) return { ...base, barra, alcista: true, bajista: false };
-    if (n === 5) return { ...base, barra: barra + 60, alcista: true, bajista: false };
+    if (n === 5) return { ...base, barra: barra + 60, ahora: barraEnMs(barra + 60) + 5000, alcista: true, bajista: false };
     if (n === 6) throw new Error('chart interno');
-    if (n === 7) return { ...base, resolucion: '5', barra: barra - 500, alcista: true, bajista: false };
-    if (n === 8) return { ...base, resolucion: '5', barra: barra - 800, alcista: true, bajista: false };
-    return { ...base, resolucion: '5', barra: barra + 300, alcista: true, bajista: false };
+    if (n === 7) return { ...base, resolucion: '5', barra: barra - 500, ahora: tLive, alcista: true, bajista: false };
+    if (n === 8) return { ...base, resolucion: '5', barra: barra - 800, ahora: tLive, alcista: true, bajista: false };
+    if (n === 9) return { ...base, resolucion: '5', barra: barra + 300, ahora: barraEnMs(barra + 300) + 5000, alcista: true, bajista: false };
+    return { ...base, resolucion: '5', barra: barra + 300, ahora: barraEnMs(barra + 300) + 5000 + 1100, alcista: true, bajista: false };
   },
 });
 const uno = await tv.oirSenal();
@@ -127,10 +165,13 @@ assert.equal(siete.senal.seq, 2, 'cambiar de marco con el círculo encendido en 
 const ocho = await tv.oirSenal();
 assert.equal(ocho.senal.seq, 2, 'una barra anterior a la ya vista no suena');
 const nueve = await tv.oirSenal();
-assert.equal(nueve.senal.seq, 3, 'la vela en curso del marco nuevo sí suena');
+assert.equal(nueve.senal.seq, 2, 'la primera lectura del marco nuevo, aunque sea la vela en vivo, espera');
+const diez = await tv.oirSenal();
+assert.equal(diez.senal.seq, 3, 'un segundo después, en la misma vela en vivo, suena');
 assert.ok(lineas.some(l => l.includes('marco reanudado') && l.includes('1') && l.includes(String(barra))));
 assert.ok(lineas.some(l => l.includes(`barra ${barra}`) && l.includes('1') && l.includes('alcista')));
 assert.ok(lineas.some(l => l.includes(`barra ${barra + 60}`) && l.includes('alcista')));
+assert.ok(lineas.some(l => l.includes('vela pasada ignorada')));
 assert.equal(lineas.filter(l => l.includes('marco reanudado')).length, 2);
 
 const html = fs.readFileSync(new URL('./Granja-de-Cuentas-v2.html', import.meta.url), 'utf8');

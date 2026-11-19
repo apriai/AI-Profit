@@ -13,6 +13,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 ## [0.10.32] — 2026-11-19
 ### Cambiado
 - **La explicación bajo Estrategia ya no se repite.** Solo queda el texto corto. Si el stop se mueve una vez (Fast Breakeven) se añade «Se mueve una sola vez.» Si es un colchón o tiene escalones, «Solo sube, nunca baja.» Si el stop no se mueve, el texto corto queda igual. Los dólares siguen saliendo de la cuenta, 25K o 50K.
+- **El sonido del algoritmo solo suena en la vela que está abierta.** Al cambiar de marco, las velas ya cerradas que van apareciendo mientras carga no suenan y no tapan la vela en vivo. Tras el cambio espera ~1 s a que la lectura se quede en la misma barra. En esa vela sigue sonando cada vez que el círculo se enciende.
 ### Notas
 - No cambia la orden ni el motor.
 
