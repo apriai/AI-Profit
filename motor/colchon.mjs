@@ -480,6 +480,7 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
       }
       const pos = st.pos;
       const plan = (pos.price != null) ? planAlAbrir({ side, entry: pos.entry, price: pos.price, steps, slPts, tpPts, usdPerPoint: (PT_USD[symbol] || 0) * pos.qty }) : null;
+      let tpFallo = null;
       if (plan && plan.tpReached) {
         let cr = null;
         try { cr = await evaluate(js.cerrarQty(symbol, s, Math.min(pos.qty, qty))); } catch (e) { cr = { error: String(e.message || e) }; }
@@ -494,9 +495,11 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
         }
         const pnl = salida != null && pos.entry != null ? Math.round((salida - pos.entry) * s * (PT_USD[symbol] || 0) * (cr && cr.qty || 0) * 100) / 100 : null;
         const okCierre = !!(cr && cr.ok && salida != null);
-        last.open = { tpHit: okCierre, ref: pos.entry, tp: plan.tp, price: pos.price, salida, salidaReal: pnl, qty: cr && cr.qty, orderId, pedirSaldo: true, alerta: okCierre ? null : 'El objetivo ya estaba pasado y el cierre de ESTA cantidad no se confirmó. No se tocó el resto.' };
-        if (!okCierre) return 'error: ' + last.open.alerta;
-        return `ok market ${cr.qty} @${pos.entry} objetivo ya pasado: salida ${salida}`;
+        if (okCierre) {
+          last.open = { tpHit: true, ref: pos.entry, tp: plan.tp, price: pos.price, salida, salidaReal: pnl, qty: cr && cr.qty, orderId, pedirSaldo: true, alerta: null };
+          return `ok market ${cr.qty} @${pos.entry} objetivo ya pasado: salida ${salida}`;
+        }
+        tpFallo = 'El objetivo ya estaba pasado y el cierre de ESTA cantidad no se confirmó. El stop de la orden sigue. No se tocó el resto.';
       }
       let visto = { ok: false, stops: [], doble: false };
       const hasta = Date.now() + 1000;
@@ -513,7 +516,7 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
         : !visto.ok
           ? 'NO VEO EL STOP de esta operación. Se sigue intentando. No se toca ninguna otra orden.'
           : parcial ? `Llenado parcial: hay ${pos.qty} de ${qty}. El bracket de la orden sigue. No se manda otra orden.` : (dudoso ? 'La orden tardó en confirmarse. La posición se adoptó con el bracket que ya traía.' : null);
-      const alerta = ((res && res.corte) ? 'La llamada se cortó. No se reenvía la orden. Se adopta la posición que apareció. ' : '') + (baseAlerta || '');
+      const alerta = ((res && res.corte) ? 'La llamada se cortó. No se reenvía la orden. Se adopta la posición que apareció. ' : '') + (tpFallo ? tpFallo + ' ' : '') + (baseAlerta || '');
       last.open = {
         ref: pos.entry, sl: plan ? plan.sl : (res && res.sl), tp: plan ? plan.tpPlace : (res && res.tp),
         orderId: orderId || null, posId: pos.id, slObjetivo: plan ? plan.sl : (res && res.sl), slOk: visto.ok && !visto.doble,

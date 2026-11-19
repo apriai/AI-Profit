@@ -45,6 +45,7 @@ function pagina(opts = {}) {
         return { orderId: id };
       }
       if (positions.length && o.side === -positions[0].side) {
+        if (opts.closeFail) return false;
         const p = positions[0];
         const q = Math.min(o.qty, Math.abs(Number(p.qty)));
         const id = 'C' + nid++;
@@ -278,6 +279,12 @@ ok(objetivo.tpReached && objetivo.sl == null, 'si el precio ya pasó el objetivo
   const sm = k.summary();
   ok(r.closed === 'tp' && pg.reduces.length === 1 && pg.reduces[0].qty === 20 && pg.reduces[0].price === 27740 && pg.closes.length === 0, 'el objetivo ya pasado cierra solo la cantidad de esta orden, al precio real');
   ok(sm && sm.pnlFinalUSD === 490 && sm.salida === 27740, 'el resumen usa la salida real, no los $104 del objetivo (' + (sm && sm.pnlFinalUSD) + ')'); }
+
+{ const book = { front: 'MNQZ2026', bid: 27739.75, ask: 27740, live: 27740, chart: 27720 };
+  const pg = pagina({ book, fillPx: 27727.75, closeFail: true });
+  const d = apiDriver(pg.evaluate);
+  const r = await d.openBracket({ side: 'long', symbol: 'MNQ', qty: 20, slPts: 15, tpPts: 2.5, steps: [] });
+  ok(pg.positions.length === 1 && pg.closes.length === 0 && pg.orders.some(o => o.type === 3) && /no se confirmó/.test(String(d.lastOpen() && d.lastOpen().alerta)) && !d.lastOpen().tpHit, 'si el cierre del objetivo falla, sigue el stop y no se da por cerrado (' + r + ')'); }
 
 if (process.exitCode) process.exit(process.exitCode);
 console.log('apertura-incierta ok');
