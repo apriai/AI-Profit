@@ -290,8 +290,13 @@ export const js = {
     else sym=symChart;
     if(!sym)return {ok:false,error:'sin simbolo',front:fr||null,rollover:rollover};
     var histIds=[];try{histIds=(await ab.ordersHistory()||[]).map(function(o){return String(o.id)})}catch(e){}
-    var trabIds=[];try{var wo=await tvAllOrders(t,ab);trabIds=wo.filter(function(o){return o&&tvRoot(o.symbol)===R&&(o.status===6||o.status===4)}).map(function(o){return String(o.id)})}catch(e){}
-    return {ok:true,accountId:cur,accountName:yo?yo.name:null,broker:tvBrokerId(ab),accounts:accounts,bid:bid,ask:ask,last:last,front:fr||null,symbol:sym,chart:symChart,rollover:rollover,histIds:histIds,trabIds:trabIds}})()`,
+    var leerTrab=async function(){var l=[],vio=false,err=null;
+      try{var a=tvWv(t._ordersService&&t._ordersService.activeOrders());if(a){l=a.slice();vio=true}}catch(e){err=String(e&&e.message||e)}
+      try{var b=await ab.orders();if(b){(b||[]).forEach(function(o){if(o&&!l.some(function(x){return x&&String(x.id)===String(o.id)}))l.push(o)});vio=true}}catch(e){err=err||String(e&&e.message||e)}
+      if(!vio)throw new Error(err||'sin órdenes de trabajo');return l};
+    var trabIds=[],trabError=null;
+    for(var ti=0;ti<2;ti++){try{var wo=await leerTrab();trabIds=wo.filter(function(o){return o&&tvRoot(o.symbol)===R&&(o.status===6||o.status===4)}).map(function(o){return String(o.id)});trabError=null;break}catch(e){trabError=String(e&&e.message||e);trabIds=[];if(ti===0)await new Promise(function(z){setTimeout(z,50)})}}
+    return {ok:true,accountId:cur,accountName:yo?yo.name:null,broker:tvBrokerId(ab),accounts:accounts,bid:bid,ask:ask,last:last,front:fr||null,symbol:sym,chart:symChart,rollover:rollover,histIds:histIds,trabIds:trabIds,trabError:trabError}})()`,
   // Llamada 2, la orden. No se reintenta. Relee cuenta, plano y contrato; si algo cambió, no envía.
   // El bracket se calcula aquí con el bid/ask de este momento y viaja en la misma placeOrder.
   enviar: p => `(async function(){${PAGE}/*ENVIO_APERTURA*/
@@ -426,9 +431,10 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
     const hol = HOLGURA_TICKS * TICK;
     const libro = side === 'long' ? (st && st.bid) : (st && st.ask);
     const px = st && st.pos && st.pos.price != null ? st.pos.price : (Number.isFinite(Number(libro)) ? Number(libro) : null);
-    const stops = ((st && st.ordenes) || []).filter(x => x.type === 3 && x.stopPrice != null);
+    const activo = x => x.status == null || Number(x.status) === 6 || Number(x.status) === 4;
+    const stops = ((st && st.ordenes) || []).filter(x => x.type === 3 && x.stopPrice != null && activo(x));
     const bueno = px == null ? [] : stops.filter(x => side === 'long' ? x.stopPrice <= px - hol + 1e-9 : x.stopPrice >= px + hol - 1e-9);
-    return { stops, ok: stops.length === 1 && bueno.length === 1, doble: stops.length > 1, px };
+    return { stops, ok: stops.length === 1, doble: stops.length > 1, bueno: bueno.length, px };
   };
   return {
     kind: 'api', ticker, lastOpen: () => last.open || null, lastPrep: () => prepVisto, vigilancia: () => vigilP,
@@ -632,14 +638,12 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
       const parcial = pos.qty < qty;
       const baseAlerta = visto.doble
         ? 'HAY MÁS DE UN STOP ligado a esta posición. No se manda otro. Revisa TradingView.'
-        : !visto.ok
-          ? 'NO VEO EL STOP de esta operación. Se sigue intentando. No se toca ninguna otra orden.'
-          : parcial && !(tpFallo && /^Salida parcial en el objetivo: quedan /.test(tpFallo)) ? `Llenado parcial: hay ${pos.qty} de ${qty}. El bracket de la orden sigue. No se manda otra orden.` : (dudoso ? 'La orden tardó en confirmarse. La posición se adoptó con el bracket que ya traía.' : null);
+        : parcial && !(tpFallo && /^Salida parcial en el objetivo: quedan /.test(tpFallo)) ? `Llenado parcial: hay ${pos.qty} de ${qty}. El bracket de la orden sigue. No se manda otra orden.` : (dudoso ? 'La orden tardó en confirmarse. La posición se adoptó con el bracket que ya traía.' : null);
       const alerta = [res && res.corte ? 'La llamada se cortó. No se reenvía la orden. Se adopta la posición que apareció.' : '', tpFallo || '', baseAlerta || ''].filter(Boolean).join(' ');
       last.open = {
-        ref: pos.entry, sl: plan ? plan.sl : (res && res.sl), tp: plan ? plan.tpPlace : (res && res.tp),
+        ref: pos.entry, enviado: res ? (side === 'long' ? res.ask : res.bid) : null, sl: plan ? plan.sl : (res && res.sl), tp: plan ? plan.tpPlace : (res && res.tp),
         orderId: orderId || null, posId: pos.id, slObjetivo: plan ? plan.sl : (res && res.sl), slOk: visto.ok && !visto.doble,
-        alerta, step: plan && plan.step ? plan.nextStep : 0, locked: !!(plan && plan.step && plan.locked),
+        alerta, sinStop: !visto.ok && !visto.doble, step: plan && plan.step ? plan.nextStep : 0, locked: !!(plan && plan.step && plan.locked),
         paso: plan && plan.step ? { paso: plan.step.n, disparoUSD: plan.step.triggerUsd, protegeUSD: plan.step.lockUsd, precio: plan.sl, enSeg: 0, confirmado: false, saltados: plan.stepIndex } : null,
         parcial, qtyVista: pos.qty, dudoso, pedirSaldo: dudoso || parcial, volcado,
       };
@@ -777,21 +781,39 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
           const rec = { ref: S.ref, fill: pos.entry, slAntes: slA, slNuevo: slN, tpAntes: tpA, tpNuevo: tpN, stopId: pos.stopId ?? null, paso: plan.step ? plan.step.n : null, una: true };
           if ((slA === slN || slN == null) && (tpA === tpN || tpN == null)) { rec.ok = slN != null; rec.nada = true; }
           else { const t0 = Date.now();
-            let job = slN == null || slA === slN ? Promise.resolve({ ok: slN != null, ya: true }) : driver.modifyStop(slN, c.symbol);
-            const tpJob = tpN == null ? Promise.resolve({ ok: true, ya: true }) : (driver.modifyTp ? driver.modifyTp(tpN, c.symbol) : Promise.resolve({ ok: false, err: 'sin modifyTp' }));
+            const enPaper = /paper/i.test(String(((driver.lastPrep && driver.lastPrep()) || {}).broker || ''));
+            const vuelos = [];
+            let token = 0;
+            const lanzar = precio => { const yo = ++token; const p = driver.modifyStop(precio, c.symbol).then(r => ({ yo, r, precio })); vuelos.push(p); return p; };
+            let job = slN == null || slA === slN ? Promise.resolve({ yo: 0, r: { ok: slN != null, ya: true }, precio: slN }) : lanzar(slN);
+            const lanzarTp = () => tpN == null ? Promise.resolve({ ok: true, ya: true }) : (driver.modifyTp ? driver.modifyTp(tpN, c.symbol) : Promise.resolve({ ok: false, err: 'sin modifyTp' }));
+            let tpJob = enPaper ? null : lanzarTp();
             let slR;
             for (;;) {
-              const listo = await Promise.race([job.then(r => r), sleep(40).then(() => null)]);
-              if (listo) { slR = listo; break; }
+              const listo = await Promise.race([job.then(x => x), sleep(40).then(() => null)]);
+              if (listo && listo.yo === token) { slR = listo.r; break; }
+              if (listo) continue;
               let px = null; try { px = driver.lastPrice ? await driver.lastPrice() : null; } catch {}
               if (px == null) continue;
               const mas = planAlAbrir({ ...basePlan, price: px });
               const sube = mas.step && mas.sl != null && (c.side === 'long' ? mas.sl > slN + 1e-9 : mas.sl < slN - 1e-9);
               if (!sube) continue;
+              const tPaso = Date.now();
               slN = mas.sl; plan = mas; marcarPaso(mas); rec.slNuevo = slN; rec.paso = mas.step.n; rec.adelantado = true;
-              log(`Escalón ${mas.step.n} durante el ajuste: el stop va a ${slN} sin esperar el ajuste del fill.`);
-              job = driver.modifyStop(slN, c.symbol);
+              log(`Escalón ${mas.step.n} durante el ajuste (${tPaso - t0} ms): el stop va a ${slN} sin esperar el ajuste del fill.`);
+              job = lanzar(slN);
             }
+            if (vuelos.length) await Promise.all(vuelos);
+            let visto = null;
+            try { const p2 = await driver.position(c.symbol); visto = p2 && p2.stop != null ? p2.stop : null; } catch {}
+            if (slN != null && visto !== slN) {
+              const tRe = Date.now();
+              log(`El ajuste viejo dejó el stop en ${visto == null ? '—' : visto}. Lo dejo en el paso ${slN}.`);
+              slR = await driver.modifyStop(slN, c.symbol);
+              log(`Reenvío del paso: ${Date.now() - tRe} ms.`);
+              rec.reenvio = true;
+            }
+            if (enPaper) { const tTp = Date.now(); tpJob = lanzarTp(); log(`Paper: el objetivo sale después del stop (${tTp - t0} ms).`); }
             const tpR = await tpJob;
             rec.sl = slR; rec.tp = tpR;
             rec.ok = !!(slR && slR.ok && tpR && tpR.ok); rec.seg = Math.round((Date.now() - t0) / 100) / 10;
@@ -801,17 +823,17 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
             try { const w = driver.working ? await driver.working(c.symbol) : []; const ajenas = new Set(((driver.lastPrep && driver.lastPrep()) || {}).trabIds || []); dobles = w.filter(o => o.type === 3 && !ajenas.has(String(o.id))); } catch { dobles = []; }
             if (dobles.length > 1) { rec.doble = true; S.alerta = 'HAY MÁS DE UN STOP ligado a esta posición. No se manda otro. Revisa TradingView.'; ev('notificacion', { texto: S.alerta }); }
           }
-          if (tpN != null) S.tpPrice = tpN; S.ajuste = rec; if (rec.sl && rec.sl.ok && slN != null) S.slOk = true;
+          if (tpN != null) S.tpPrice = tpN; S.ajuste = rec; if (rec.sl && rec.sl.ok && slN != null) { S.slOk = true; if (S.alerta && /NO VEO EL STOP|tardó en confirmarse/.test(S.alerta)) S.alerta = null; }
           ev('ajuste_brackets', rec);
           const cual = rec.adelantado ? `paso ${rec.paso} adelantado` : (plan.step ? `paso ${plan.step.n}` : 'distancia del fill');
-          log(rec.nada ? `Fill ${pos.entry} = referencia: SL/TP ya correctos` : `Ajuste por fill ${pos.entry} (ref ${S.ref}): una decisión ${cual} SL ${slA}→${slN} ${rec.sl && rec.sl.ok ? 'OK' : 'FALLO'} · TP ${tpA}→${tpN} ${rec.tp && rec.tp.ok ? 'OK' : 'FALLO'} (${rec.seg || 0} s)${rec.detalle ? ' · ' + rec.detalle : ''}`);
-          if (!rec.ok || slN == null) { S.slOk = false; S.alerta = S.alerta || `NO VEO EL STOP tras el ajuste (SL ${slN == null ? 'inseguro' : slN}). Se sigue intentando. No se toca ninguna otra orden.`; ev('notificacion', { texto: S.alerta }); if (!S.volcadoHecho && driver.volcado) { S.volcadoHecho = true; let d = null; try { d = await driver.volcado(c.symbol); } catch (e) { d = { error: String(e.message || e) }; } log('VOLCADO ajuste ' + JSON.stringify(d)); } }
+          log(rec.nada ? `Fill ${pos.entry} = referencia: SL/TP ya correctos` : `Ajuste por fill ${pos.entry} (ref ${S.enviado != null ? S.enviado : S.ref}): una decisión ${cual} SL ${slA}→${slN} ${rec.sl && rec.sl.ok ? 'OK' : 'FALLO'} · TP ${tpA}→${tpN} ${rec.tp && rec.tp.ok ? 'OK' : 'FALLO'} (${rec.seg || 0} s)${rec.detalle ? ' · ' + rec.detalle : ''}`);
+          if (!rec.ok || slN == null) { S.slOk = false; if (!S.sinStopLog) { S.sinStopLog = true; log('No veo el stop de esta operación.'); } if (!S.volcadoHecho && driver.volcado) { S.volcadoHecho = true; let d = null; try { d = await driver.volcado(c.symbol); } catch (e) { d = { error: String(e.message || e) }; } log('VOLCADO ajuste ' + JSON.stringify(d)); } }
         }
         if (pos && S.slOk === false && S.slObjetivo != null && Date.now() - (S.slIntento || 0) > 1000) {
           S.slIntento = Date.now();
           const rsl = await driver.modifyStop(S.slObjetivo, c.symbol);
-          if (rsl && rsl.ok) { S.slOk = true; if (S.alerta && /NO VEO EL STOP/.test(S.alerta)) S.alerta = null; }
-          else S.alerta = 'NO VEO EL STOP de esta operación. Se sigue intentando. No se toca ninguna otra orden.';
+          if (rsl && rsl.ok) { S.slOk = true; if (S.alerta && /NO VEO EL STOP|tardó en confirmarse/.test(S.alerta)) S.alerta = null; }
+          else if (!S.sinStopLog) { S.sinStopLog = true; log('No veo el stop de esta operación.'); }
         }
         const sl = sl0;
         if (pos && S.openAt == null) { S.openAt = Date.now(); log('Posición abierta (fill visto)'); }
@@ -854,7 +876,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
             log(`modify via ${r.via || '?'} (${sg(tDone - t0)}) -> verificado ${v}`, v === d.price ? 'OK' : 'NO coincide ' + (r.err || r.raw || ''));
             const stepRec = { paso: stp.n, disparoUSD: stp.triggerUsd, protegeUSD: stp.lockUsd, precio: d.price, pnlAlDisparar: pos.pnl, fuente: pos.pnlSrc, saltados: d.step - (st.step ?? 0), latencia: lat };
             if (v === d.price || r.accepted) { stepRec.enSeg = S.openAt ? Math.round((Date.now() - S.openAt) / 100) / 10 : null; stepRec.confirmado = v === d.price; S.pasos.push(stepRec); st.step = d.step + 1; S.step = st.step; if (st.step >= c.steps.length) st.locked = true; }
-            if (v === d.price) { S.locked = true; S.lockPrice = v; S.sl = v; S.lockTarget = d.price; S.lockAt = S.lockAt || Date.now(); } else if (r.accepted) { S.lockAt = S.lockAt || Date.now(); S.lockPending = true; S.lockTarget = d.price; log(`editPositionBrackets aceptado; TradingView aún no refleja ${d.price} tras 1.5 s: no se reintenta, se confirma en las próximas lecturas`); }
+            if (v === d.price) { S.locked = true; S.lockPrice = v; S.sl = v; S.lockTarget = d.price; S.lockAt = S.lockAt || Date.now(); if (S.alerta && /NO VEO EL STOP|tardó en confirmarse/.test(S.alerta)) S.alerta = null; } else if (r.accepted) { S.lockAt = S.lockAt || Date.now(); S.lockPending = true; S.lockTarget = d.price; log(`editPositionBrackets aceptado; TradingView aún no refleja ${d.price} tras 1.5 s: no se reintenta, se confirma en las próximas lecturas`); }
             else { if ((r.intentos || []).some(x => x.metodo === 'ui')) st.uiTried = true; st.fails++;
               if (st.fails >= (real || st.uiTried ? 1 : 3)) { st.locked = true; S.alerta = `NO PUDE MOVER EL STOP: muévelo a mano a ${d.price} (intentos: ${(r.intentos || []).map(x => `${x.metodo} ${x.ok ? 'ok' : 'falló'}`).join(', ') || 'api falló'})`; log(S.alerta); ev('notificacion', { texto: S.alerta, precio: d.price }); if (!S.volcadoHecho && /no-stop-found|sin id del stop/.test(JSON.stringify(r)) && driver.volcado) { S.volcadoHecho = true; let vd = null; try { vd = await driver.volcado(c.symbol); } catch (e) { vd = { error: String(e.message || e) }; } log('VOLCADO stop ' + JSON.stringify(vd)); } } } }
           else { log('SIMULACIÓN: no se modifica'); st.step = d.step + 1; S.step = st.step; if (st.step >= c.steps.length) st.locked = true; S.locked = true; S.lockPrice = d.price; }
@@ -942,11 +964,12 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
       S.tiempos = { total: infoT.total, texto: infoT.linea };
       setImmediate(() => { try { fs.appendFile(logFile, infoT.linea + '\n' + infoT.detalle + '\n', () => {}); } catch {} });
       const prep = drv.lastPrep ? drv.lastPrep() : null;
-      if (prep) { S.mode = prep.paper ? 'paper' : prep.real ? 'real' : 'simulacion'; S.realLabel = prep.real ? realLabel(prep.accountName) : null; S.account = { name: prep.accountName, broker: prep.broker }; S.accountId = prep.accountId; if (prep.rollover) log('El contrato del gráfico cambió respecto al anterior. Se usa el de ahora: ' + prep.front); }
+      if (prep) { S.mode = prep.paper ? 'paper' : prep.real ? 'real' : 'simulacion'; S.realLabel = prep.real ? realLabel(prep.accountName) : null; S.account = { name: prep.accountName, broker: prep.broker }; S.accountId = prep.accountId; if (prep.rollover) log('El contrato del gráfico cambió respecto al anterior. Se usa el de ahora: ' + prep.front); if (prep.trabError) log('No pude leer las órdenes que ya trabajan. Reintenté una vez: ' + prep.trabError + '. Sigo sin esa lista.'); }
       if (String(op).startsWith('blocked:')) { S.state = 'blocked'; S.error = op.slice(9); return { ok: false, blocked: true, needConfirm: /REAL/.test(op), err: S.error, status: S }; }
       const lo = drv.lastOpen ? drv.lastOpen() : null;
-      Object.assign(S, { ajusteHecho: false, ajuste: null, slPts, tpPts, ref: lo ? lo.ref : null, tpRef: lo ? lo.tp : null, step: lo && lo.step ? lo.step : 0, locked: !!(lo && lo.locked), lockPrice: lo && lo.step ? lo.sl : null, tpPrice: lo ? lo.tp : null, slOk: !!(lo && lo.slOk), slObjetivo: lo ? (lo.slObjetivo ?? null) : null, orderId: lo ? (lo.orderId || null) : null, posId: lo ? (lo.posId || null) : null, alerta: (lo && lo.alerta) || null, salidaReal: lo ? (lo.salidaReal ?? null) : null, salidaPrecio: lo ? (lo.salida ?? null) : null, volcadoHecho: !!(lo && lo.volcado) });
+      Object.assign(S, { ajusteHecho: false, ajuste: null, slPts, tpPts, ref: lo ? lo.ref : null, enviado: lo ? (lo.enviado ?? null) : null, tpRef: lo ? lo.tp : null, step: lo && lo.step ? lo.step : 0, locked: !!(lo && lo.locked), lockPrice: lo && lo.step ? lo.sl : null, tpPrice: lo ? lo.tp : null, slOk: !!(lo && lo.slOk), slObjetivo: lo ? (lo.slObjetivo ?? null) : null, orderId: lo ? (lo.orderId || null) : null, posId: lo ? (lo.posId || null) : null, alerta: (lo && lo.alerta) || null, salidaReal: lo ? (lo.salidaReal ?? null) : null, salidaPrecio: lo ? (lo.salida ?? null) : null, volcadoHecho: !!(lo && lo.volcado) });
       if (lo && lo.volcado) log('VOLCADO apertura ' + JSON.stringify(lo.volcado));
+      if (lo && lo.sinStop) log('No veo el stop de esta operación.');
       if (lo && lo.paso) S.pasos = [lo.paso];
       if (String(op).startsWith('vigilando')) {
         S.alerta = (lo && lo.alerta) || op.slice(11);

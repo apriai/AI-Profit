@@ -10,6 +10,16 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.36] — 2026-11-19
+### Corregido
+- **Si el ajuste del fill llega después del escalón, el stop queda en el paso.** Cuando los dos movimientos terminan se relee la orden y, si no está en el paso, se vuelve a mandar.
+- **En Paper el stop y el objetivo no se pisan.** Primero el stop y después el objetivo. En Tradovate siguen a la vez.
+- **Si no se pueden leer las órdenes que ya trabajan, se reintenta una vez y queda escrito en el registro.**
+- **La granja ya no dice «NO VEO EL STOP».** Si falta, solo queda una línea en el registro. Un stop recién puesto (estado 6) cuenta como visto. Cuando el movimiento se confirma, se quita el aviso de que la orden tardó.
+- El registro del fill muestra el precio con el que se armó la orden, no el del llenado.
+### Notas
+- La orden a mercado sigue saliendo con el stop y el objetivo pegados.
+
 ## [0.10.35] — 2026-11-19
 ### Corregido
 - **Al llenarse hay una sola decisión de stop.** Si un escalón ya cabe, el stop va a ese nivel. Si no, va a la distancia de la estrategia desde el precio real. Nunca son dos movimientos seguidos.

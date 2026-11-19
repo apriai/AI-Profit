@@ -11,7 +11,7 @@ function pagina(opts = {}) {
   const book = opts.book || { front: 'MNQZ2026', bid: (opts.live ?? 27727.75) - 0.25, ask: opts.live ?? 27727.75, live: opts.live ?? 27727.75, chart: opts.chart ?? 27720 };
   if (!book.account) book.account = '1';
   let px = book.live, nid = 1, lecturas = 0, falloTrasSalida = 0, frN = 0, posRestantes = Infinity, slGen = 0;
-  const mods = [];
+  const mods = [], brackets = [];
   const positions = opts.positions || [], orders = [], hist = [], execs = [], placed = [], closes = [], reduces = [];
   const ab = {
     _brokerMetainfo: { id: opts.broker || 'paper', title: 'Paper Trading' },
@@ -31,7 +31,8 @@ function pagina(opts = {}) {
       if (falloTrasSalida > 0) { falloTrasSalida--; throw new Error('relectura'); }
       if (opts.throwAlways || (opts.throwN && lecturas <= opts.throwN)) throw new Error('tv ocupado');
       if (opts.revealAt && lecturas < opts.revealAt) return [];
-      return positions.filter(p => p && Number(p.qty) !== 0).map(p => ({ ...p, lastPrice: opts.noLast ? null : px }));
+      const slLeg = orders.find(o => o.type === 3 && o.status === 6), tpLeg = orders.find(o => o.type === 1 && o.status === 6);
+      return positions.filter(p => p && Number(p.qty) !== 0).map(p => ({ ...p, lastPrice: opts.noLast ? null : px, ...(opts.piernas ? { stopLoss: slLeg ? slLeg.stopPrice : null, takeProfit: tpLeg ? tpLeg.limitPrice : null } : {}) }));
     },
     async orders() { return orders.filter(o => o.status === 6).map(o => ({ ...o })); },
     async ordersHistory() { return hist.map(o => ({ ...o })); },
@@ -86,12 +87,15 @@ function pagina(opts = {}) {
       return { orderId: id };
     },
     async editPositionBrackets(id, b) {
-      if (opts.noPB) return false;
+      const br = { t0: Date.now(), stop: b.stopLoss ?? null, tp: b.takeProfit ?? null, t1: 0 };
+      brackets.push(br);
+      if (opts.noPB) { br.t1 = Date.now(); return false; }
       const p = positions.find(q => q.id === id); if (!p) return false;
       let so = orders.find(o => o.type === 3 && o.parentId != null);
       if (b.stopLoss != null) { if (so) so.stopPrice = b.stopLoss; else orders.unshift({ id: 'S' + nid++, parentId: p.id, symbol: p.symbol, side: -p.side, type: 3, status: 6, qty: p.qty, stopPrice: b.stopLoss }); }
       let tp = orders.find(o => o.type === 1 && o.parentId != null);
       if (b.takeProfit != null) { if (tp) tp.limitPrice = b.takeProfit; else orders.push({ id: 'T' + nid++, parentId: p.id, symbol: p.symbol, side: -p.side, type: 1, status: 6, qty: p.qty, limitPrice: b.takeProfit }); }
+      br.t1 = Date.now();
       return true;
     },
     async modifyOrder(o) {
@@ -105,7 +109,7 @@ function pagina(opts = {}) {
         await new Promise(r => setTimeout(r, opts.pausaSl));
       }
       rec.t1 = Date.now();
-      if (o.stopPrice != null && mine !== slGen) { rec.pisado = true; return true; }
+      if (o.stopPrice != null && mine !== slGen && !opts.aterrizaUltimo) { rec.pisado = true; return true; }
       if (o.stopPrice != null) x.stopPrice = o.stopPrice;
       if (o.limitPrice != null) x.limitPrice = o.limitPrice;
       if (x.type === 1 && positions.length) {
@@ -143,7 +147,7 @@ function pagina(opts = {}) {
   const doc = { visibilityState: 'hidden', hasFocus: () => false, querySelector: s => /accountName/.test(s) ? { innerText: 'Paper Trading' } : null };
   win.performance = globalThis.performance;
   const evaluate = async expr => new Function('window', 'document', 'performance', 'return (' + expr + ')')(win, doc, performance);
-  return { evaluate, placed, positions, orders, closes, reduces, ab, book, hist, mods, limitarPos: n => { posRestantes = n; } };
+  return { evaluate, placed, positions, orders, closes, reduces, ab, book, hist, mods, brackets, limitarPos: n => { posRestantes = n; } };
 }
 
 const ok = (c, m) => { if (!c) { console.error('FAIL ' + m); process.exitCode = 1; } else console.log('PASS ' + m); };
@@ -162,7 +166,7 @@ ok(!htmlGran.includes('Poner stop') && !htmlGran.includes('alarmaStop') && !html
 ok(htmlGran.includes('if(!accId){setPhase("blocked","Elige una cuenta");return}') && !htmlGran.includes('accId||(activa'), 'sin cuenta elegida no se opera la cuenta activa de TradingView');
 ok(htmlGran.includes('beforeunload') && htmlGran.includes('avisarPanel(false,true)'), 'al cerrar la página se apaga el panel');
 ok(htmlGran.includes('Apertura <b>') && htmlGran.includes('clic:pulsado'), 'la granja manda el clic y muestra el total');
-ok(htmlGran.includes('al-fuerte') && htmlGran.includes('NO VEO EL STOP|NO PUDE MOVER EL STOP'), 'si falta el stop, el aviso de la granja queda en rojo');
+ok(!htmlGran.includes('NO VEO EL STOP'), 'la granja no muestra el aviso de que no ve el stop');
 const srcColchon = fs.readFileSync(new URL('./colchon.mjs', import.meta.url), 'utf8');
 ok(srcColchon.includes('o.status===6||o.status===4)&&(!pos||(tvRoot(o.symbol)===tvRoot(pos.symbol)&&o.side===-pos.side))') && !srcColchon.includes('o.status===6||o.status===4)&&o.parentId!=null'), 'la búsqueda del stop es la de main, sin exigir parentId');
 ok(srcColchon.includes('o.type===1&&(o.status===6||o.status===4)&&o.side===-p2.side&&tvRoot(o.symbol)===tvRoot(p2.symbol)') && !srcColchon.includes('o.parentId!=null&&o.side===-p2.side'), 'la búsqueda del objetivo es la de main');
@@ -313,6 +317,30 @@ ok(srcColchon.includes('enviar ${x.envioMs}ms') && srcColchon.includes('lecturas
   ok(tp && tp.t0 < stops[0].t1, 'el objetivo sale en paralelo y no espera al stop');
   await k.stop({ flatten: false }); }
 
+{ const book = { front: 'MNQZ2026', bid: 27721.75, ask: 27722, live: 27722, chart: 27722 };
+  let pg;
+  const pg0 = pagina({ book, fillPx: 27720, noPB: true, broker: 'Tradovate', pausaSl: 350, aterrizaUltimo: true, alEmpezarSl() { book.chart = 27730; book.live = 27730; if (pg && pg.positions[0]) pg.positions[0].lastPrice = 27730; } });
+  pg = pg0;
+  const k = createColchon(apiDriver(pg.evaluate), { pollMs: 40, logFile: '/tmp/apertura-tarde.log', ignoreClock: true, flatConfirm: { reads: 8, ms: 5000 }, noTicks: true });
+  await k.start({ side: 'long', symbol: 'MNQ', qty: 1, strategyId: 'prueba-be' });
+  const espera = Date.now() + 1200;
+  let sl = null;
+  while (Date.now() < espera) { sl = pg.orders.find(o => o.type === 3); if (sl && sl.stopPrice === 27720.75 && pg.mods.filter(m => m.stop === 27720.75).length >= 2) break; await dormir(20); }
+  const stops = pg.mods.filter(m => m.stop != null);
+  const bit = fs.readFileSync('/tmp/apertura-tarde.log', 'utf8');
+  ok(stops[0] && stops[0].stop === 27405 && stops[1] && stops[1].t0 < stops[0].t1 && sl && sl.stopPrice === 27720.75 && /Lo dejo en el paso/.test(bit), 'si el ajuste del fill aterriza el último, el stop queda en el paso (' + stops.map(m => m.stop).join(' → ') + ' / ' + (sl && sl.stopPrice) + ')');
+  await k.stop({ flatten: false }); }
+
+{ const book = { front: 'MNQZ2026', bid: 27721.75, ask: 27722, live: 27722, chart: 27722 };
+  const pg = pagina({ book, fillPx: 27720, piernas: true });
+  const k = createColchon(apiDriver(pg.evaluate), { pollMs: 40, logFile: '/tmp/apertura-paper.log', ignoreClock: true, flatConfirm: { reads: 8, ms: 5000 }, noTicks: true });
+  await k.start({ side: 'long', symbol: 'MNQ', qty: 1, strategyId: 'prueba-be' });
+  await dormir(200);
+  const sl = pg.orders.find(o => o.type === 3);
+  const primero = pg.brackets[0], segundo = pg.brackets[1];
+  ok(primero && segundo && primero.stop === 27405 && primero.t1 <= segundo.t0 && segundo.stop === 27405 && sl && sl.stopPrice === 27405, 'en Paper el objetivo sale después del stop y no lo revierte (' + JSON.stringify(pg.brackets) + ')');
+  await k.stop({ flatten: false }); }
+
 { const pg = pagina({ reject: true });
   const r = await apiDriver(pg.evaluate).openBracket({ side: 'long', symbol: 'MNQ', qty: 20, slPts: 15, tpPts: 2.5 });
   ok(pg.positions.length === 0 && pg.closes.length === 0 && /RECHAZADA/.test(String(r)), 'un rechazo es no se llenó (' + r + ')'); }
@@ -333,7 +361,7 @@ ok(srcColchon.includes('enviar ${x.envioMs}ms') && srcColchon.includes('lecturas
 { const pg = pagina({ noChildren: true });
   const k = createColchon(apiDriver(pg.evaluate), { pollMs: 40, logFile: '/tmp/apertura-stop.log', ignoreClock: true, flatConfirm: { reads: 1, ms: 0 }, noTicks: true });
   const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 20, strategyId: 'rascacielo' });
-  ok(!r.ok && r.watching && /NO VEO EL STOP/.test(String(r.alerta || k.status().alerta || '')), 'sin stop confirmado no se reporta ok (' + (r.alerta || r.err) + ')');
+  ok(!r.ok && r.watching && !/NO VEO EL STOP/.test(String(r.alerta || k.status().alerta || '')) && fs.readFileSync('/tmp/apertura-stop.log', 'utf8').includes('No veo el stop de esta operación.'), 'sin stop confirmado no se reporta ok y solo queda en el registro (' + (r.alerta || r.err) + ')');
   ok(fs.readFileSync('/tmp/apertura-stop.log', 'utf8').includes('VOLCADO'), 'si no aparece el stop, el registro vuelca posición y órdenes');
   await k.stop({ flatten: false });
   ok(pg.closes.length === 0 && pg.positions.length === 1, 'si falta el stop no se cierra la posición'); }
