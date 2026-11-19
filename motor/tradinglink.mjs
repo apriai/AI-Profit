@@ -3,7 +3,7 @@
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
 import * as orders from './orders.mjs';
 import { negocio } from './negocio.mjs';
-import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, diaFarm, fueraDeSesion, cdpEvaluator, PAGE, acctGuard, js } from './colchon.mjs';
+import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, diaFarm, fueraDeSesion, cdpEvaluator, PAGE, acctGuard, js, frenaEscaneo, PANEL_PAUSA_MS } from './colchon.mjs';
 import { attachReporte } from './tv-reporte.mjs';
 import { createVistaPrevia } from './tv-vista-previa.mjs';
 import { estrategiasPropias } from './estrategias-propias.mjs';
@@ -109,7 +109,7 @@ function riesgo(a) { if (!a || a.balance == null) return; applyPlan(a); const R 
 function rellenar(live) { for (const a of Object.values(state.accounts)) if (a.floor == null) riesgo(a); for (const id of live || []) { if (state.accounts[id] || esPapel({ id, name: id })) continue; const s = sod.accounts[id]; if (!s || s.lastBal == null || s.gone) continue;
   const a = state.accounts[id] = { id, type: typeOf(id, { type: s.type }), balance: s.lastBal, equity: s.lastBal, profit: 0, readAt: s.lastAt || null, stale: true, tradingDay: s.day };
   if (s.day === tradingDay()) { a.startOfDay = s.bal; a.dayPnl = pnlDelDia(id, s.lastBal, s.bal); } applyPlan(a); riesgo(a); } }
-let cycling = false;
+let cycling = false, panelHasta = 0;
 async function cycle() {
   if (cycling) return; cycling = true;
   try {
@@ -119,11 +119,12 @@ async function cycle() {
     // Un trade en marcha o un arranque en curso (acctGuard.testActive) cuenta como ocupado: no se inicia
     // un recorrido nuevo de todas las cuentas ni de solo fondeadas. La lectura de la cuenta activa sigue.
     const operando = colchon.status().state === 'running' || acctGuard.testActive;
-    // lectura completa (cambia de cuenta) SOLO si: sin pausa, sin prueba colchon ni arranque, y sin posiciones/ordenes en la cuenta activa (si las hay, se salta y se reintenta en 5 min)
-    const full = !pausa && Date.now() - lastFull >= FULL_MS && !operando;
+    // Con el panel de operar abierto no se cambia de cuenta (el pulso caduca solo si la página se cierra).
+    const paso = frenaEscaneo({ pausa, panelHasta, operando, lastFull, lastFunded, fullMs: FULL_MS });
+    const full = paso.full;
     // Con pausa-lectura.flag NO se recorren las evaluaciones, pero las FONDEADAS (LFF) se siguen leyendo cada 5 min
-    // (mismas protecciones: sin posición/orden abierta, TradingView en segundo plano, sin prueba colchón ni arranque) para evaluar la quema de $1,000.
-    const fundedOnly = !full && pausa && Date.now() - lastFunded >= FULL_MS && !operando;
+    // (mismas protecciones: sin posición/orden abierta, TradingView en segundo plano, sin prueba colchón ni arranque, panel cerrado) para evaluar la quema de $1,000.
+    const fundedOnly = paso.funded;
     const nombresFondeadas = new Set();
     for (const a of Object.values(state.accounts)) if (tipoDe(a) === 'funded' && a.id) nombresFondeadas.add(a.id);
     for (const [id, s] of Object.entries(sod.accounts || {})) if (s && !s.gone && tipoDe({ id, type: s.type }) === 'funded') nombresFondeadas.add(id);
@@ -350,6 +351,8 @@ http.createServer((q, r) => manejar(q, r, {
   propiasH, negocioH, vistaPrevia, colchon, colchonCFG, DIR, state,
   buildReport, diaFarm, maskId, detalleTrade,
   lastFull: () => lastFull, lastBusy: () => lastBusy, quietMs: () => QUIET_MS,
+  pulsoPanel: abierto => { panelHasta = abierto ? Date.now() + PANEL_PAUSA_MS : 0; return panelHasta; },
+  panelAbierto: () => panelHasta > Date.now(),
   metricasDe, tradesDe, conexion, orders,
   algoTv: () => algoTv, textoVersion, ROOT, HTML,
 })).listen(PORT, '127.0.0.1', () => console.log(`Granja: http://localhost:${PORT}`));

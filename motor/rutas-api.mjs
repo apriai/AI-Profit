@@ -54,7 +54,10 @@ export function manejar(q, r, deps) {
           r.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
           return r.end(JSON.stringify(out2));
         }
-        if (q.url.startsWith('/api/colchon/lectura')) {
+        if (q.url.startsWith('/api/colchon/panel') && q.method === 'POST') {
+          if (typeof deps.pulsoPanel === 'function') deps.pulsoPanel(!!(j && j.abierto));
+          out = { ok: true, abierto: typeof deps.panelAbierto === 'function' ? !!deps.panelAbierto() : !!(j && j.abierto) };
+        } else if (q.url.startsWith('/api/colchon/lectura')) {
           const f = path.join(deps.DIR, 'pausa-lectura.flag');
           if (q.method === 'POST') {
             const p = j.pause ?? !fs.existsSync(f);

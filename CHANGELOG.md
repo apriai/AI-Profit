@@ -10,6 +10,16 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.26] — 2026-11-19
+### Corregido
+- **La orden de las 9:47 ya no se da por no llenada cuando el bróker sí la llenó.** El SL y el TP de la orden a mercado salían del cierre de la vela. En Rascacielo, con 20 MNQ, el objetivo son 2.5 pts. Ese día el fill fue 27727.75 y el cierre de la vela iba unos 3.5 pts más abajo, así que el límite de venta nacía en 27726.75, ya por debajo del precio, y Tradovate lo ejecutó en el mismo segundo (−$52.50 brutos y −$20 de comisión). Profito miró 6 s si había posición abierta, no la vio y escribió «no se llenó». Ahora el bracket se calcula con el precio vivo (ask en compra, bid en venta) justo antes de enviar, en la misma orden. Si el SL o el TP quedarían dentro del precio, se recalculan y, si siguieran dentro, no se envía nada. Si la orden se abre y se cierra en esa ventana, el registro dice «se llenó y se cerró» con los precios, y no se vuelve a enviar.
+### Cambiado
+- **Menos idas a TradingView antes de la orden.** Entre el clic de BUY o SELL y placeOrder quedan dos lecturas: la cuenta (y el cambio, si hace falta), el contrato y que no haya posición; y la cotización viva. Siguen la confirmación de cuenta real y «Elige una cuenta».
+- **Tiempos en el registro.** Cada apertura deja una línea `TIEMPOS:` (clic, preparativos, cotización, placeOrder, posición, total). Cada movimiento del stop deja `LATENCIA: envío … ms · confirmación … ms`.
+- **El panel de operar pausa el recorrido de cuentas.** Mientras está abierto, la granja no cambia de cuenta en TradingView para leer saldos. Al cerrarlo sigue. Si la página se cierra sin avisar, la pausa caduca sola.
+### Notas
+- La orden sigue siendo una sola, a mercado, con SL y TP en el mismo envío. Después del fill, el stop se mueve como antes.
+
 ## [0.10.25] — 2026-11-19
 ### Cambiado
 - **El sonido del círculo suena cada vez que vuelve a aparecer.** En la vela que se está formando, Burbuja doble suena al pasar de sin círculo a círculo. Si el círculo se apaga y vuelve en esa misma vela, suena otra vez. Mientras sigue a la vista, no se repite. Al cerrar la vela se olvida. El interruptor «Sonido de la señal» sigue igual. BUY y SELL siguen en silencio.
