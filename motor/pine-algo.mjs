@@ -449,15 +449,86 @@ return {ok:true, visible:!!D.visible, studyId:uno[0].id};
 })()`;
 }
 
-// Cada vez que el círculo pasa de apagado a encendido en la vela en curso.
-// Si sigue encendido, no se repite. Al cambiar de vela se olvida lo anterior.
-export function decidirToque(estado, lectura) {
+// Duración de un marco de TradingView, en ms. Número solo = minutos. 15S = segundos. 1H, 1D, 1W, 1M.
+export function duracionMarcoMs(resolucion) {
+  const s = String(resolucion ?? '').trim().toUpperCase();
+  if (!s) return null;
+  if (/^\d+$/.test(s)) { const n = Number(s); return n > 0 ? n * 60 * 1000 : null; }
+  const m = s.match(/^(\d*)([SDWHM])$/);
+  if (!m) return null;
+  const n = m[1] ? Number(m[1]) : 1;
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const u = m[2];
+  if (u === 'S') return n * 1000;
+  if (u === 'H') return n * 3600000;
+  if (u === 'D') return n * 86400000;
+  if (u === 'W') return n * 7 * 86400000;
+  if (u === 'M') return n * 30 * 86400000;
+  return null;
+}
+// info.time de TradingView llega en segundos (≈1e9) o en ms (≈1e12).
+export function barraEnMs(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n < 1e12 ? n * 1000 : n;
+}
+const SESGO_VELA_MS = 3000;
+// La vela en vivo es la que contiene «ahora». Margen corto por desfase de reloj.
+// Si el marco no se reconoce, se usa 1 minuto: una barra más vieja que eso no es la de ahora.
+export function velaEnVivo(barra, resolucion, ahora) {
+  const inicio = barraEnMs(barra);
+  const now = Number(ahora);
+  if (inicio == null || !Number.isFinite(now)) return false;
+  const dur = duracionMarcoMs(resolucion) ?? 60 * 1000;
+  return now + SESGO_VELA_MS >= inicio && now < inicio + dur + SESGO_VELA_MS;
+}
+// Suena solo en la vela en vivo, cada vez que el círculo pasa de apagado a encendido.
+// Un cambio de marco o de símbolo reanuda y no suena hasta que la misma barra se repite ~1 s.
+// Una vela pasada no suena y no deja el círculo marcado, para no tapar la vela en vivo.
+export function decidirToque(estado, lectura, ahora) {
   const nada = { tocar: false, lado: null, barra: null };
   if (!estado || typeof estado !== 'object' || Array.isArray(estado) || estado instanceof Set) return nada;
   if (!lectura || lectura.ok !== true) return nada;
   if (lectura.visible === false || !lectura.enGrafico) return nada;
   const barra = lectura.barra;
   if (barra == null || barra === '') return nada;
+  const res = lectura.resolucion != null ? String(lectura.resolucion) : '';
+  const sim = lectura.simbolo != null ? String(lectura.simbolo) : '';
+  const clave = res + '\n' + sim;
+  const now = Number.isFinite(+ahora) ? +ahora : (Number.isFinite(+lectura.ahora) ? +lectura.ahora : Date.now());
+  const meta = { barra, resolucion: res, simbolo: sim };
+  if (estado.clave == null || estado.clave !== clave) {
+    const cambio = estado.clave != null;
+    estado.clave = clave;
+    estado.resolucion = res;
+    estado.simbolo = sim;
+    estado.esperaMarco = cambio;
+    estado.estableBarra = null;
+    estado.estableDesde = null;
+    if (cambio || !velaEnVivo(barra, res, now)) {
+      estado.barra = null;
+      estado.alcista = false;
+      estado.bajista = false;
+    } else {
+      estado.barra = barra;
+      estado.alcista = !!lectura.alcista;
+      estado.bajista = !!lectura.bajista;
+    }
+    return { tocar: false, lado: null, rebaseline: true, ...meta };
+  }
+  if (!velaEnVivo(barra, res, now)) return { tocar: false, lado: null, pasada: true, ignorada: true, ...meta };
+  if (estado.esperaMarco) {
+    if (String(estado.estableBarra) !== String(barra)) {
+      estado.estableBarra = barra;
+      estado.estableDesde = now;
+      return { tocar: false, lado: null, estabilizando: true, ...meta };
+    }
+    if (now - estado.estableDesde < 1000) return { tocar: false, lado: null, estabilizando: true, ...meta };
+    estado.esperaMarco = false;
+    estado.barra = barra;
+    estado.alcista = false;
+    estado.bajista = false;
+  }
   if (String(estado.barra) !== String(barra)) {
     estado.barra = barra;
     estado.alcista = false;
@@ -471,7 +542,7 @@ export function decidirToque(estado, lectura) {
   estado.bajista = bajista;
   const tocar = subeAlcista || subeBajista;
   const lado = subeAlcista ? 'alcista' : (subeBajista ? 'bajista' : null);
-  return { tocar, lado, barra };
+  return { tocar, lado, ...meta };
 }
 
 // Lee Alcista/Bajista en la última vela (la que se está formando). No toca órdenes ni la cuenta.
@@ -543,6 +614,9 @@ function plotEn(info, idx){
 }
 try{
   var c=chart();
+  var res='', sim='';
+  try{ if(c&&typeof c.resolution==='function') res=String(c.resolution()||''); }catch(eR){}
+  try{ if(c&&typeof c.symbol==='function') sim=String(c.symbol()||''); }catch(eS){}
   var lista=[];
   if(c&&typeof c.getAllStudies==='function'){
     var raw=[]; try{raw=c.getAllStudies()||[]}catch(e){raw=[]}
@@ -556,7 +630,7 @@ try{
     for(var n=0;n<lista.length;n++){ if(lista[n].id&&id&&lista[n].id===id){ lista[n].src=src; ya=true; } }
     if(!ya) lista.push({id:id, src:src});
   }
-  if(!lista.length) return {ok:true, enGrafico:0, visible:false, barra:null, alcista:false, bajista:false};
+  if(!lista.length) return {ok:true, enGrafico:0, visible:false, barra:null, alcista:false, bajista:false, resolucion:res, simbolo:sim};
   var elegido=null;
   for(var p=0;p<lista.length;p++){
     var item=lista[p];
@@ -564,12 +638,12 @@ try{
     if(oculto(c, item.src, item.id)) continue;
     elegido=item; break;
   }
-  if(!elegido) return {ok:true, enGrafico:lista.length, visible:false, barra:null, alcista:false, bajista:false};
+  if(!elegido) return {ok:true, enGrafico:lista.length, visible:false, barra:null, alcista:false, bajista:false, resolucion:res, simbolo:sim};
   var mi=null; try{ mi=elegido.src&&elegido.src.metaInfo&&elegido.src.metaInfo(); }catch(e6){}
   var ix=indices(mi||{});
   var info=elegido.src?ultimo(elegido.src):null;
-  if(!info||info.time==null) return {ok:true, enGrafico:lista.length, visible:true, barra:null, alcista:false, bajista:false};
-  return {ok:true, enGrafico:lista.length, visible:true, barra:info.time, alcista:plotEn(info, ix.al), bajista:plotEn(info, ix.ba)};
+  if(!info||info.time==null) return {ok:true, enGrafico:lista.length, visible:true, barra:null, alcista:false, bajista:false, resolucion:res, simbolo:sim};
+  return {ok:true, enGrafico:lista.length, visible:true, barra:info.time, alcista:plotEn(info, ix.al), bajista:plotEn(info, ix.ba), resolucion:res, simbolo:sim};
 }catch(e){ return {ok:false}; }
 })()`;
 }
@@ -628,7 +702,12 @@ export function crearAlgoTv({
     try {
       const r = await evaluar(exprSenal({ nombre: ALGO_NOMBRE }));
       const d = decidirToque(estadoSenal, r || {});
-      if (d.tocar) senal = { seq: senal.seq + 1, barra: d.barra, lado: d.lado };
+      if (d.rebaseline) log(`Señal Profito Algoritmo: marco reanudado (${d.resolucion || '?'} ${d.simbolo || '?'}, barra ${d.barra})`);
+      if (d.pasada) log(`Señal Profito Algoritmo: vela pasada ignorada (${d.resolucion || '?'} ${d.simbolo || '?'}, barra ${d.barra})`);
+      if (d.tocar) {
+        senal = { seq: senal.seq + 1, barra: d.barra, lado: d.lado };
+        log(`Señal Profito Algoritmo: barra ${d.barra} · ${d.resolucion || '?'} · ${d.lado}`);
+      }
     } catch { /* el gráfico a veces no deja leer el estudio; no suena y no se cae */ }
     finally { senalEnCurso = false; }
     return estado();

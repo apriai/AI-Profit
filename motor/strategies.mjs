@@ -1,9 +1,10 @@
-// Registro de estrategias. Orden: Evaluación → Evaluación con trailing → Rascacielo (Dia Minimo+Colchon) → Rascacielo → Fast Breakeven → Dos disparos · 1:2.
-// Explicaciones al estilo flecha: +$300 → protege $100. Todas usan el mismo motor colchon (modifyOrder / Tradovate·Bit).
-// Rascacielo / Fast Breakeven: idea de Karol (PR #19), integradas en 0.8.0.
+// Registro de estrategias. Orden: Evaluación → Evaluación con rascacielos → Rascacielo (Dia Minimo+Colchon) → Fast Breakeven → Dos disparos · 1:2.
+// Explicaciones al estilo flecha: +$112 → protege ~$100. Todas usan el mismo motor colchon (modifyOrder / Tradovate·Bit).
+// Rascacielo (Dia Minimo+Colchon) / Fast Breakeven: idea de Karol (PR #19), integradas en 0.8.0.
+// El id viejo «rascacielo» (SL −$600 / TP +$104, stop fijo) ya no está: una selección guardada cae en la estrategia por defecto.
 // Las propias (estrategias-propias.json, solo esta computadora) se agregan al final con propia:true y no pisan un id de serie.
 import { getPropia, listPropias } from './estrategias-propias.mjs';
-export const STRATEGY_ORDER = ['evaluacion-simple', 'evaluacion', 'dia-minimo-colchon', 'rascacielo', 'prueba-be', 'dos-disparos'];
+export const STRATEGY_ORDER = ['evaluacion-simple', 'evaluacion', 'dia-minimo-colchon', 'prueba-be', 'dos-disparos'];
 export const STRATEGIES = {
   'evaluacion-simple': {
     id: 'evaluacion-simple', name: 'Evaluación',
@@ -12,22 +13,16 @@ export const STRATEGIES = {
     params: { SL_USD: 630, TP_USD: 630, STEPS: [], DEFAULT_QTY: { MNQ: 8, NQ: 1 } },
   },
   'evaluacion': {
-    id: 'evaluacion', name: 'Evaluación con trailing',
-    short: "Operación: SL −$630 / TP +$630\n+$200 → protege $0 (entrada)\n+$300 → protege $100\n+$500 → protege $200",
-    description: "Operación: entra a mercado con SL −$630 y TP +$630. AI: +$200 → el stop sube a la entrada (sin pérdida); +$300 → protege $100; +$500 → protege $200. Solo sube, nunca baja.",
-    params: { SL_USD: 630, TP_USD: 630, STEPS: [{ trigger: 200, lock: 0 }, { trigger: 300, lock: 100 }, { trigger: 500, lock: 200 }], DEFAULT_QTY: { MNQ: 8, NQ: 1 } },
+    id: 'evaluacion', name: 'Evaluación con rascacielos',
+    short: "Evaluación con rascacielos. Operación: SL −$630 / TP +$630\n~+$112 → protege ~$100 netos",
+    description: "Evaluación con rascacielos. Operación: entra a mercado con SL −$630 y TP +$630. AI: ~+$112 → el stop sube una sola vez para proteger ~$100 netos y el trade sigue hasta el TP o el SL. Solo sube, nunca baja.",
+    params: { SL_USD: 630, TP_USD: 630, NET_USD: 100, COMM_RT: { MNQ: 1, NQ: 3.5 }, SLIP_TICKS: 1, TRIGGER_EXTRA_USD: 15, DEFAULT_QTY: { MNQ: 8, NQ: 1 } },
   },
   'dia-minimo-colchon': {
     id: 'dia-minimo-colchon', name: 'Rascacielo (Dia Minimo+Colchon)',
     short: "Rascacielo (Dia Minimo+Colchon). Operación: SL −$600 / TP +$1,600\n~+$115 → protege ~$100",
     description: "Rascacielo (Dia Minimo+Colchon). Operación: entra a mercado con SL −$600 y TP +$1,600. AI: ~+$115 → el stop sube para proteger ~$100 netos. Solo sube, nunca baja.",
     params: { SL_USD: 600, TP_USD: 1600, NET_USD: 100, COMM_RT: { MNQ: 1, NQ: 3.5 }, SLIP_TICKS: 1, TRIGGER_EXTRA_USD: 15, DEFAULT_QTY: { MNQ: 8, NQ: 2 } },
-  },
-  'rascacielo': {
-    id: 'rascacielo', name: 'Rascacielo',
-    short: "Operación: SL −$600 / TP +$104\nAI: el stop no se mueve",
-    description: "Rascacielo. Operación: entra a mercado con SL −$600 y TP +$104. AI: el stop no se mueve; termina en TP, en SL o si la cierras tú.",
-    params: { SL_USD: 600, TP_USD: 104, STEPS: [], DEFAULT_QTY: { MNQ: 8, NQ: 1 } },
   },
   'prueba-be': {
     id: 'prueba-be', name: 'Fast Breakeven',
@@ -45,7 +40,7 @@ export const STRATEGIES = {
 export const DEFAULT_STRATEGY = 'evaluacion-simple';
 const pubBuilt = s => { const { id, name, short, description, params } = s; return { id, name, short, description, params, default: id === DEFAULT_STRATEGY, propia: false }; };
 export const getStrategy = id => {
-  const key = id ?? DEFAULT_STRATEGY;
+  const key = id == null || id === '' || id === 'rascacielo' ? DEFAULT_STRATEGY : id;
   const built = STRATEGIES[key];
   if (built) return built;
   if (typeof key === 'string' && key.startsWith('propia-')) return getPropia(key);

@@ -3,7 +3,7 @@
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
 import * as orders from './orders.mjs';
 import { negocio } from './negocio.mjs';
-import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, diaFarm, fueraDeSesion, cdpEvaluator, PAGE, acctGuard, js } from './colchon.mjs';
+import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, diaFarm, fueraDeSesion, cdpEvaluator, PAGE, acctGuard, js, frenaEscaneo, PANEL_PAUSA_MS } from './colchon.mjs';
 import { attachReporte } from './tv-reporte.mjs';
 import { createVistaPrevia } from './tv-vista-previa.mjs';
 import { estrategiasPropias } from './estrategias-propias.mjs';
@@ -13,7 +13,7 @@ import { rulesFor, maxQtyFor } from './account-size.mjs';
 import { tipoDe, inicioDe } from './granja-flores.mjs';
 import { debeGuardarSaldo, esPapel, filtroFondeadas } from './cuentas.mjs';
 import { textoVersion } from './version-api.mjs';
-import { cerrarSesion } from './pnl-sesion.mjs';
+import { cerrarSesion, cierreDesdeEjecuciones, roundTrips } from './pnl-sesion.mjs';
 import { crearAlgoTv } from './pine-algo.mjs';
 import { manejar } from './rutas-api.mjs';
 const DIR = dataDir();
@@ -109,7 +109,7 @@ function riesgo(a) { if (!a || a.balance == null) return; applyPlan(a); const R 
 function rellenar(live) { for (const a of Object.values(state.accounts)) if (a.floor == null) riesgo(a); for (const id of live || []) { if (state.accounts[id] || esPapel({ id, name: id })) continue; const s = sod.accounts[id]; if (!s || s.lastBal == null || s.gone) continue;
   const a = state.accounts[id] = { id, type: typeOf(id, { type: s.type }), balance: s.lastBal, equity: s.lastBal, profit: 0, readAt: s.lastAt || null, stale: true, tradingDay: s.day };
   if (s.day === tradingDay()) { a.startOfDay = s.bal; a.dayPnl = pnlDelDia(id, s.lastBal, s.bal); } applyPlan(a); riesgo(a); } }
-let cycling = false;
+let cycling = false, panelHasta = 0;
 async function cycle() {
   if (cycling) return; cycling = true;
   try {
@@ -119,11 +119,12 @@ async function cycle() {
     // Un trade en marcha o un arranque en curso (acctGuard.testActive) cuenta como ocupado: no se inicia
     // un recorrido nuevo de todas las cuentas ni de solo fondeadas. La lectura de la cuenta activa sigue.
     const operando = colchon.status().state === 'running' || acctGuard.testActive;
-    // lectura completa (cambia de cuenta) SOLO si: sin pausa, sin prueba colchon ni arranque, y sin posiciones/ordenes en la cuenta activa (si las hay, se salta y se reintenta en 5 min)
-    const full = !pausa && Date.now() - lastFull >= FULL_MS && !operando;
+    // Con el panel de operar abierto no se cambia de cuenta (el pulso caduca solo si la página se cierra).
+    const paso = frenaEscaneo({ pausa, panelHasta, operando, lastFull, lastFunded, fullMs: FULL_MS });
+    const full = paso.full;
     // Con pausa-lectura.flag NO se recorren las evaluaciones, pero las FONDEADAS (LFF) se siguen leyendo cada 5 min
-    // (mismas protecciones: sin posición/orden abierta, TradingView en segundo plano, sin prueba colchón ni arranque) para evaluar la quema de $1,000.
-    const fundedOnly = !full && pausa && Date.now() - lastFunded >= FULL_MS && !operando;
+    // (mismas protecciones: sin posición/orden abierta, TradingView en segundo plano, sin prueba colchón ni arranque, panel cerrado) para evaluar la quema de $1,000.
+    const fundedOnly = paso.funded;
     const nombresFondeadas = new Set();
     for (const a of Object.values(state.accounts)) if (tipoDe(a) === 'funded' && a.id) nombresFondeadas.add(a.id);
     for (const [id, s] of Object.entries(sod.accounts || {})) if (s && !s.gone && tipoDe({ id, type: s.type }) === 'funded') nombresFondeadas.add(id);
@@ -310,15 +311,13 @@ async function metricasDe(url) {
 // === fin metricas puras ===
 
 // Ejecuciones reales del bróker (solo lectura: ab.executions) -> trades ida y vuelta con P&L bruto (sin comisiones)
-const PV = s => { const r = String(s || '').replace(/^.*:/, ''); return /^MNQ/.test(r) ? 2 : /^NQ/.test(r) ? 20 : /^MES/.test(r) ? 5 : /^ES/.test(r) ? 50 : /^M2K/.test(r) ? 5 : /^RTY/.test(r) ? 50 : /^MYM/.test(r) ? 0.5 : /^YM/.test(r) ? 5 : null; };
 let execCache = { at: 0, v: null };
 async function brokerExecs() { if (execCache.v && (Date.now() - execCache.at < 20000 || colchon.status().state === 'running')) return execCache.v;
   let E; try { E = await cdpEvaluator(9222); const v = await Promise.race([E.evaluate(`(async function(){${PAGE}var ab=tvBroker(tvTrading());if(!ab||typeof ab.allExecutions!=='function'&&typeof ab.executions!=='function')return null;var n=null;try{var ci=tvWv(ab.currentAccount());var ms=await ab.accountsMetainfo();(ms||[]).forEach(function(m){if(String(m.id)===String(ci))n=m.name})}catch(e){}var l=null;try{l=await ab.allExecutions()}catch(e){}if(!l||!l.length){l=[];var sy=['CME_MINI:MNQZ2026','CME_MINI:NQZ2026'];try{var cs=window.TradingViewApi._activeChartWidgetWV.value().symbol();if(cs&&sy.indexOf(cs)<0)sy.push(cs)}catch(e){}for(var i=0;i<sy.length;i++){try{(await ab.executions(sy[i])||[]).forEach(function(x){if(!l.some(function(y){return String(y.id)===String(x.id)}))l.push(x)})}catch(e){}}}return {cuenta:n,ex:(l||[]).map(function(x){return {id:String(x.id),symbol:x.symbol,price:+x.price,qty:Math.abs(+x.qty),side:+x.side,time:+x.time,comm:x.commission!=null?+x.commission:null}})}})()`), sleep(6000).then(() => null)]);
     if (v) execCache = { at: Date.now(), v }; } catch {} finally { try { E && E.close(); } catch {} }
   return execCache.v; }
-// Al terminar una prueba, si el bucle no tiene P&L final, el motor pide aqui el P&L bruto real de las ejecuciones del broker (solo lectura).
-colchonHooks.pnlFinalBroker = async ({ openAt, side, cuenta }) => { try { execCache.at = 0; const b = await brokerExecs(); if (!b || !b.ex) return null; if (cuenta && b.cuenta && String(b.cuenta) !== String(cuenta)) return null; const dir = side === 'long' ? 'COMPRA' : 'VENTA';
-  const rt = roundTrips(b.ex).filter(t => t.direccion === dir && Date.parse(t.at) >= openAt - 2000 && Date.parse(t.abierta) >= openAt - 30000).sort((x, y) => Date.parse(x.at) - Date.parse(y.at)); const t = rt[rt.length - 1]; return t && typeof t.pnlBruto === 'number' ? t.pnlBruto : null; } catch { return null; } };
+// Al cerrar, el motor pide el mismo cierre que la fila del historial (pnl tras cerrarSesion y precio de salida).
+colchonHooks.pnlFinalBroker = async ({ openAt, side, cuenta }) => { try { execCache.at = 0; const b = await brokerExecs(); if (!b || !b.ex) return null; return cierreDesdeEjecuciones(b.ex, { openAt, side, cuenta, cuentaBroker: b.cuenta }); } catch { return null; } };
 // Reporte de trades en TradingView: solo el cierre que acaba de confirmarse. No barre el historial ni repone dibujos.
 let reporte = null;
 try {
@@ -331,11 +330,6 @@ const vistaPrevia = createVistaPrevia({
   cotizar: async () => { const E = await cdpEvaluator(9222); try { return await E.evaluate(js.lastPrice); } finally { try { E.close(); } catch {} } },
   dibujar: async (expr) => { const E = await cdpEvaluator(9222); try { return await E.evaluate(expr); } finally { try { E.close(); } catch {} } },
 });
-function roundTrips(ex) { const by = {}; for (const x of [...ex].sort((a, b) => a.time - b.time)) (by[x.symbol] ||= []).push(x);
-  const out = []; for (const [sym, l] of Object.entries(by)) { const pv = PV(sym); let pos = 0, cash = 0, t0 = null, q = 0, first = null, comm = 0, commOk = true, entry = 0;
-    for (const x of l) { if (!pos) { t0 = x.time; first = x.side; q = 0; cash = 0; comm = 0; commOk = true; entry = x.price; } pos += x.side * x.qty; cash -= x.side * x.qty * x.price; if (x.side === first) q += x.qty; if (x.comm == null) commOk = false; else comm += x.comm;
-      if (pos === 0 && pv) { const g = Math.round(cash * pv * 100) / 100; out.push({ abierta: new Date(t0).toISOString(), at: new Date(x.time).toISOString(), direccion: first > 0 ? 'COMPRA' : 'VENTA', tamano: `${q} ${String(sym).replace(/^.*:/, '').replace(/Z?\d{4}$|[FGHJKMNQUVXZ]\d$/, '')}`, entrada: entry, salida: x.price, pnl: commOk ? Math.round((g - comm) * 100) / 100 : g, pnlBruto: g, neto: commOk, fuente: 'broker' }); } } }
-  return out; }
 let conn = { at: 0, v: null };
 async function conexion() { if (conn.v && Date.now() - conn.at < 10000) return conn.v;
   let cdp = false; try { const ac = new AbortController(); setTimeout(() => ac.abort(), 1500); cdp = (await fetch('http://127.0.0.1:9222/json/version', { signal: ac.signal })).ok; } catch {}
@@ -350,6 +344,8 @@ http.createServer((q, r) => manejar(q, r, {
   propiasH, negocioH, vistaPrevia, colchon, colchonCFG, DIR, state,
   buildReport, diaFarm, maskId, detalleTrade,
   lastFull: () => lastFull, lastBusy: () => lastBusy, quietMs: () => QUIET_MS,
+  pulsoPanel: abierto => { panelHasta = abierto ? Date.now() + PANEL_PAUSA_MS : 0; return panelHasta; },
+  panelAbierto: () => panelHasta > Date.now(),
   metricasDe, tradesDe, conexion, orders,
   algoTv: () => algoTv, textoVersion, ROOT, HTML,
 })).listen(PORT, '127.0.0.1', () => console.log(`Granja: http://localhost:${PORT}`));

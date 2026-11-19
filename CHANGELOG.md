@@ -10,6 +10,65 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.32] — 2026-11-19
+### Cambiado
+- **La explicación bajo Estrategia ya no se repite.** Solo queda el texto corto. Si el stop se mueve una vez (Fast Breakeven) se añade «Se mueve una sola vez.» Si es un colchón o tiene escalones, «Solo sube, nunca baja.» Si el stop no se mueve, el texto corto queda igual. Los dólares siguen saliendo de la cuenta, 25K o 50K.
+- **El sonido del algoritmo solo suena en la vela que está abierta.** Al cambiar de marco, las velas ya cerradas que van apareciendo mientras carga no suenan y no tapan la vela en vivo. Tras el cambio espera ~1 s a que la lectura se quede en la misma barra. En esa vela sigue sonando cada vez que el círculo se enciende.
+### Notas
+- No cambia la orden ni el motor.
+
+## [0.10.31] — 2026-11-19
+### Corregido
+- **El resumen usa el mismo P&L que el historial.** Al cerrarse la posición se lee la ida y vuelta de las ejecuciones del bróker (hasta ~3 s si tardan). El número es el de la fila, ya con la comisión. Solo si no se puede leer se queda el P&L aproximado. El motivo sale del precio de salida: a 1 pt del stop protegido es Stop loss, a 1 pt del objetivo es Take profit.
+- **Detener y cerrar, con el trade abierto, cierra al momento.** Ya no pregunta.
+- **BUY y SELL no preguntan si la cuenta es real.** La orden sale directo. El servidor sigue comprobando la cuenta. El registro dice «sin confirmación (desactivada)».
+### Notas
+- No cambia cómo se abre la orden ni cómo se mueve el stop.
+
+## [0.10.30] — 2026-11-19
+### Corregido
+- **El reajuste al fill espera a que aparezcan el SL y el TP.** La posición puede verse en menos de un segundo, antes de que TradingView liste las órdenes hijas. Mientras faltan, no se reajusta y no se marca como hecho: se vuelve a mirar cada ~150 ms, hasta 2 s desde que se vio la posición. El paso, si toca, se mueve en cuanto el stop existe. Cuando están las dos, el reajuste sigue en orden (SL y después TP) y no baja un stop ya protegido. Si a los 2 s siguen sin verse, se dejan como se enviaron y el registro dice «Ajuste por fill omitido», sin aviso en pantalla. El fallo de un reajuste que sí se intentó también queda solo en el registro. Cuando aparecen, se anota «SL/TP visibles a los … ms».
+- **El sonido de Profito Algoritmo no suena por barras viejas al cambiar el marco de TradingView.** Al cambiar de marco o de símbolo, o en la primera lectura, solo reanuda el estado y no suena. Una barra más vieja que la ya vista en ese marco se ignora. En la vela en curso sigue sonando cada vez que el círculo pasa de apagado a encendido. Cada sonido y cada reanudación quedan en el registro.
+### Notas
+- La orden sigue siendo una sola. No cambia cómo se decide el paso.
+
+## [0.10.29] — 2026-11-19
+### Añadido
+- **El beneficio del DOM también decide el paso.** El P&L que ya llega del DOM (~cada 120 ms) entra como una fuente más, junto al gráfico, al bid/ask y al bróker. Gana la más alta que siga fresca. Solo cuenta si es de la misma cuenta y del mismo símbolo, en dólares de la posición. Un cero, un texto raro o el de otra cuenta no mueven el stop. El registro del paso dice `(dom)` cuando esa fue la que disparó.
+### Corregido
+- **La foto de ejecuciones y de historial, antes de enviar, no se queda colgada.** Cada lectura tiene un tope de ~300 ms. Si no llega, se envía igual con lo que se alcanzó a leer y se marca la foto como incompleta: después no se dice «no se llenó» por una lista a medias. El tiempo sale en `TIEMPOS:` como `snapshot`, aparte de placeOrder.
+- **El aviso «Se llenó y se cerró» se cierra solo a los 6 s**, igual que Bloqueado, y así se suelta la pausa del recorrido de cuentas.
+- **Si al llenarse el P&L ya pasó el disparo, el paso mueve el stop antes del reajuste.** La entrada es el precio real del fill. El reajuste sigue en orden (SL y después TP) y no baja un stop que el paso ya dejó más protegido. `TIEMPOS:` anota el orden (`paso→ajuste` o `ajuste`).
+### Notas
+- Después del fill, el stop se mueve como antes. La orden sigue siendo una sola.
+
+## [0.10.28] — 2026-11-19
+### Cambiado
+- **Se quitó la estrategia Rascacielo de stop fijo** (SL −$600 / TP +$104). Sigue Rascacielo (Dia Minimo+Colchon). Si una selección guardada pide el id `rascacielo`, se usa la estrategia por defecto.
+- **Evaluación con trailing ahora se llama Evaluación con rascacielos.** El id sigue siendo `evaluacion`. SL −$630 / TP +$630. En vez de tres escalones hay un solo colchón, el mismo del día mínimo: protege ~$100 netos, se mueve una vez y el trade sigue hasta el TP o el SL. En 50K los dólares se duplican.
+### Notas
+- No cambia cómo el motor mueve el stop. Solo qué estrategia se elige.
+
+## [0.10.27] — 2026-11-19
+### Corregido
+- **Si la posición llega tarde, se vigila hasta un minuto y se gestiona.** Ya no se da por terminada a los 14 s con «se llenó y no aparece la posición». Si aparece dentro de ese minuto, entra al bucle de siempre. No se reenvía la orden.
+- **Una ejecución vieja o sin hora no cuenta como este trade.** Hace falta marca de tiempo, y se descartan los ids que ya existían antes de enviar. Un rechazo o una orden que sigue trabajando se mira antes de decir que se abrió y se cerró.
+- **Si no se pueden leer las ejecuciones, el registro lo dice.** No se inventa un «no se llenó» ni un cierre.
+- **El registro dice de qué precio salió el bracket** (ask, bid, último o el lado opuesto), la edad de la cotización y si hubo que recalcularlo.
+- **«Se llenó y se cerró» se muestra como aviso**, no bajo el título Bloqueado ni con el texto de las cuentas Lucid.
+### Notas
+- Después del fill, el stop se mueve como antes. La orden sigue siendo una sola.
+
+## [0.10.26] — 2026-11-19
+### Corregido
+- **La orden de las 9:47 ya no se da por no llenada cuando el bróker sí la llenó.** El SL y el TP de la orden a mercado salían del cierre de la vela. En Rascacielo, con 20 MNQ, el objetivo son 2.5 pts. Ese día el fill fue 27727.75 y el cierre de la vela iba unos 3.5 pts más abajo, así que el límite de venta nacía en 27726.75, ya por debajo del precio, y Tradovate lo ejecutó en el mismo segundo (−$52.50 brutos y −$20 de comisión). Profito miró 6 s si había posición abierta, no la vio y escribió «no se llenó». Ahora el bracket se calcula con el precio vivo (ask en compra, bid en venta) justo antes de enviar, en la misma orden. Si el SL o el TP quedarían dentro del precio, se recalculan y, si siguieran dentro, no se envía nada. Si la orden se abre y se cierra en esa ventana, el registro dice «se llenó y se cerró» con los precios, y no se vuelve a enviar.
+### Cambiado
+- **Menos idas a TradingView antes de la orden.** Entre el clic de BUY o SELL y placeOrder quedan dos lecturas: la cuenta (y el cambio, si hace falta), el contrato y que no haya posición; y la cotización viva. Siguen la confirmación de cuenta real y «Elige una cuenta».
+- **Tiempos en el registro.** Cada apertura deja una línea `TIEMPOS:` (clic, preparativos, cotización, placeOrder, posición, total). Cada movimiento del stop deja `LATENCIA: envío … ms · confirmación … ms`.
+- **El panel de operar pausa el recorrido de cuentas.** Mientras está abierto, la granja no cambia de cuenta en TradingView para leer saldos. Al cerrarlo sigue. Si la página se cierra sin avisar, la pausa caduca sola.
+### Notas
+- La orden sigue siendo una sola, a mercado, con SL y TP en el mismo envío. Después del fill, el stop se mueve como antes.
+
 ## [0.10.25] — 2026-11-19
 ### Cambiado
 - **El sonido del círculo suena cada vez que vuelve a aparecer.** En la vela que se está formando, Burbuja doble suena al pasar de sin círculo a círculo. Si el círculo se apaga y vuelve en esa misma vela, suena otra vez. Mientras sigue a la vista, no se repite. Al cerrar la vela se olvida. El interruptor «Sonido de la señal» sigue igual. BUY y SELL siguen en silencio.

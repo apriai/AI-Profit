@@ -125,7 +125,7 @@ Se definen en [`motor/strategies.mjs`](motor/strategies.mjs). Añadir una nueva 
 |---|---|---|
 | `dia-minimo-colchon` *(por defecto)* | Día mínimo + colchón | SL −$600 / TP +$1,600. Al llegar al disparo, el stop sube para asegurar unos +$100 netos (colchón = $100 + comisiones + 1 tick, redondeado arriba a tick). 5 MNQ por defecto. |
 | `prueba-be` | PRUEBA BE | SL −$630 / TP +$630. A +$15 el stop pasa a la entrada (*break even*). 5 MNQ por defecto. |
-| `evaluacion` | Trailing stop loss: Evaluación | SL −$630 / TP +$630 con stop escalonado: a +$150 protege +$100, a +$250 protege +$200 y a +$350 protege +$300. |
+| `evaluacion` | Evaluación con rascacielos | SL −$630 / TP +$630. Un solo colchón, como el día mínimo: al disparo el stop sube una vez para proteger ~$100 netos y el trade sigue hasta el TP o el SL. |
 | `evaluacion-simple` | Evaluación | SL −$630 / TP +$630. El stop no se mueve nunca. |
 
 Tope de tamaño: 20 MNQ o 2 NQ.

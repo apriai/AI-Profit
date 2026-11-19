@@ -2,6 +2,27 @@
 // No usa la primera lectura tardía de la granja como saldo de inicio.
 
 export const COMM_RT = { MNQ: 1, NQ: 3.5 };
+const PV = s => { const r = String(s || '').replace(/^.*:/, ''); return /^MNQ/.test(r) ? 2 : /^NQ/.test(r) ? 20 : /^MES/.test(r) ? 5 : /^ES/.test(r) ? 50 : /^M2K/.test(r) ? 5 : /^RTY/.test(r) ? 50 : /^MYM/.test(r) ? 0.5 : /^YM/.test(r) ? 5 : null; };
+// La misma ida y vuelta que arma el historial: precios de las ejecuciones del bróker.
+export function roundTrips(ex) {
+  const by = {}; for (const x of [...(ex || [])].sort((a, b) => a.time - b.time)) (by[x.symbol] ||= []).push(x);
+  const out = []; for (const [sym, l] of Object.entries(by)) { const pv = PV(sym); let pos = 0, cash = 0, t0 = null, q = 0, first = null, comm = 0, commOk = true, entry = 0;
+    for (const x of l) { if (!pos) { t0 = x.time; first = x.side; q = 0; cash = 0; comm = 0; commOk = true; entry = x.price; } pos += x.side * x.qty; cash -= x.side * x.qty * x.price; if (x.side === first) q += x.qty; if (x.comm == null) commOk = false; else comm += x.comm;
+      if (pos === 0 && pv) { const g = Math.round(cash * pv * 100) / 100; out.push({ abierta: new Date(t0).toISOString(), at: new Date(x.time).toISOString(), direccion: first > 0 ? 'COMPRA' : 'VENTA', tamano: `${q} ${String(sym).replace(/^.*:/, '').replace(/Z?\d{4}$|[FGHJKMNQUVXZ]\d$/, '')}`, entrada: entry, salida: x.price, pnl: commOk ? Math.round((g - comm) * 100) / 100 : g, pnlBruto: g, neto: commOk, fuente: 'broker' }); } } }
+  return out;
+}
+// El P&L que muestra la fila del historial (después de cerrarSesion) y el precio de salida.
+export function cierreDesdeEjecuciones(ex, { openAt, side, cuenta, cuentaBroker } = {}) {
+  if (!Array.isArray(ex) || !ex.length) return null;
+  if (cuenta && cuentaBroker && String(cuentaBroker) !== String(cuenta)) return null;
+  const dir = side === 'long' ? 'COMPRA' : side === 'short' ? 'VENTA' : side;
+  const abierto = Number(openAt);
+  const rt = roundTrips(ex).filter(t => (!dir || t.direccion === dir) && (!Number.isFinite(abierto) || (Date.parse(t.at) >= abierto - 2000 && Date.parse(t.abierta) >= abierto - 30000))).sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  const t = rt[rt.length - 1];
+  if (!t || typeof t.pnlBruto !== 'number') return null;
+  const fila = (cerrarSesion([t], {}).trades || [])[0] || t;
+  return { pnl: fila.pnl, salida: t.salida, pnlBruto: t.pnlBruto };
+}
 
 const r2 = x => Math.round(x * 100) / 100;
 
