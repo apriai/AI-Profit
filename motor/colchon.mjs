@@ -679,14 +679,45 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
   function tiempos() { if (S.openAt != null && S.closeAt == null && S.state !== 'running') S.closeAt = Date.now();
     return { abiertaEn: S.openAt ? new Date(S.openAt).toISOString() : null, cerradaEn: S.closeAt ? new Date(S.closeAt).toISOString() : null, abiertaET: etT(S.openAt), cerradaET: etT(S.closeAt),
       duracionSeg: seg(S.openAt, S.closeAt), colchonTrasSeg: S.locked ? seg(S.openAt, S.lockAt) : null, precisionMs: `±${poll}` }; }
-  // Si el bucle no tiene P&L final (cierre rapido), toma el P&L bruto real de las ejecuciones del broker. Nunca lanza error ni bloquea mas de ~6 s.
-  async function brokerFinal() { S.pnlBroker = null; try { if (S.openAt != null && S.closeAt == null) S.closeAt = Date.now(); if (S.reason === 'tp' || S.reason === 'sl' || S.pnl != null || S.openAt == null) return; const f = opts.pnlFinalBroker || colchonHooks.pnlFinalBroker; if (typeof f !== 'function') return;
-    for (let i = 0; i < 2 && S.pnlBroker == null; i++) { if (i) await sleep(1000); const v = await Promise.race([f({ openAt: S.openAt, side: S.side, cuenta: S.account && S.account.name }), sleep(2500).then(() => null)]); if (typeof v === 'number' && Number.isFinite(v)) { S.pnlBroker = v; log('P&L final tomado de las ejecuciones del broker: ' + v); } } } catch {} }
+  // Al quedar plano, el P&L del resumen sale de la misma ida y vuelta que el historial. Si no llega, se queda el aproximado. Como mucho ~3 s.
+  function clasificarSalida(px) {
+    if (px == null || !Number.isFinite(+px)) return;
+    const up = S.side === 'long', banda = TICK * 4, sl = S.lockTarget ?? S.sl, tp = S.tpPrice;
+    if (tp != null && (up ? px >= tp - banda : px <= tp + banda)) S.reason = 'tp';
+    else if (sl != null && (up ? px <= sl + banda : px >= sl - banda)) S.reason = 'sl';
+    else S.reason = 'flat';
+  }
+  async function brokerFinal() {
+    S.pnlBroker = null; S.salidaBroker = null;
+    try {
+      if (S.openAt == null) return;
+      if (S.closeAt == null) S.closeAt = Date.now();
+      const f = opts.pnlFinalBroker || colchonHooks.pnlFinalBroker;
+      if (typeof f !== 'function') return;
+      const hasta = Date.now() + (opts.cierreEsperaMs ?? 3000);
+      while (S.pnlBroker == null && Date.now() < hasta) {
+        let v = null;
+        try { v = await Promise.race([Promise.resolve().then(() => f({ openAt: S.openAt, side: S.side, cuenta: S.account && S.account.name })), sleep(Math.min(2500, Math.max(50, hasta - Date.now()))).then(() => null)]); } catch { v = null; }
+        const pnl = v && typeof v === 'object' ? v.pnl : v;
+        const salida = v && typeof v === 'object' ? v.salida : null;
+        if (typeof pnl === 'number' && Number.isFinite(pnl)) {
+          S.pnlBroker = pnl;
+          if (typeof salida === 'number' && Number.isFinite(salida)) S.salidaBroker = salida;
+          log('P&L final tomado de las ejecuciones del broker: ' + pnl);
+          break;
+        }
+        const queda = hasta - Date.now();
+        if (queda <= 40) break;
+        await sleep(Math.min(1000, queda));
+      }
+      if (S.salidaBroker != null && S.reason !== 'stop') clasificarSalida(S.salidaBroker);
+    } catch {}
+  }
   function summarize() {
     if (S.reason === 'sl' && S.lockTarget != null && !S.locked) { S.locked = true; S.lockPrice = S.lockTarget; S.sl = S.lockTarget; S.lockPending = false; } // salió por stop en el precio del colchón
     if (S.reason === 'sl' && S.lockTarget != null) S.sl = S.lockTarget;
     const pnlSL = S.sl != null && S.entry != null ? Math.round((S.sl - S.entry) * (S.side === 'long' ? 1 : -1) * PT_USD[S.symbol] * S.qty * 100) / 100 : null;
-    const SP = S.P || (S.strategy && getStrategy(S.strategy.id) || getStrategy()).params; const pnlFinal0 = S.reason === 'tp' ? SP.TP_USD : S.reason === 'sl' ? pnlSL : S.pnl; const usaBroker = pnlFinal0 == null && typeof S.pnlBroker === 'number'; const pnlFinal = usaBroker ? S.pnlBroker : pnlFinal0;
+    const SP = S.P || (S.strategy && getStrategy(S.strategy.id) || getStrategy()).params; const pnlFinal0 = S.reason === 'tp' ? SP.TP_USD : S.reason === 'sl' ? pnlSL : S.pnl; const usaBroker = typeof S.pnlBroker === 'number' && Number.isFinite(S.pnlBroker); const pnlFinal = usaBroker ? S.pnlBroker : pnlFinal0;
     last = { fin: new Date().toISOString(), cuenta: S.account && S.account.name, modo: S.mode, direccion: S.side === 'long' ? 'COMPRA' : 'VENTA', tamano: `${S.qty} ${S.symbol}`, motivo: { tp: 'Take profit', sl: 'Stop loss', stop: 'Detenido manualmente', flat: 'Posición cerrada', error: 'Error' }[S.reason] || S.reason || '—',
       ajusteFill: S.ajuste || null, estrategia: S.strategy ? S.strategy.name : null, estrategiaId: S.strategy ? S.strategy.id : null, ...tiempos(), entrada: S.entry, pnlFinalUSD: pnlFinal, pnlFinalAprox: usaBroker ? false : !(S.reason === 'tp' || S.reason === 'sl'), colchonMovido: S.locked, slColchon: S.lockPrice, pasos: (S.pasos || []).map(p => ({ paso: p.paso, disparoUSD: p.disparoUSD, protegeUSD: p.protegeUSD, precio: p.precio, enSeg: p.enSeg, confirmado: p.confirmado, saltados: p.saltados, latenciaSeg: p.latencia ? Math.round(p.latencia.totalDesdeLecturaMs / 10) / 100 : null })), probabilidadNecesaria: S.qty ? breakEvenFor(S.symbol, S.qty, SP) : null, pasosTotal: S.steps ? S.steps.length : null, colchonUSD: S.qty ? ((S.pasos && S.pasos.length) ? S.pasos[S.pasos.length - 1].protegeUSD : (SP.STEPS ? null : lockUsdFor(S.symbol, S.qty, SP))) : null, disparoUSD: S.qty && !SP.STEPS ? triggerUsdFor(S.symbol, S.qty, SP) : null, latencia: S.latency || null, fuenteModo: S.fuenteModo || null, fuenteLider: S.fuenteLider || null, fuentes: S.fuentesStats || null, alerta: S.alerta || null, inicio: S.startedAt, error: S.error };
     S.summary = last; try { fs.writeFileSync(path.join(path.dirname(logFile), 'colchon-resumen.json'), JSON.stringify(last, null, 2)); } catch {}

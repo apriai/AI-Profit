@@ -10,6 +10,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.31] — 2026-11-19
+### Corregido
+- **El resumen usa el mismo P&L que el historial.** Al cerrarse la posición se lee la ida y vuelta de las ejecuciones del bróker (hasta ~3 s si tardan). El número es el de la fila, ya con la comisión. Solo si no se puede leer se queda el P&L aproximado. El motivo sale del precio de salida: a 1 pt del stop protegido es Stop loss, a 1 pt del objetivo es Take profit.
+- **Detener y cerrar, con el trade abierto, cierra al momento.** Ya no pregunta.
+### Notas
+- No cambia cómo se abre la orden ni cómo se mueve el stop.
+
 ## [0.10.30] — 2026-11-19
 ### Corregido
 - **El reajuste al fill espera a que aparezcan el SL y el TP.** La posición puede verse en menos de un segundo, antes de que TradingView liste las órdenes hijas. Mientras faltan, no se reajusta y no se marca como hecho: se vuelve a mirar cada ~150 ms, hasta 2 s desde que se vio la posición. El paso, si toca, se mueve en cuanto el stop existe. Cuando están las dos, el reajuste sigue en orden (SL y después TP) y no baja un stop ya protegido. Si a los 2 s siguen sin verse, se dejan como se enviaron y el registro dice «Ajuste por fill omitido», sin aviso en pantalla. El fallo de un reajuste que sí se intentó también queda solo en el registro. Cuando aparecen, se anota «SL/TP visibles a los … ms».
