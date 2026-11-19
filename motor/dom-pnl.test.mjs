@@ -24,14 +24,22 @@ assert.equal(SNAPSHOT_MS, 300);
 
 function pagina() {
   const orders = [], positions = [], stops = [];
-  let px = 20000, colocadas = 0;
+  let px = 20000, colocadas = 0, born = 0;
+  const visible = o => {
+    if (!o || (o.type !== 1 && o.type !== 3)) return true;
+    const d = o.type === 3 ? globalThis.__stopDelay : globalThis.__tpDelay;
+    const delay = d != null ? d : globalThis.__bracketDelay;
+    if (delay == null) return true;
+    if (delay < 0) return false;
+    return Date.now() >= born + delay;
+  };
   const ab = {
     _brokerMetainfo: { id: 'Paper', title: 'Paper Trading' },
     currentAccount: () => '1',
     async accountsMetainfo() { return [{ id: '1', name: 'Paper Trading', type: 'demo' }]; },
     setCurrentAccount() {},
-    async positions() { const fill = globalThis.__fill ?? px; return positions.map(p => ({ ...p, pl: globalThis.__pl ?? 0, lastPrice: fill, avgPrice: fill, stopLoss: (orders.find(o => o.type === 3) || {}).stopPrice, takeProfit: (orders.find(o => o.type === 1) || {}).limitPrice })); },
-    async orders() { return orders.filter(o => o.status === 6).map(o => ({ ...o })); },
+    async positions() { const fill = globalThis.__fill ?? px; const so = orders.find(o => o.type === 3 && visible(o)); const to = orders.find(o => o.type === 1 && visible(o)); return positions.map(p => ({ ...p, pl: globalThis.__pl ?? 0, lastPrice: fill, avgPrice: fill, ...(so ? { stopLoss: so.stopPrice } : {}), ...(to ? { takeProfit: to.limitPrice } : {}) })); },
+    async orders() { return orders.filter(o => o.status === 6 && visible(o)).map(o => ({ ...o })); },
     async ordersHistory() { if (globalThis.__histHang && !globalThis.__histYa) { globalThis.__histYa = true; return new Promise(() => {}); } return []; },
     async allExecutions() { if (globalThis.__execHang && !globalThis.__execYa) { globalThis.__execYa = true; return new Promise(() => {}); } return []; },
     async symbolInfo(sy) { return { name: sy }; },
@@ -39,6 +47,7 @@ function pagina() {
       colocadas++;
       if (globalThis.__sinPos) return { orderId: 'P' + colocadas };
       const id = 'P' + colocadas;
+      born = Date.now();
       positions.push({ id, symbol: o.symbol, side: o.side, qty: o.qty, avgPrice: globalThis.__fill ?? px });
       orders.push({ id: 'S' + id, parentId: id, symbol: o.symbol, side: -o.side, type: 3, status: 6, qty: o.qty, stopPrice: o.stopLoss });
       orders.push({ id: 'T' + id, parentId: id, symbol: o.symbol, side: -o.side, type: 1, status: 6, qty: o.qty, limitPrice: o.takeProfit });
@@ -49,7 +58,7 @@ function pagina() {
     async closePosition() { positions.length = 0; return true; },
   };
   const win = {
-    TradingView: { bottomWidgetBar: { _widgetControllers: new Map([['paper_trading', { _trading: { activeBroker: () => ab, _ordersService: { activeOrders: () => orders.filter(o => o.status === 6) } } }]]) } },
+    TradingView: { bottomWidgetBar: { _widgetControllers: new Map([['paper_trading', { _trading: { activeBroker: () => ab, _ordersService: { activeOrders: () => orders.filter(o => o.status === 6 && visible(o)) } } }]]) } },
     TradingViewApi: { _activeChartWidgetWV: { value: () => ({ symbol: () => 'CME_MINI:MNQ1!', _chartWidget: { model: () => ({ mainSeries: () => ({ symbol: () => 'CME_MINI:MNQ1!', symbolInfo: () => ({ front_contract: 'MNQZ2026' }), quotes: () => ({ bid: px - 0.25, ask: px, last: px }), bars: () => ({ last: () => ({ value: [0, 0, 0, 0, px] }) }) }) }) } }) } },
   };
   const doc = { get visibilityState() { return 'hidden'; }, hasFocus: () => false, querySelector: s => /accountName/.test(s) ? { innerText: 'Paper Trading' } : null };
@@ -130,6 +139,74 @@ const ticker = { async start(_root, fn) { tick = fn; return { ok: true, fuentes:
   delete globalThis.__fill; delete globalThis.__pl;
   await k.stop({ flatten: false });
   assert.match(texto, /TIEMPOS: orden paso→ajuste/);
+  assert.ok(texto.indexOf('paso 1/') < texto.indexOf('Ajuste por fill'), texto);
+  assert.equal(pg.stops[0], esperado, 'stops ' + pg.stops.join(','));
+  assert.ok(!pg.stops.includes(peor), 'el reajuste pisó el paso: ' + pg.stops.join(','));
+  assert.equal(pg.orders.find(o => o.type === 3).stopPrice, esperado);
+}
+
+{
+  const pg = pagina();
+  const fill = 20010;
+  globalThis.__fill = fill; globalThis.__pl = 0; globalThis.__bracketDelay = 400;
+  const logA = path.join(tmp, 'ajuste-espera.log');
+  const t0 = Date.now();
+  const k = createColchon(apiDriver(pg.evaluate, null, ticker), { pollMs: 40, logFile: logA, ignoreClock: true, flatConfirm: { reads: 1, ms: 0 }, realAllowFile: path.join(tmp, 'no.json'), fuente: { modo: 'mas-rapido', frescoMs: 2000, pollMs: 40 } });
+  const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 1, strategyId: 'prueba-be', accountId: '1', accountName: 'Paper Trading', tClick: Date.now() });
+  assert.equal(r.ok, true, r.err);
+  let texto = '';
+  for (let i = 0; i < 40 && !/Ajuste por fill \d/.test(texto); i++) { await new Promise(z => setTimeout(z, 50)); texto = fs.readFileSync(logA, 'utf8'); }
+  delete globalThis.__fill; delete globalThis.__pl; delete globalThis.__bracketDelay;
+  await k.stop({ flatten: false });
+  const m = texto.match(/SL\/TP visibles a los (\d+) ms/);
+  assert.ok(m, texto);
+  assert.ok(Number(m[1]) >= 300, m[1]);
+  assert.doesNotMatch(texto, /omitido/);
+  assert.doesNotMatch(texto, /no verificado/);
+  assert.equal(k.status().alerta ?? null, null);
+  const nuevo = roundTick(fill - ptsFor(getStrategy('prueba-be').params.SL_USD, 'MNQ', 1));
+  assert.ok(pg.stops.includes(nuevo), 'stops ' + pg.stops.join(','));
+  assert.ok(Date.now() - t0 < 2000);
+}
+
+{
+  const pg = pagina();
+  globalThis.__fill = 20010; globalThis.__pl = 0; globalThis.__bracketDelay = -1;
+  const logN = path.join(tmp, 'ajuste-nunca.log');
+  const t0 = Date.now();
+  const k = createColchon(apiDriver(pg.evaluate, null, ticker), { pollMs: 40, logFile: logN, ignoreClock: true, flatConfirm: { reads: 1, ms: 0 }, realAllowFile: path.join(tmp, 'no.json'), fuente: { modo: 'mas-rapido', frescoMs: 2000, pollMs: 40 } });
+  const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 1, strategyId: 'prueba-be', accountId: '1', accountName: 'Paper Trading', tClick: Date.now() });
+  assert.equal(r.ok, true, r.err);
+  let texto = '';
+  for (let i = 0; i < 50 && !/omitido/.test(texto); i++) { await new Promise(z => setTimeout(z, 100)); texto = fs.readFileSync(logN, 'utf8'); }
+  const dt = Date.now() - t0;
+  delete globalThis.__fill; delete globalThis.__pl; delete globalThis.__bracketDelay;
+  await k.stop({ flatten: false });
+  assert.match(texto, /Ajuste por fill omitido: SL\/TP no visibles tras 2 s/);
+  assert.ok(dt >= 1800 && dt < 4000, 'tardó ' + dt);
+  assert.equal(pg.stops.length, 0);
+  assert.equal(k.status().alerta ?? null, null);
+  const evs = fs.readFileSync(path.join(tmp, 'colchon-eventos.jsonl'), 'utf8');
+  assert.doesNotMatch(evs, /Ajuste SL\/TP al fill no verificado/);
+  assert.doesNotMatch(texto, /notificacion/);
+}
+
+{
+  const pg = pagina();
+  const fill = 20010;
+  const P = getStrategy('prueba-be').params;
+  const esperado = roundTick(fill + stepsFor('MNQ', 1, P)[0].lockPts);
+  const peor = roundTick(fill - ptsFor(P.SL_USD, 'MNQ', 1));
+  globalThis.__fill = fill; globalThis.__pl = 20; globalThis.__stopDelay = 180; globalThis.__tpDelay = 500;
+  const logE = path.join(tmp, 'ajuste-paso.log');
+  const k = createColchon(apiDriver(pg.evaluate, null, ticker), { pollMs: 40, logFile: logE, ignoreClock: true, flatConfirm: { reads: 1, ms: 0 }, realAllowFile: path.join(tmp, 'no.json'), fuente: { modo: 'mas-rapido', frescoMs: 2000, pollMs: 40 } });
+  const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 1, strategyId: 'prueba-be', accountId: '1', accountName: 'Paper Trading', tClick: Date.now() });
+  assert.equal(r.ok, true, r.err);
+  let texto = '';
+  for (let i = 0; i < 40 && !/TIEMPOS: orden paso→ajuste/.test(texto); i++) { await new Promise(z => setTimeout(z, 50)); texto = fs.readFileSync(logE, 'utf8'); }
+  delete globalThis.__fill; delete globalThis.__pl; delete globalThis.__stopDelay; delete globalThis.__tpDelay;
+  await k.stop({ flatten: false });
+  assert.match(texto, /SL\/TP visibles a los \d+ ms/);
   assert.ok(texto.indexOf('paso 1/') < texto.indexOf('Ajuste por fill'), texto);
   assert.equal(pg.stops[0], esperado, 'stops ' + pg.stops.join(','));
   assert.ok(!pg.stops.includes(peor), 'el reajuste pisó el paso: ' + pg.stops.join(','));

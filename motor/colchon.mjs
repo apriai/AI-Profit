@@ -617,12 +617,25 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
           ev('flat_decidido', { lecturasVacias: S.emptyN, msDesdePrimera: Date.now() - S.emptySince });
         } else if (pos && S.emptyN) { ev('anomalia', { kind: 'lectura_vacia_transitoria', lecturas: S.emptyN }); log(`lectura vacía transitoria (${S.emptyN}): la posición sigue`); S.emptyN = 0; S.emptySince = null; }
         let sl = sl0;
-        if (pos && pos.entry != null && paper && !S.ajusteHecho && S.ref != null) {
+        const quiereAjuste = !!(pos && pos.entry != null && paper && !S.ajusteHecho && S.ref != null);
+        if (quiereAjuste && S.bracketsDesde == null) S.bracketsDesde = Date.now();
+        const slLista = typeof sl === 'number' && Number.isFinite(sl);
+        let tpLista = false;
+        if (quiereAjuste) { try { const kids = driver.working ? await driver.working(c.symbol) : []; tpLista = (kids || []).some(o => o && o.type === 1); } catch { tpLista = false; } }
+        const esperaAjuste = quiereAjuste && Date.now() - S.bracketsDesde < (opts.ajusteEsperaMs ?? 2000);
+        let esperarBrackets = false;
+        if (quiereAjuste && (!slLista || !tpLista)) {
+          if (!esperaAjuste) { S.ajusteHecho = true; log('Ajuste por fill omitido: SL/TP no visibles tras 2 s'); }
+          else esperarBrackets = true;
+        }
+        if (quiereAjuste && slLista && tpLista) {
+          log(`SL/TP visibles a los ${Date.now() - S.bracketsDesde} ms`);
           S.entry = pos.entry;
           if (S.openAt == null) { S.openAt = Date.now(); log('Posición abierta (fill visto)'); }
           pos = aplicarFuentes(pos, sl);
           const dPre = decide(pos, sl, st, c);
           const orden = [];
+          if ((S.pasos || []).length && dPre.action !== 'modify') orden.push('paso');
           if (dPre.action === 'modify' || dPre.action === 'skip') { if (dPre.action === 'modify') orden.push('paso'); await actuar(dPre, pos, sl, tRead, tSeen); if (S.lockPrice != null) sl = S.lockPrice; }
           orden.push('ajuste');
           S.ajusteHecho = true; const sd2 = c.side === 'long' ? 1 : -1, slCalc = roundTick(pos.entry - sd2 * S.slPts), tpN = roundTick(pos.entry + sd2 * S.tpPts);
@@ -638,7 +651,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
           S.tpPrice = tpN; S.ajuste = rec; ev('ajuste_brackets', rec);
           log(rec.nada ? `Fill ${pos.entry} = referencia: SL/TP ya correctos` : `Ajuste por fill ${pos.entry} (ref ${S.ref}): SL ${slA}→${slN} ${rec.sl.ok ? 'OK' : 'FALLO'} · TP ${tpA}→${tpN} ${rec.tp.ok ? 'OK' : 'FALLO'} (${rec.seg} s)`);
           log(`TIEMPOS: orden ${orden.join('→')}`);
-          if (!rec.ok) { S.alerta = `Ajuste SL/TP al fill no verificado (SL ${slN}, TP ${tpN}): revisa TradingView. No se canceló nada.`; ev('notificacion', { texto: S.alerta }); }
+          if (!rec.ok) log(`Ajuste SL/TP al fill no verificado (SL ${slN}, TP ${tpN}): revisa TradingView. No se canceló nada.`);
           if (!rec.nada) { await sleep(wait); continue; }
         }
         if (pos && S.openAt == null) { S.openAt = Date.now(); log('Posición abierta (fill visto)'); }
@@ -648,8 +661,8 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
         if (d.action === 'flat') { if (paper && S.openAt == null && i < 10) { await sleep(poll); continue; }
           let lp = S.price; try { const q = driver.lastPrice && await driver.lastPrice(); if (q != null) lp = q; } catch {} const up = c.side === 'long'; S.reason = lp == null ? 'flat' : (S.tpPrice != null && (up ? lp >= S.tpPrice - TICK * 4 : lp <= S.tpPrice + TICK * 4)) ? 'tp' : ((S.lockTarget ?? S.sl) != null && (up ? lp <= (S.lockTarget ?? S.sl) + TICK * 4 : lp >= (S.lockTarget ?? S.sl) - TICK * 4)) ? 'sl' : 'flat';
           S.closeAt = Date.now(); log('Sin posición: fin del loop (' + S.reason + ')'); break; }
-        if (d.action === 'skip' || d.action === 'modify') await actuar(d, pos, sl, tRead, tSeen);
-        await sleep(wait);
+        if ((d.action === 'skip' || d.action === 'modify') && (d.action !== 'modify' || slLista)) await actuar(d, pos, sl, tRead, tSeen);
+        await sleep(esperarBrackets ? 150 : wait);
       }
     } catch (e) { S.error = String(e.message || e); log('ERROR', S.error); ev('error', { error: S.error }); }
     if (driver.ticker && !opts.noTicks) { try { await driver.ticker.stop(); } catch {} }
