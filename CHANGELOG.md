@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.29] — 2026-11-19
+### Cambiado
+- **Abrir usa dos llamadas a DevTools.** La primera solo lee: cuenta activa, lista, posición del símbolo, bid/ask/last y el contrato del gráfico. Si se corta, se puede repetir. La segunda relee la cuenta, que siga plano y que el contrato sea el mismo; si algo cambió, no envía y lo dice. Entonces manda la orden a mercado con el stop y el objetivo calculados con el bid y el ask de ese momento. Esa segunda llamada no se reintenta. Si se corta, no se manda otra: se relee por el id y, si la posición apareció, se adopta y se avisa.
+### Notas
+- No cambia los dólares de las estrategias.
+
 ## [0.10.28] — 2026-11-19
 ### Corregido
 - **La orden a mercado vuelve a salir con el stop y el objetivo pegados.** Los precios salen del bid y del ask de ese momento, no del cierre de la vela. El stop queda a la distancia de la estrategia desde el ask (compra) o el bid (venta). Si el objetivo es corto, queda al menos 8 ticks (2,00 puntos) más allá del lado contrario del libro, para que un deslizamiento normal no lo cruce al entrar. Ni el stop ni el objetivo se mandan a menos de 2 ticks del precio que los dispararía.

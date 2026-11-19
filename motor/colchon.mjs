@@ -244,32 +244,53 @@ export const js = {
     return {ok:v===PX,verified:v,ret:r===undefined?'undefined':r,err:er,sendMs:Math.round(T1-T0),confirmMs:Math.round(performance.now()-T1)}})()`,
   lastPrice: `(function(){try{var ms=window.TradingViewApi._activeChartWidgetWV.value()._chartWidget.model().mainSeries();var b=ms.bars().last();var fr=null;try{var si=ms.symbolInfo&&ms.symbolInfo();fr=si&&si.front_contract||null}catch(e){}return {symbol:ms.symbol(),price:b.value[4],front:fr}}catch(e){return {error:e.message}}})()`,
   place: o => `(async function(){${PAGE}var ab=tvBroker(tvTrading());if(!tvBrokerId(ab))return {error:'No active broker'};var r=await ab.placeOrder(${JSON.stringify(o)});return {ok:r!==false,orderId:r&&(r.orderId||r.id)||null}})()`,
-  // Una sola llamada: lee la posición, el bid/ask y el contrato, y solo entonces manda la orden CON el bracket.
-  // Si la lectura falla o ya hay posición en ese símbolo, no envía nada. El script lleva placeOrder: no se reintenta.
-  abrir: (root, side, qty, slPts, tpPts, front) => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t);if(!tvBrokerId(ab))return {sent:false,error:'No active broker'};
-    var R=${JSON.stringify(root)},SIDE=${Number(side)},QTY=${Number(qty)},SLP=${Number(slPts)},TPP=${Number(tpPts)},FRENTE_GUARDADO=${JSON.stringify(front || null)};
-    var HOL=${HOLGURA_TICKS},FRENTE=${TP_FRENTE_TICKS},TICK=0.25,rnd=function(x){return Math.round(x/TICK)*TICK};
-    var pos;try{pos=await tvPos(ab,R)}catch(e){return {sent:false,error:'lectura'}}
-    if(tvPos.lastErr)return {sent:false,error:'no pude leer la posición. No se cierra nada y no se envía la orden',detail:tvPos.lastErr};
-    if(pos)return {sent:false,error:'ya hay posicion',side:pos.side===1?'long':'short',qty:Math.abs(Number(pos.qty))};
-    var ms,q=null,fr=null,symChart=null;try{ms=window.TradingViewApi._activeChartWidgetWV.value()._chartWidget.model().mainSeries();symChart=ms.symbol();q=ms.quotes&&ms.quotes();var si=ms.symbolInfo&&ms.symbolInfo();fr=si&&si.front_contract||null}catch(e){return {sent:false,error:'sin grafico'}}
-    if(tvRoot(symChart)!==R)return {sent:false,error:'el chart está en '+symChart};
+  // Llamada 1, solo lectura. Se puede reintentar: no contiene placeOrder.
+  // Cuenta activa, lista, posición del símbolo, bid/ask/last y el contrato del chart. El guardado no se manda si no coincide.
+  preparar: (root, front) => `(async function(){${PAGE}/*LECTURA_APERTURA*/
+    var t=tvTrading(),ab=tvBroker(t);if(!tvBrokerId(ab))return {ok:false,error:'No active broker'};
+    var R=${JSON.stringify(root)},FRENTE_GUARDADO=${JSON.stringify(front || null)};
+    var cur;try{cur=String(tvWv(ab.currentAccount()))}catch(e){return {ok:false,error:'no pude leer la cuenta. No se envía.'}}
+    var listaC;try{listaC=await ab.accountsMetainfo()||[]}catch(e){return {ok:false,error:'no pude leer la lista de cuentas. No se envía.'}}
+    var accounts=listaC.map(function(a){return {id:String(a.id),name:a.name}});
+    var pos;try{pos=await tvPos(ab,R)}catch(e){return {ok:false,error:'no pude leer la posición. No se cierra nada y no se envía la orden'}}
+    if(tvPos.lastErr)return {ok:false,error:'no pude leer la posición. No se cierra nada y no se envía la orden',detail:tvPos.lastErr};
+    if(pos)return {ok:false,error:'ya hay posicion',side:pos.side===1?'long':'short',qty:Math.abs(Number(pos.qty))};
+    var ms,q=null,fr=null,symChart=null,last=null;
+    try{ms=window.TradingViewApi._activeChartWidgetWV.value()._chartWidget.model().mainSeries();symChart=ms.symbol();q=ms.quotes&&ms.quotes();var si=ms.symbolInfo&&ms.symbolInfo();fr=si&&si.front_contract||null;last=q&&q.last!=null?Number(q.last):tvChartPx()}catch(e){return {ok:false,error:'sin grafico'}}
+    if(tvRoot(symChart)!==R)return {ok:false,error:'el chart está en '+symChart};
     var bid=q&&Number(q.bid),ask=q&&Number(q.ask);
-    if(!isFinite(bid)||!isFinite(ask)||ask<bid||bid<=0)return {sent:false,error:'sin bid/ask'};
-    var sl,tp,ref;if(SIDE===1){sl=rnd(ask-SLP);tp=rnd(Math.max(ask+TPP,bid+FRENTE*TICK,ask+HOL*TICK));ref=ask;if(!(sl<=bid-HOL*TICK+1e-9))return {sent:false,error:'el stop quedaría del lado malo del bid',bid:bid,ask:ask};if(!(tp>=ask+HOL*TICK-1e-9))return {sent:false,error:'el objetivo quedaría del lado malo del ask',bid:bid,ask:ask}}
-    else{sl=rnd(bid+SLP);tp=rnd(Math.min(bid-TPP,ask-FRENTE*TICK,bid-HOL*TICK));ref=bid;if(!(sl>=ask+HOL*TICK-1e-9))return {sent:false,error:'el stop quedaría del lado malo del ask',bid:bid,ask:ask};if(!(tp<=bid-HOL*TICK+1e-9))return {sent:false,error:'el objetivo quedaría del lado malo del bid',bid:bid,ask:ask}}
+    if(!isFinite(bid)||!isFinite(ask)||ask<bid||bid<=0)return {ok:false,error:'sin bid/ask'};
     var idBroker=tvBrokerId(ab),base=symChart.indexOf(':')>=0?symChart.replace(/[^:]*$/,''):'';
-    // El guardado solo se acepta si el chart, leído en ESTA llamada, trae el mismo contrato. Si rodó o no coincide, manda el chart.
     var frente=fr||null,rollover=!!(FRENTE_GUARDADO&&frente&&String(FRENTE_GUARDADO)!==String(frente));
-    if(!frente){frente=null}
-    var dt=frente?base+String(frente).replace(/^.*:/,''):null,lista=[symChart];
-    if(dt&&/\\d!$/.test(symChart))lista=String(idBroker).toLowerCase()==='paper'?[symChart,dt]:[dt,symChart];
-    var sym=null;if(typeof ab.symbolInfo==='function'){for(var i=0;i<lista.length&&!sym;i++){try{var inf=await Promise.race([ab.symbolInfo(lista[i]),new Promise(function(z){setTimeout(function(){z(null)},5000)})]);if(inf)sym=lista[i]}catch(e){}}}
+    var dt=frente?base+String(frente).replace(/^.*:/,''):null,cands=[symChart];
+    if(dt&&/\\d!$/.test(symChart))cands=String(idBroker).toLowerCase()==='paper'?[symChart,dt]:[dt,symChart];
+    var sym=null;if(typeof ab.symbolInfo==='function'){for(var i=0;i<cands.length&&!sym;i++){try{var inf=await Promise.race([ab.symbolInfo(cands[i]),new Promise(function(z){setTimeout(function(){z(null)},5000)})]);if(inf)sym=cands[i]}catch(e){}}}
     else sym=symChart;
-    if(!sym)return {sent:false,error:'sin simbolo',front:fr||null,rollover:rollover};
-    var r;try{r=await ab.placeOrder({symbol:sym,side:SIDE,type:2,qty:QTY,stopLoss:sl,takeProfit:tp})}catch(e){return {sent:true,dudoso:true,error:String(e&&e.message||e),sl:sl,tp:tp,bid:bid,ask:ask,front:fr||null,rollover:rollover}}
-    if(r===false)return {sent:false,error:'el bróker no aceptó la orden',sl:sl,tp:tp,bid:bid,ask:ask,front:fr||null,rollover:rollover};
-    return {sent:true,orderId:r&&(r.orderId||r.id)?String(r.orderId||r.id):null,sl:sl,tp:tp,ref:ref,bid:bid,ask:ask,symbol:sym,front:fr||null,rollover:rollover}})()`,
+    if(!sym)return {ok:false,error:'sin simbolo',front:fr||null,rollover:rollover};
+    return {ok:true,accountId:cur,accounts:accounts,bid:bid,ask:ask,last:last,front:fr||null,symbol:sym,chart:symChart,rollover:rollover}})()`,
+  // Llamada 2, la orden. No se reintenta. Relee cuenta, plano y contrato; si algo cambió, no envía.
+  // El bracket se calcula aquí con el bid/ask de este momento y viaja en la misma placeOrder.
+  enviar: p => `(async function(){${PAGE}/*ENVIO_APERTURA*/
+    var t=tvTrading(),ab=tvBroker(t);if(!tvBrokerId(ab))return {sent:false,error:'No active broker'};
+    var R=${JSON.stringify(p.root)},SIDE=${Number(p.side)},QTY=${Number(p.qty)},SLP=${Number(p.slPts)},TPP=${Number(p.tpPts)};
+    var CUENTA=${JSON.stringify(String(p.accountId || ''))},SYM=${JSON.stringify(p.symbol || '')},ESP=${JSON.stringify(p.front || null)};
+    var HOL=${HOLGURA_TICKS},F=${TP_FRENTE_TICKS},TICK=0.25,rnd=function(x){return Math.round(x/TICK)*TICK};
+    var cur;try{cur=String(tvWv(ab.currentAccount()))}catch(e){return {sent:false,error:'no pude releer la cuenta. No se envía.'}}
+    if(cur!==CUENTA)return {sent:false,error:'la cuenta cambió: era '+CUENTA+' y ahora es '+cur+'. No se envía.'};
+    var pos;try{pos=await tvPos(ab,R)}catch(e){return {sent:false,error:'no pude releer la posición. No se envía.'}}
+    if(tvPos.lastErr)return {sent:false,error:'no pude releer la posición. No se envía.',detail:tvPos.lastErr};
+    if(pos)return {sent:false,error:'ya hay posicion',side:pos.side===1?'long':'short'};
+    var fr=null,symChart=null,q=null;
+    try{var ms=window.TradingViewApi._activeChartWidgetWV.value()._chartWidget.model().mainSeries();symChart=ms.symbol();q=ms.quotes&&ms.quotes();var si=ms.symbolInfo&&ms.symbolInfo();fr=si&&si.front_contract||null}catch(e){return {sent:false,error:'sin grafico. No se envía.'}}
+    if(tvRoot(symChart)!==R)return {sent:false,error:'el chart está en '+symChart+'. No se envía.'};
+    if(String(fr||'')!==String(ESP||''))return {sent:false,error:'el contrato cambió: era '+(ESP||'(ninguno)')+' y ahora es '+(fr||'(ninguno)')+'. No se envía.'};
+    var bid=q&&Number(q.bid),ask=q&&Number(q.ask);
+    if(!isFinite(bid)||!isFinite(ask)||ask<bid||bid<=0)return {sent:false,error:'sin bid/ask. No se envía.'};
+    var sl,tp;if(SIDE===1){sl=rnd(ask-SLP);tp=rnd(Math.max(ask+TPP,bid+F*TICK,ask+HOL*TICK));if(!(sl<=bid-HOL*TICK+1e-9))return {sent:false,error:'el stop quedaría del lado malo del bid',bid:bid,ask:ask};if(!(tp>=ask+HOL*TICK-1e-9))return {sent:false,error:'el objetivo quedaría del lado malo del ask',bid:bid,ask:ask}}
+    else{sl=rnd(bid+SLP);tp=rnd(Math.min(bid-TPP,ask-F*TICK,bid-HOL*TICK));if(!(sl>=ask+HOL*TICK-1e-9))return {sent:false,error:'el stop quedaría del lado malo del ask'};if(!(tp<=bid-HOL*TICK+1e-9))return {sent:false,error:'el objetivo quedaría del lado malo del bid'}}
+    var r;try{r=await ab.placeOrder({symbol:SYM,side:SIDE,type:2,qty:QTY,stopLoss:sl,takeProfit:tp})}catch(e){return {sent:true,dudoso:true,error:String(e&&e.message||e),sl:sl,tp:tp,bid:bid,ask:ask,front:fr||null}}
+    if(r===false)return {sent:false,error:'el bróker no aceptó la orden',sl:sl,tp:tp,bid:bid,ask:ask,front:fr||null};
+    return {sent:true,orderId:r&&(r.orderId||r.id)?String(r.orderId||r.id):null,sl:sl,tp:tp,bid:bid,ask:ask,symbol:SYM,front:fr||null}})()`,
   // Posición de ESTE símbolo y solo las órdenes cuyo parentId es esta posición o esta orden de entrada.
   estado: (root, orderId, posId) => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t),R=${JSON.stringify(root)},OID=${JSON.stringify(orderId || '')},PID=${JSON.stringify(posId || '')};
     var pos=null,err=null;try{pos=await tvPos(ab,R)}catch(e){err=String(e&&e.message||e)}
@@ -417,8 +438,17 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
       last.open = null;
       const s = side === 'long' ? 1 : -1;
       const front = frenteCache.symbol === symbol && Date.now() - frenteCache.at < 5 * 60 * 1000 ? frenteCache.front : null;
+      let prep = null, prepErr = null;
+      for (let intento = 0; intento < 2 && !prep; intento++) {
+        try { prep = await evaluate(js.preparar(symbol, front)); }
+        catch (e) { prepErr = e; prep = null; }
+      }
+      if (!prep) return 'error: no pude leer la cuenta ni el precio. No se envía.' + (prepErr ? ' ' + prepErr.message : '');
+      if (prep.ok === false) return 'error: ' + (prep.error || 'lectura');
+      if (!prep.accountId || !prep.symbol) return 'error: la lectura no trajo cuenta o contrato. No se envía.';
+      if (prep.front) frenteCache = { symbol, front: prep.front, at: Date.now() };
       let res;
-      try { res = await evaluate(js.abrir(symbol, s, qty, slPts, tpPts, front)); }
+      try { res = await evaluate(js.enviar({ root: symbol, side: s, qty, slPts, tpPts, accountId: prep.accountId, symbol: prep.symbol, front: prep.front })); }
       catch (e) { res = { dudoso: true, corte: true, error: String(e.message || e) }; }
       if (res && res.front) frenteCache = { symbol, front: res.front, at: Date.now() };
       if (res && res.sent === false) return 'error: ' + (res.error || 'no enviada');

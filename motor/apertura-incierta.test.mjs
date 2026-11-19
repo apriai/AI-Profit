@@ -9,11 +9,12 @@ process.env.COLCHON_DUDA_MS = '700';
 
 function pagina(opts = {}) {
   const book = opts.book || { front: 'MNQZ2026', bid: (opts.live ?? 27727.75) - 0.25, ask: opts.live ?? 27727.75, live: opts.live ?? 27727.75, chart: opts.chart ?? 27720 };
+  if (!book.account) book.account = '1';
   let px = book.live, nid = 1, lecturas = 0;
   const positions = opts.positions || [], orders = [], hist = [], execs = [], placed = [], closes = [], reduces = [];
   const ab = {
     _brokerMetainfo: { id: opts.broker || 'paper', title: 'Paper Trading' },
-    currentAccount: () => '1',
+    currentAccount: () => book.account,
     accountMetainfo: () => (opts.noPB ? { config: { supportPositionBrackets: false } } : {}),
     async accountsMetainfo() { return [{ id: '1', name: 'Paper Trading', type: 'demo' }]; },
     async symbolInfo(sy) {
@@ -106,9 +107,9 @@ function pagina(opts = {}) {
 const ok = (c, m) => { if (!c) { console.error('FAIL ' + m); process.exitCode = 1; } else console.log('PASS ' + m); };
 const dormir = ms => new Promise(r => setTimeout(r, ms));
 
-ok(reintentaEvaluate(js.abrir('MNQ', 1, 1, 15, 2.5, 'MNQZ2026'), new Error('WebSocket disconnect')) === false, 'un script con placeOrder no se reintenta ni por desconexión');
-ok(reintentaEvaluate(js.abrir('MNQ', 1, 1, 15, 2.5, null), new Error('Timeout')) === false, 'un script con placeOrder no se reintenta por tiempo agotado');
-ok(reintentaEvaluate('1+1', new Error('WebSocket disconnect')) === true, 'una lectura sin escritura sí puede reintentarse');
+ok(reintentaEvaluate(js.enviar({ root: 'MNQ', side: 1, qty: 1, slPts: 15, tpPts: 2.5, accountId: '1', symbol: 'CME_MINI:MNQZ2026', front: 'MNQZ2026' }), new Error('WebSocket disconnect')) === false, 'la llamada de la orden no se reintenta ni por desconexión');
+ok(reintentaEvaluate(js.enviar({ root: 'MNQ', side: 1, qty: 1, slPts: 15, tpPts: 2.5, accountId: '1', symbol: 'CME_MINI:MNQZ2026', front: null }), new Error('Timeout')) === false, 'la llamada de la orden no se reintenta por tiempo agotado');
+ok(!/placeOrder/.test(js.preparar('MNQ', 'MNQZ2026')) && reintentaEvaluate(js.preparar('MNQ', 'MNQZ2026'), new Error('WebSocket disconnect')) === true, 'la lectura previa no lleva placeOrder y sí se puede reintentar');
 
 const piso = bracketEntrada({ side: 'long', bid: 99.75, ask: 100, slPts: 15, tpPts: 0.25 });
 ok(piso.ok && piso.tp === 101.75 && piso.sl === 85, 'un objetivo corto queda al menos 8 ticks más allá del bid (' + JSON.stringify(piso) + ')');
@@ -196,7 +197,7 @@ ok(lejos.tp == null && lejos.sl === 27705, 'un objetivo calculado con la vela, y
 { const pg = pagina();
   let abrios = 0;
   const ev = async expr => {
-    if (String(expr).includes('FRENTE_GUARDADO')) {
+    if (String(expr).includes('ENVIO_APERTURA')) {
       abrios++;
       if (abrios > 1) throw new Error('no debía reenviar');
       await pg.ab.placeOrder({ symbol: 'CME_MINI:MNQZ2026', side: 1, type: 2, qty: 20, stopLoss: 27712.75, takeProfit: 27730.25 });
@@ -206,8 +207,39 @@ ok(lejos.tp == null && lejos.sl === 27705, 'un objetivo calculado con la vela, y
   };
   const d = apiDriver(ev);
   const r = await d.openBracket({ side: 'long', symbol: 'MNQ', qty: 20, slPts: 15, tpPts: 2.5 });
-  ok(abrios === 1 && pg.placed.filter(o => o.type === 2).length === 1, 'la desconexión a mitad no reenvía la orden');
+  ok(abrios === 1 && pg.placed.filter(o => o.type === 2).length === 1, 'la llamada 2 no se reenvía si se corta');
   ok(pg.positions.length === 1 && /No se reenvía/.test(String(d.lastOpen() && d.lastOpen().alerta)) && String(r).startsWith('ok'), 'se adopta la posición que apareció y se avisa (' + (d.lastOpen() && d.lastOpen().alerta) + ')'); }
+
+{ const pg = pagina();
+  let lecturas = 0, envios = 0;
+  const ev = async expr => {
+    const s = String(expr);
+    if (s.includes('LECTURA_APERTURA')) { lecturas++; if (lecturas === 1) throw new Error('WebSocket disconnect'); }
+    if (s.includes('ENVIO_APERTURA')) envios++;
+    return pg.evaluate(expr);
+  };
+  const r = await apiDriver(ev).openBracket({ side: 'long', symbol: 'MNQ', qty: 20, slPts: 15, tpPts: 2.5 });
+  ok(lecturas === 2 && envios === 1 && pg.placed.filter(o => o.type === 2).length === 1 && String(r).startsWith('ok'), 'si la lectura falla, se reintenta una vez y la orden sale una sola vez (' + lecturas + '/' + envios + ')'); }
+
+{ const book = { front: 'MNQZ2026', bid: 27727.5, ask: 27727.75, live: 27727.75, chart: 27720, account: '1' };
+  const pg = pagina({ book });
+  const ev = async expr => { if (String(expr).includes('ENVIO_APERTURA')) book.account = '9'; return pg.evaluate(expr); };
+  const r = await apiDriver(ev).openBracket({ side: 'long', symbol: 'MNQ', qty: 20, slPts: 15, tpPts: 2.5 });
+  ok(pg.placed.length === 0 && /la cuenta cambió/.test(String(r)), 'si la cuenta cambia entre las dos llamadas, no se envía (' + r + ')'); }
+
+{ const book = { front: 'MNQZ2026', bid: 27727.5, ask: 27727.75, live: 27727.75, chart: 27720, account: '1' };
+  const pg = pagina({ book });
+  const ev = async expr => { if (String(expr).includes('ENVIO_APERTURA')) book.front = 'MNQH2027'; return pg.evaluate(expr); };
+  const r = await apiDriver(ev).openBracket({ side: 'long', symbol: 'MNQ', qty: 20, slPts: 15, tpPts: 2.5 });
+  ok(pg.placed.length === 0 && /el contrato cambió/.test(String(r)) && /MNQH2027/.test(String(r)), 'si el contrato cambia entre las dos llamadas, no se envía (' + r + ')'); }
+
+{ const pg = pagina();
+  const ev = async expr => {
+    if (String(expr).includes('ENVIO_APERTURA')) pg.positions.push({ id: 'PX', symbol: 'CME_MINI:MNQZ2026', side: 1, qty: 3, avgPrice: 27000, lastPrice: 27727.75 });
+    return pg.evaluate(expr);
+  };
+  const r = await apiDriver(ev).openBracket({ side: 'long', symbol: 'MNQ', qty: 20, slPts: 15, tpPts: 2.5 });
+  ok(pg.placed.length === 0 && /ya hay posicion/.test(String(r)) && pg.positions[0].qty === 3, 'si aparece una posición entre las dos llamadas, no se envía (' + r + ')'); }
 
 { const book = { front: 'MNQZ2026', bid: 27727.5, ask: 27727.75, live: 27727.75, chart: 27720, solo: 'MNQZ2026' };
   const pg = pagina({ book });
