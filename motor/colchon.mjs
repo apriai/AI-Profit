@@ -218,7 +218,8 @@ function tvBrokerId(ab){try{return ab&&ab._brokerMetainfo&&ab._brokerMetainfo.id
 function tvRoot(s){var x=String(s||'').replace(/^.*:/,'');return /^MNQ/.test(x)?'MNQ':/^NQ/.test(x)?'NQ':x}
 async function tvPos(ab,root){var l=[];tvPos.lastErr=null;try{l=await ab.positions()}catch(e){tvPos.lastErr=String(e&&e.message||e)}l=(l||[]).filter(function(p){return p&&Number(p.qty)!==0&&tvRoot(p.symbol)===root});return l[0]||null}
 async function tvAllOrders(t,ab){var l=[];try{l=(tvWv(t._ordersService.activeOrders())||[]).slice()}catch(e){}try{(await ab.orders()||[]).forEach(function(o){if(o&&!l.some(function(x){return x&&String(x.id)===String(o.id)}))l.push(o)})}catch(e){}return l}
-function tvStopOrder(t,pos,extra){var l=[];try{l=(tvWv(t&&t._ordersService&&t._ordersService.activeOrders())||[]).slice()}catch(e){}(extra||[]).forEach(function(o){if(o&&!l.some(function(x){return x&&String(x.id)===String(o.id)}))l.push(o)});
+function tvStopOrder(t,pos,extra,fuera){var l=[];try{l=(tvWv(t&&t._ordersService&&t._ordersService.activeOrders())||[]).slice()}catch(e){}(extra||[]).forEach(function(o){if(o&&!l.some(function(x){return x&&String(x.id)===String(o.id)}))l.push(o)});
+ if(fuera&&fuera.length)l=l.filter(function(o){return o&&fuera.indexOf(String(o.id))<0});
  var sc=function(o){return (pos&&Math.abs(Number(o.qty))===Math.abs(Number(pos.qty))?2:0)+(o.parentId!=null?1:0)};
  var c=l.filter(function(o){return o&&(o.type===3||o.type===4)&&(o.status===6||o.status===4)&&(!pos||(tvRoot(o.symbol)===tvRoot(pos.symbol)&&o.side===-pos.side))});c.sort(function(a,b){return sc(b)-sc(a)});return c[0]||null}
 function tvNoPosBrackets(ab){try{var f=ab._brokerMetainfo&&ab._brokerMetainfo.configFlags;if(f&&f.supportPositionBrackets===false)return true}catch(e){}try{var m=ab.accountMetainfo&&ab.accountMetainfo();m=tvWv(m);if(m&&m.config&&m.config.supportPositionBrackets===false)return true}catch(e){}return false}
@@ -239,8 +240,8 @@ export const js = {
       if(bz)return {ok:false,error:'no se cambia de cuenta: '+bz};ab.setCurrentAccount(id)}
     while(performance.now()-T<6000){var n=document.querySelector('[class*=accountName]');if(String(tvWv(ab.currentAccount()))===id&&(!nm||(n&&n.innerText.trim()===nm))){await new Promise(function(z){setTimeout(z,1000)});try{await ab.positions();tvWv(tvTrading()._ordersService.activeOrders())}catch(e){return {ok:false,error:'recarga de posiciones/órdenes: '+e.message}}if(String(tvWv(ab.currentAccount()))!==id)return {ok:false,error:'la cuenta cambió durante la espera'};var np=0,no=0;try{np=((await ab.positions())||[]).filter(function(x){return x&&Number(x.qty)!==0}).length;no=(tvWv(tvTrading()._ordersService.activeOrders())||[]).length}catch(e){return {ok:false,error:'relectura: '+e.message}}if(np||no)return {ok:false,error:'la cuenta '+nm+' ya tiene '+np+' posición(es) y '+no+' orden(es): no se opera'};return {ok:true,ms:Math.round(performance.now()-T)}}await new Promise(function(z){setTimeout(z,100)})}
     return {ok:false,error:'la cuenta no quedó activa',current:String(tvWv(ab.currentAccount()))}})()`,
-  position: root => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t);if(!ab)return {error:'no-api'};var R=${JSON.stringify(root)};var p=await tvPos(ab,R);if(!p)return tvPos.lastErr?{transient:tvPos.lastErr}:null;
-    var xo=[];try{xo=(await ab.orders())||[]}catch(e){}var e=p.extra||{},bpl=e.pl!=null?e.pl:(p.pl!=null?p.pl:p.unrealizedPl),so=tvStopOrder(t,p,xo);
+  position: (root, fuera = []) => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t);if(!ab)return {error:'no-api'};var R=${JSON.stringify(root)},AJ=${JSON.stringify(fuera || [])};var p=await tvPos(ab,R);if(!p)return tvPos.lastErr?{transient:tvPos.lastErr}:null;
+    var xo=[];try{xo=(await ab.orders())||[]}catch(e){}var e=p.extra||{},bpl=e.pl!=null?e.pl:(p.pl!=null?p.pl:p.unrealizedPl),so=tvStopOrder(t,p,xo,AJ);
     var cpx=tvChartPx(),pv=R==='MNQ'?2:20,sd=p.side===1?1:-1,cpl=cpx!=null?Math.round((cpx-p.avgPrice)*sd*pv*Math.abs(p.qty)*100)/100:null,hasB=typeof bpl==='number';
     var raw={};for(var k in p){var v=p[k];if(v==null||(typeof v!=='object'&&typeof v!=='function'))raw[k]=v}
     return {id:String(p.id),symbol:p.symbol,side:p.side===1?'long':'short',qty:Math.abs(p.qty),entry:p.avgPrice,price:p.lastPrice!=null?p.lastPrice:cpx,priceSrc:p.lastPrice!=null?'broker':'grafica',pnl:hasB?bpl:cpl,pnlSrc:hasB?'broker':'propio',brokerPl:hasB?bpl:null,raw:raw,
@@ -277,6 +278,7 @@ export const js = {
     if(pos)return {ok:false,error:'ya hay posicion',side:pos.side===1?'long':'short',qty:Math.abs(Number(pos.qty))};
     var ms,q=null,fr=null,symChart=null,last=null;
     try{ms=window.TradingViewApi._activeChartWidgetWV.value()._chartWidget.model().mainSeries();symChart=ms.symbol();q=ms.quotes&&ms.quotes();var si=ms.symbolInfo&&ms.symbolInfo();fr=si&&si.front_contract||null;last=q&&q.last!=null?Number(q.last):tvChartPx()}catch(e){return {ok:false,error:'sin grafico'}}
+    if(!fr&&/\\d!$/.test(String(symChart||''))){var Tfr=performance.now();while(!fr&&performance.now()-Tfr<2000){await new Promise(function(z){setTimeout(z,250)});try{var si2=ms.symbolInfo&&ms.symbolInfo();fr=si2&&si2.front_contract||null}catch(e){}}}
     if(tvRoot(symChart)!==R)return {ok:false,error:'el chart está en '+symChart};
     var bid=q&&Number(q.bid),ask=q&&Number(q.ask);
     if(!isFinite(bid)||!isFinite(ask)||ask<bid||bid<=0)return {ok:false,error:'sin bid/ask'};
@@ -288,7 +290,8 @@ export const js = {
     else sym=symChart;
     if(!sym)return {ok:false,error:'sin simbolo',front:fr||null,rollover:rollover};
     var histIds=[];try{histIds=(await ab.ordersHistory()||[]).map(function(o){return String(o.id)})}catch(e){}
-    return {ok:true,accountId:cur,accountName:yo?yo.name:null,broker:tvBrokerId(ab),accounts:accounts,bid:bid,ask:ask,last:last,front:fr||null,symbol:sym,chart:symChart,rollover:rollover,histIds:histIds}})()`,
+    var trabIds=[];try{var wo=await tvAllOrders(t,ab);trabIds=wo.filter(function(o){return o&&tvRoot(o.symbol)===R&&(o.status===6||o.status===4)}).map(function(o){return String(o.id)})}catch(e){}
+    return {ok:true,accountId:cur,accountName:yo?yo.name:null,broker:tvBrokerId(ab),accounts:accounts,bid:bid,ask:ask,last:last,front:fr||null,symbol:sym,chart:symChart,rollover:rollover,histIds:histIds,trabIds:trabIds}})()`,
   // Llamada 2, la orden. No se reintenta. Relee cuenta, plano y contrato; si algo cambió, no envía.
   // El bracket se calcula aquí con el bid/ask de este momento y viaja en la misma placeOrder.
   enviar: p => `(async function(){${PAGE}/*ENVIO_APERTURA*/
@@ -320,15 +323,15 @@ export const js = {
       return {sent:true,dudoso:true,sinId:true,sl:sl,tp:tp,bid:bid,ask:ask,front:fr||null,antesPlace:marca.antesPlace,placeMs:marca.placeMs}}
     return {sent:true,orderId:id,sl:sl,tp:tp,bid:bid,ask:ask,symbol:SYM,front:fr||null,antesPlace:marca.antesPlace,placeMs:marca.placeMs}})()`,
   // Posición de ESTE símbolo y solo las órdenes cuyo parentId es esta posición o esta orden de entrada.
-  estado: (root, orderId, posId) => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t),R=${JSON.stringify(root)},OID=${JSON.stringify(orderId || '')},PID=${JSON.stringify(posId || '')};
+  estado: (root, orderId, posId, fuera = []) => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t),R=${JSON.stringify(root)},OID=${JSON.stringify(orderId || '')},PID=${JSON.stringify(posId || '')},AJ=${JSON.stringify(fuera || [])};
     var pos=null,err=null;try{pos=await tvPos(ab,R)}catch(e){err=String(e&&e.message||e)}
     if(tvPos.lastErr)err=tvPos.lastErr;
     var kids=[];try{kids=await tvAllOrders(t,ab)}catch(e){}
-    var liga=function(o){if(!o)return false;var p=o.parentId!=null?String(o.parentId):'';return (OID&&(String(o.id)===OID||p===OID))||(PID&&p===PID)||(pos&&p===String(pos.id))};
+    var liga=function(o){if(!o||AJ.indexOf(String(o.id))>=0)return false;var p=o.parentId!=null?String(o.parentId):'';return (OID&&(String(o.id)===OID||p===OID))||(PID&&p===PID)||(pos&&p===String(pos.id))};
     var map=function(o){return {id:String(o.id),parentId:o.parentId!=null?String(o.parentId):null,type:o.type,side:o.side,qty:Math.abs(Number(o.qty)||0),status:o.status,stopPrice:o.stopPrice!=null?o.stopPrice:null,limitPrice:o.limitPrice!=null?o.limitPrice:null}};
     var ordenes=kids.filter(liga).map(map);
-    if(pos){var soMain=tvStopOrder(t,pos,kids);if(soMain&&!ordenes.some(function(o){return o.id===String(soMain.id)}))ordenes.push(map(soMain));
-      var loMain=kids.find(function(o){return o&&o.type===1&&(o.status===6||o.status===4)&&o.side===-pos.side&&tvRoot(o.symbol)===tvRoot(pos.symbol)});if(loMain&&!ordenes.some(function(o){return o.id===String(loMain.id)}))ordenes.push(map(loMain))}
+    if(pos){var soMain=tvStopOrder(t,pos,kids,AJ);if(soMain&&!ordenes.some(function(o){return o.id===String(soMain.id)}))ordenes.push(map(soMain));
+      var loMain=kids.find(function(o){return o&&AJ.indexOf(String(o.id))<0&&o.type===1&&(o.status===6||o.status===4)&&o.side===-pos.side&&tvRoot(o.symbol)===tvRoot(pos.symbol)});if(loMain&&!ordenes.some(function(o){return o.id===String(loMain.id)}))ordenes.push(map(loMain))}
     var h=[];try{h=(await ab.ordersHistory())||[]}catch(e){}
     var ex=[];try{if(typeof ab.allExecutions==='function')ex=(await ab.allExecutions())||[]}catch(e){}
     var hist=h.filter(function(o){return o&&(String(o.id)===OID||(o.parentId!=null&&String(o.parentId)===OID))}).map(map);
@@ -337,37 +340,42 @@ export const js = {
     var bid=null,ask=null;try{var ms=window.TradingViewApi._activeChartWidgetWV.value()._chartWidget.model().mainSeries(),qq=ms.quotes&&ms.quotes();if(qq){bid=qq.bid!=null?Number(qq.bid):null;ask=qq.ask!=null?Number(qq.ask):null}}catch(e){}
     return {err:err,bid:bid,ask:ask,pos:pos?{id:String(pos.id),side:pos.side===1?'long':'short',qty:Math.abs(Number(pos.qty)||0),entry:pos.avgPrice,price:pos.lastPrice!=null?pos.lastPrice:null}:null,ordenes:ordenes,hist:hist,execs:execs,mercado:mercado}})()`,
   accountId: `(function(){${PAGE}var ab=tvBroker(tvTrading());try{return String(tvWv(ab.currentAccount()))}catch(e){return null}})()`,
-  modify: (root, price, waitMs = 3000) => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t);if(!tvBrokerId(ab))return {error:'No active broker'};var R=${JSON.stringify(root)},PX=${Number(price)};var p=await tvPos(ab,R);if(!p)return {error:'sin posicion'};
+  modify: (root, price, waitMs = 3000, fuera = []) => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t);if(!tvBrokerId(ab))return {error:'No active broker'};var R=${JSON.stringify(root)},PX=${Number(price)},AJ=${JSON.stringify(fuera || [])};var p=await tvPos(ab,R);if(!p)return {error:'sin posicion'};
     // Paper: editPositionBrackets (reenviando el TP). Tradovate (supportPositionBrackets:false): modifyOrder sobre la orden stop hija, con tope de 3 s. Siempre la MISMA orden; nunca cancela ni recrea.
-    var xo=[];try{xo=(await ab.orders())||[]}catch(e){}var noPB=tvNoPosBrackets(ab),so=tvStopOrder(t,p,xo),T0=performance.now(),tries=[];
-    var tpPx=p.takeProfit!=null?p.takeProfit:null;if(tpPx==null){try{var lo=(await tvAllOrders(t,ab)).find(function(o){return o&&o.type===1&&(o.status===6||o.status===4)&&o.side===-p.side&&tvRoot(o.symbol)===tvRoot(p.symbol)});if(lo)tpPx=lo.limitPrice}catch(e){}}
-    var readSL=async function(){var p2=await tvPos(ab,R);if(!p2)return null;var x2=[];try{x2=(await ab.orders())||[]}catch(e){}var s2=tvStopOrder(t,p2,x2);return s2&&s2.stopPrice!=null?s2.stopPrice:(p2.stopLoss!=null?p2.stopLoss:null)};
+    var xo=[];try{xo=(await ab.orders())||[]}catch(e){}var noPB=tvNoPosBrackets(ab),so=tvStopOrder(t,p,xo,AJ),T0=performance.now(),tries=[];
+    var tpPx=p.takeProfit!=null?p.takeProfit:null;if(tpPx==null){try{var lo=(await tvAllOrders(t,ab)).find(function(o){return o&&AJ.indexOf(String(o.id))<0&&o.type===1&&(o.status===6||o.status===4)&&o.side===-p.side&&tvRoot(o.symbol)===tvRoot(p.symbol)});if(lo)tpPx=lo.limitPrice}catch(e){}}
+    var readSL=async function(){var p2=await tvPos(ab,R);if(!p2)return null;var x2=[];try{x2=(await ab.orders())||[]}catch(e){}var s2=tvStopOrder(t,p2,x2,AJ);return s2&&s2.stopPrice!=null?s2.stopPrice:(p2.stopLoss!=null?p2.stopLoss:null)};
     if(!noPB&&ab.editPositionBrackets&&(p.stopLoss!=null||(so&&(so.parentId!=null||so.parentType!=null)))){var b={stopLoss:PX};if(tpPx!=null)b.takeProfit=tpPx;var r1,e1=null;try{r1=await ab.editPositionBrackets(String(p.id),b)}catch(e){e1=e&&e.message||String(e)}
       var T1=performance.now(),v1=null,n=0;
       if(r1!==false&&!e1){do{v1=await readSL();if(v1===PX)break;await new Promise(function(z){setTimeout(z,100)});n++}while(performance.now()-T1<1500)}
       tries.push({via:'editPositionBrackets',payload:b,ret:r1===undefined?'undefined':r1,err:e1,verified:v1,polls:n});
       if(r1!==false&&!e1)return {ok:v1===PX,accepted:true,via:'editPositionBrackets',verified:v1,tpKept:tpPx,tries:tries,modifyMs:Math.round(T1-T0),confirmMs:Math.round(performance.now()-T1)}}
-    if(so){if(so.stopPrice===PX)return {ok:true,via:'modifyOrder',verified:PX,ya:true,tries:[{via:'modifyOrder',orderId:String(so.id),ya:true}],modifyMs:0,confirmMs:0};
+    var leerId=async function(id,campo){var broker=null,cache=null;try{var xs=await ab.orders()||[];broker=xs.find(function(x){return x&&String(x.id)===String(id)})}catch(e){}try{var act=tvWv(t._ordersService.activeOrders())||[];cache=act.find(function(x){return x&&String(x.id)===String(id)})}catch(e){}var o=(broker&&broker[campo]!=null)?broker:(cache&&cache[campo]!=null?cache:(broker||cache));return o&&o[campo]!=null?o[campo]:null};
+    if(so){if(so.stopPrice===PX)return {ok:true,via:'modifyOrder',verified:PX,ya:true,tries:[{via:'modifyOrder',orderId:String(so.id),ya:true,envioMs:0,polls:0}],modifyMs:0,confirmMs:0,envioMs:0,polls:0};
       var o=Object.assign({},so);o.stopPrice=PX;var T2=performance.now(),r2,e2=null;
       try{r2=await Promise.race([Promise.resolve().then(function(){return ab.modifyOrder(o)}),new Promise(function(z){setTimeout(function(){z('pendiente-3s')},${Number(waitMs)})})])}catch(e){e2=e&&e.message||String(e)}
-      var T3=performance.now(),v2=null;if(r2!==false&&!e2){do{v2=await readSL();if(v2===PX)break;await new Promise(function(z){setTimeout(z,100)})}while(performance.now()-T3<1500)}else v2=await readSL();
-      tries.push({via:'modifyOrder',orderId:String(so.id),parentId:so.parentId,ret:r2===undefined?'undefined':r2,err:e2,verified:v2,noPosBrackets:noPB});
-      if(v2===PX)return {ok:true,via:'modifyOrder',verified:v2,tries:tries,modifyMs:Math.round(T3-T2),confirmMs:Math.round(performance.now()-T3)}}
+      var T3=performance.now(),v2=null,n=0,tope=noPB?400:1500,paso=noPB?80:100;
+      var lee=async function(){n++;return noPB?await leerId(so.id,'stopPrice'):await readSL()};
+      v2=await lee();
+      if(v2!==PX&&r2!==false&&!e2){while(performance.now()-T3<tope){await new Promise(function(z){setTimeout(z,paso)});v2=await lee();if(v2===PX)break}}
+      tries.push({via:'modifyOrder',orderId:String(so.id),parentId:so.parentId,ret:r2===undefined?'undefined':r2,err:e2,verified:v2,noPosBrackets:noPB,envioMs:Math.round(T3-T2),polls:n});
+      if(v2===PX)return {ok:true,via:'modifyOrder',verified:v2,tries:tries,modifyMs:Math.round(T3-T2),confirmMs:Math.round(performance.now()-T3),envioMs:Math.round(T3-T2),polls:n}}
     return tries.length?{ok:false,error:'no verificado: '+JSON.stringify(tries),tries:tries}:{error:'no-stop-found'}})()`,
   // TP tras el fill: MISMA orden límite hija (type 1). Paper: editPositionBrackets reenviando el SL actual. Tradovate: modifyOrder limitPrice (tope 3 s). Nunca cancela ni recrea.
-  modifyTp: (root, price, waitMs = 3000) => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t);if(!tvBrokerId(ab))return {error:'No active broker'};var R=${JSON.stringify(root)},PX=${Number(price)};var p=await tvPos(ab,R);if(!p)return {error:'sin posicion'};
-    var findTp=async function(p2){var l=[];try{l=(await tvAllOrders(t,ab))||[]}catch(e){}return l.find(function(o){return o&&o.type===1&&(o.status===6||o.status===4)&&o.side===-p2.side&&tvRoot(o.symbol)===tvRoot(p2.symbol)})};
+  modifyTp: (root, price, waitMs = 3000, fuera = []) => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t);if(!tvBrokerId(ab))return {error:'No active broker'};var R=${JSON.stringify(root)},PX=${Number(price)},AJ=${JSON.stringify(fuera || [])};var p=await tvPos(ab,R);if(!p)return {error:'sin posicion'};
+    var findTp=async function(p2){var l=[];try{l=(await tvAllOrders(t,ab))||[]}catch(e){}return l.find(function(o){return o&&AJ.indexOf(String(o.id))<0&&o.type===1&&(o.status===6||o.status===4)&&o.side===-p2.side&&tvRoot(o.symbol)===tvRoot(p2.symbol)})};
     var lo=await findTp(p),cur=lo&&lo.limitPrice!=null?lo.limitPrice:(p.takeProfit!=null?p.takeProfit:null),tries=[],T0=performance.now();
     if(cur===PX)return {ok:true,ya:true,verified:PX,orderId:lo?String(lo.id):null,tries:[]};
-    var readTp=async function(){var p2=await tvPos(ab,R);if(!p2)return null;var o2=await findTp(p2);return o2&&o2.limitPrice!=null?o2.limitPrice:(p2.takeProfit!=null?p2.takeProfit:null)};
-    var poll=async function(){var T=performance.now(),v=null;do{v=await readTp();if(v===PX)break;await new Promise(function(z){setTimeout(z,100)})}while(performance.now()-T<1500);return v};
+    var leerIdTp=async function(id){var broker=null,cache=null;try{var xs=await ab.orders()||[];broker=xs.find(function(x){return x&&String(x.id)===String(id)})}catch(e){}try{var act=tvWv(t._ordersService.activeOrders())||[];cache=act.find(function(x){return x&&String(x.id)===String(id)})}catch(e){}var o=(broker&&broker.limitPrice!=null)?broker:(cache&&cache.limitPrice!=null?cache:(broker||cache));return o&&o.limitPrice!=null?o.limitPrice:null};
+    var readTp=async function(){if(noPB&&lo)return leerIdTp(lo.id);var p2=await tvPos(ab,R);if(!p2)return null;var o2=await findTp(p2);return o2&&o2.limitPrice!=null?o2.limitPrice:(p2.takeProfit!=null?p2.takeProfit:null)};
+    var poll=async function(){var T=performance.now(),v=null,paso=noPB?80:100,tope=noPB?400:1500,n=0;v=await readTp();n++;if(v===PX)return {v:v,n:n};while(performance.now()-T<tope){await new Promise(function(z){setTimeout(z,paso)});v=await readTp();n++;if(v===PX)break}return {v:v,n:n}};
     var noPB=tvNoPosBrackets(ab);
-    if(!noPB&&ab.editPositionBrackets&&p.takeProfit!=null){var xo=[];try{xo=(await ab.orders())||[]}catch(e){}var so=tvStopOrder(t,p,xo);var b={takeProfit:PX};var slx=so&&so.stopPrice!=null?so.stopPrice:p.stopLoss;if(slx!=null)b.stopLoss=slx;var r1,e1=null;try{r1=await ab.editPositionBrackets(String(p.id),b)}catch(e){e1=e&&e.message||String(e)}
-      var v1=r1!==false&&!e1?await poll():await readTp();tries.push({via:'editPositionBrackets',payload:b,ret:r1===undefined?'undefined':r1,err:e1,verified:v1});
-      if(v1===PX)return {ok:true,via:'editPositionBrackets',verified:v1,orderId:lo?String(lo.id):null,tries:tries,ms:Math.round(performance.now()-T0)}}
-    if(lo){var o=Object.assign({},lo);o.limitPrice=PX;var r2,e2=null;try{r2=await Promise.race([Promise.resolve().then(function(){return ab.modifyOrder(o)}),new Promise(function(z){setTimeout(function(){z('pendiente-3s')},${Number(waitMs)})})])}catch(e){e2=e&&e.message||String(e)}
-      var v2=r2!==false&&!e2?await poll():await readTp();tries.push({via:'modifyOrder',orderId:String(lo.id),ret:r2===undefined?'undefined':r2,err:e2,verified:v2});
-      if(v2===PX)return {ok:true,via:'modifyOrder',verified:v2,orderId:String(lo.id),tries:tries,ms:Math.round(performance.now()-T0)}}
+    if(!noPB&&ab.editPositionBrackets&&p.takeProfit!=null){var xo=[];try{xo=(await ab.orders())||[]}catch(e){}var so=tvStopOrder(t,p,xo,AJ);var b={takeProfit:PX};var slx=so&&so.stopPrice!=null?so.stopPrice:p.stopLoss;if(slx!=null)b.stopLoss=slx;var r1,e1=null;try{r1=await ab.editPositionBrackets(String(p.id),b)}catch(e){e1=e&&e.message||String(e)}
+      var p1=r1!==false&&!e1?await poll():{v:await readTp(),n:1};var v1=p1.v;tries.push({via:'editPositionBrackets',payload:b,ret:r1===undefined?'undefined':r1,err:e1,verified:v1,polls:p1.n});
+      if(v1===PX)return {ok:true,via:'editPositionBrackets',verified:v1,orderId:lo?String(lo.id):null,tries:tries,polls:p1.n,ms:Math.round(performance.now()-T0)}}
+    if(lo){var o=Object.assign({},lo);o.limitPrice=PX;var Tm=performance.now(),r2,e2=null;try{r2=await Promise.race([Promise.resolve().then(function(){return ab.modifyOrder(o)}),new Promise(function(z){setTimeout(function(){z('pendiente-3s')},${Number(waitMs)})})])}catch(e){e2=e&&e.message||String(e)}
+      var envio=Math.round(performance.now()-Tm);var p2=r2!==false&&!e2?await poll():{v:await readTp(),n:1};var v2=p2.v;tries.push({via:'modifyOrder',orderId:String(lo.id),ret:r2===undefined?'undefined':r2,err:e2,verified:v2,envioMs:envio,polls:p2.n});
+      if(v2===PX)return {ok:true,via:'modifyOrder',verified:v2,orderId:String(lo.id),tries:tries,envioMs:envio,polls:p2.n,ms:Math.round(performance.now()-T0)}}
     return tries.length?{ok:false,error:'no verificado',orderId:lo?String(lo.id):null,tries:tries}:{error:'no-tp-found'}})()`,
   flatten: root => `(async function(){${PAGE}var ab=tvBroker(tvTrading());if(!tvBrokerId(ab))return {error:'No active broker'};var p=await tvPos(ab,${JSON.stringify(root)});if(!p)return {ok:true,flat:true};var r=await ab.closePosition(String(p.id));return {ok:r!==false}})()`,
   // Lectura para el registro cuando el stop no aparece. Sin nombres de cuenta.
@@ -412,8 +420,8 @@ export async function cdpEvaluator(port = 9222) {
 
 export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
   const last = { pos: null, open: null }; const rereadMs = o.rereadMs ?? 800, uiWaitMs = o.uiWaitMs ?? 3000, apiWaitMs = o.apiWaitMs ?? 3000;
-  let frenteCache = { symbol: null, front: null, at: 0 }, prepVisto = null, vigilP = null;
-  const estado = async (symbol, orderId, posId) => { try { return await evaluate(js.estado(symbol, orderId || '', posId || '')); } catch (e) { return { err: String(e.message || e), pos: null, ordenes: [], hist: [], execs: [] }; } };
+  let frenteCache = { symbol: null, front: null, at: 0 }, prepVisto = null, vigilP = null, ajenas = [];
+  const estado = async (symbol, orderId, posId) => { try { return await evaluate(js.estado(symbol, orderId || '', posId || '', ajenas)); } catch (e) { return { err: String(e.message || e), pos: null, ordenes: [], hist: [], execs: [] }; } };
   const stopLigado = (st, side) => {
     const hol = HOLGURA_TICKS * TICK;
     const libro = side === 'long' ? (st && st.bid) : (st && st.ask);
@@ -430,11 +438,11 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
     async switchAccount(id, name) { return evaluate(js.switchAccount(id, name)); },
     async accountId() { return evaluate(js.accountId); },
     async account() { const a = await evaluate(js.account); return { name: a.name, broker: [a.broker, a.brokerId].filter(Boolean).join(' '), api: a.api }; },
-    async position(symbol) { const p = await evaluate(js.position(symbol)); if (p && p.error) throw new Error(p.error); if (p && p.transient) return p; last.pos = p; return p; },
+    async position(symbol) { const p = await evaluate(js.position(symbol, ajenas)); if (p && p.error) throw new Error(p.error); if (p && p.transient) return p; last.pos = p; return p; },
     async stop() { return last.pos ? last.pos.stop : null; },
     async lastPrice() { try { const r = await evaluate(js.lastPrice); return r && typeof r.price === 'number' ? r.price : null; } catch { return null; } },
     async openBracket({ side, symbol, qty, slPts, tpPts, steps, accountId, accountName, confirmReal, cron } = {}) {
-      last.open = null; vigilP = null; prepVisto = null;
+      last.open = null; vigilP = null; prepVisto = null; ajenas = [];
       const marca = k => { if (cron) cron[k] = Date.now(); };
       const s = side === 'long' ? 1 : -1;
       const front = frenteCache.symbol === symbol && frenteCache.front ? frenteCache.front : null;
@@ -465,6 +473,7 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
       if (prep.accountId !== esperado) return 'error: la cuenta no es la verificada (' + prep.accountId + ' ≠ ' + esperado + '). No se envía.';
       const papel = isPaper(prep.accountName || '', prep.broker || '');
       prepVisto = { ...prep, paper: papel, real: !papel && realAllowed(prep.accountName || '') };
+      ajenas = (prep.trabIds || []).map(String);
       if (prepVisto.real && confirmReal !== true) return 'blocked: CUENTA REAL · ' + realLabel(prep.accountName) + ': falta confirmación';
       if (prep.front) frenteCache = { symbol, front: prep.front, at: Date.now() };
       else frenteCache = { symbol, front: null, at: 0 };
@@ -570,7 +579,7 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
       if (plan && plan.tpReached) {
         const limite = side === 'long' ? roundTick(Math.min(plan.tp, pos.price)) : roundTick(Math.max(plan.tp, pos.price));
         let mov = null;
-        try { mov = await evaluate(js.modifyTp(symbol, limite, 3000)); } catch (e) { mov = { error: String(e.message || e) }; }
+        try { mov = await evaluate(js.modifyTp(symbol, limite, 3000, ajenas)); } catch (e) { mov = { error: String(e.message || e) }; }
         const tpId = mov && (mov.orderId || ((mov.tries || []).find(t => t.orderId) || {}).orderId);
         let salida = null, qtyCerrada = 0;
         if (tpId) {
@@ -640,10 +649,10 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
     // TP: api (tope 3 s) -> relectura por id. Misma orden; nunca cancela ni recrea.
     async modifyTp(price, symbol) {
       const intentos = [], a0 = Date.now(); let r = null, err = null;
-      try { r = await evaluate(js.modifyTp(symbol, price, apiWaitMs)); } catch (e) { err = e.message; }
+      try { r = await evaluate(js.modifyTp(symbol, price, apiWaitMs, ajenas)); } catch (e) { err = e.message; }
       const tl = ((r && r.tries) || []).slice(-1)[0] || {}, id = (r && r.orderId) || tl.orderId || null;
       intentos.push({ metodo: 'api', via: (r && r.via) || tl.via || null, ms: Date.now() - a0, ok: !!(r && r.ok), verificado: r ? (r.verified ?? tl.verified ?? null) : null, error: err || (r && !r.ok ? r.error : null), tpId: id });
-      if (r && r.ok) return { ok: true, ya: !!r.ya, via: r.via || 'ya', verified: r.verified, tpId: id, intentos };
+      if (r && r.ok) return { ok: true, ya: !!r.ya, via: r.via || 'ya', verified: r.verified, tpId: id, envioMs: r.envioMs ?? tl.envioMs ?? null, polls: r.polls ?? tl.polls ?? null, confirmMs: r.ms ?? null, intentos };
       if (id) { const t0 = Date.now(); let v = null; do { try { const x = await evaluate(js.stopById(id)); v = x ? x.limitPrice : null; } catch {} if (v === price) break; await sleep(100); } while (Date.now() - t0 < rereadMs);
         intentos.push({ metodo: 'relectura', via: 'stopById', ms: Date.now() - t0, ok: v === price, verificado: v, tpId: id });
         if (v === price) return { ok: true, via: 'modifyOrder (confirmado tarde)', verified: v, tpId: id, intentos }; }
@@ -652,10 +661,10 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
     // cascada idempotente sobre la MISMA orden y el MISMO precio: api (tope 3 s) -> relectura por id -> edición interna (createEditOrderContext) -> aviso rojo
     async modifyStop(price, symbol) {
       const intentos = [], a0 = Date.now(); let r = null, apiErr = null;
-      try { r = await evaluate(js.modify(symbol, price, apiWaitMs)); } catch (e) { apiErr = e.message; }
+      try { r = await evaluate(js.modify(symbol, price, apiWaitMs, ajenas)); } catch (e) { apiErr = e.message; }
       const apiMs = Date.now() - a0, tries = (r && r.tries) || [], tl = tries[tries.length - 1] || {};
-      intentos.push({ metodo: 'api', via: (r && r.via) || tl.via || null, ms: apiMs, ok: !!(r && r.ok), verificado: r ? (r.verified ?? tl.verified ?? null) : null, ret: tl.ret ?? null, error: apiErr || (r && !r.ok ? (r.error || null) : null), stopId: tl.orderId || (last.pos && last.pos.stopId) || null });
-      if (r && !r.error && (r.ok || r.accepted)) return { ok: r.verified === price, accepted: !!r.accepted, method: 'api', via: r.via, verified: r.verified, modifyMs: r.modifyMs, confirmMs: r.confirmMs, apiMs, intentos };
+      intentos.push({ metodo: 'api', via: (r && r.via) || tl.via || null, ms: apiMs, ok: !!(r && r.ok), verificado: r ? (r.verified ?? tl.verified ?? null) : null, ret: tl.ret ?? null, error: apiErr || (r && !r.ok ? (r.error || null) : null), stopId: tl.orderId || (last.pos && last.pos.stopId) || null, envioMs: (r && r.envioMs) ?? tl.envioMs ?? null, polls: (r && r.polls) ?? tl.polls ?? null, confirmMs: r && r.confirmMs });
+      if (r && !r.error && (r.ok || r.accepted)) return { ok: r.verified === price, accepted: !!r.accepted, method: 'api', via: r.via, verified: r.verified, modifyMs: r.modifyMs, confirmMs: r.confirmMs, envioMs: r.envioMs ?? null, polls: r.polls ?? null, apiMs, intentos };
       apiErr = apiErr || (r && r.error) || 'modify false';
       const stopId = (tries.find(t => t.orderId) || {}).orderId || (last.pos && last.pos.stopId) || null;
       if (stopId) { const t0 = Date.now(); let v = null; do { try { const x = await evaluate(js.stopById(stopId)); v = x ? x.stopPrice : null; } catch {} if (v === price) break; await sleep(100); } while (Date.now() - t0 < rereadMs);
@@ -761,24 +770,33 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
         if (pos && pos.entry != null && paper && !S.ajusteHecho && S.ref != null && pos.price != null) {
           S.ajusteHecho = true;
           const plan = planAlAbrir({ side: c.side, entry: pos.entry, price: pos.price, steps: S.steps, slPts: S.slPts, tpPts: S.tpPts, usdPerPoint: pv });
-          const slN = plan.sl, tpN = plan.tpPlace, slA = sl0, tpA = S.tpRef;
-          const rec = { ref: S.ref, fill: pos.entry, slAntes: slA, slNuevo: slN, tpAntes: tpA, tpNuevo: tpN, stopId: pos.stopId ?? null, paso: plan.step ? plan.step.n : null };
-          if (plan.step) { S.step = plan.nextStep; st.step = plan.nextStep; S.locked = plan.locked; if (slN != null) S.lockPrice = slN; S.slObjetivo = slN; }
-          if ((slA === slN || slN == null) && (tpA === tpN || tpN == null)) { rec.ok = slN != null; rec.nada = true; }
-          else { const t0 = Date.now();
-            rec.sl = slN == null || slA === slN ? { ok: slN != null, ya: true } : await driver.modifyStop(slN, c.symbol);
-            rec.tp = tpN == null ? { ok: true, ya: true } : (driver.modifyTp ? await driver.modifyTp(tpN, c.symbol) : { ok: false, err: 'sin modifyTp' });
-            rec.ok = !!(rec.sl && rec.sl.ok && rec.tp && rec.tp.ok); rec.seg = Math.round((Date.now() - t0) / 100) / 10;
-            await sleep(1000);
-            let dobles = [];
-            try { const w = driver.working ? await driver.working(c.symbol) : []; dobles = w.filter(o => o.type === 3); } catch { dobles = []; }
-            if (dobles.length > 1) { rec.doble = true; S.alerta = 'HAY MÁS DE UN STOP ligado a esta posición. No se manda otro. Revisa TradingView.'; ev('notificacion', { texto: S.alerta }); }
+          const pnlYa = pos.pnl != null ? pos.pnl : pnlAt(pos.price);
+          const anticipo = decide({ ...pos, pnl: pnlYa, price: pos.price }, sl0, st, c);
+          if (anticipo.action === 'modify') {
+            log(`Fill ${pos.entry}: el escalón ya cabe (+$${pnlYa}). El stop va al paso, sin reajustar el fill antes.`);
+          } else {
+            const slN = plan.sl, tpN = plan.tpPlace, slA = sl0, tpA = S.tpRef;
+            const rec = { ref: S.ref, fill: pos.entry, slAntes: slA, slNuevo: slN, tpAntes: tpA, tpNuevo: tpN, stopId: pos.stopId ?? null, paso: plan.step ? plan.step.n : null };
+            if (plan.step) { S.step = plan.nextStep; st.step = plan.nextStep; S.locked = plan.locked; if (slN != null) S.lockPrice = slN; S.slObjetivo = slN; }
+            if ((slA === slN || slN == null) && (tpA === tpN || tpN == null)) { rec.ok = slN != null; rec.nada = true; }
+            else { const t0 = Date.now();
+              const [slR, tpR] = await Promise.all([
+                slN == null || slA === slN ? { ok: slN != null, ya: true } : driver.modifyStop(slN, c.symbol),
+                tpN == null ? { ok: true, ya: true } : (driver.modifyTp ? driver.modifyTp(tpN, c.symbol) : { ok: false, err: 'sin modifyTp' }),
+              ]);
+              rec.sl = slR; rec.tp = tpR;
+              rec.ok = !!(slR && slR.ok && tpR && tpR.ok); rec.seg = Math.round((Date.now() - t0) / 100) / 10;
+              const trozo = x => !x ? '—' : [x.ya ? 'ya' : (x.ok ? 'OK' : 'FALLO'), x.envioMs != null ? `enviar ${x.envioMs}ms` : null, x.polls != null ? `${x.polls} lecturas` : null, x.confirmMs != null ? `verificar ${x.confirmMs}ms` : null].filter(Boolean).join(' ');
+              rec.detalle = `SL ${trozo(slR)} · TP ${trozo(tpR)}`;
+              let dobles = [];
+              try { const w = driver.working ? await driver.working(c.symbol) : []; const ajenas = new Set(((driver.lastPrep && driver.lastPrep()) || {}).trabIds || []); dobles = w.filter(o => o.type === 3 && !ajenas.has(String(o.id))); } catch { dobles = []; }
+              if (dobles.length > 1) { rec.doble = true; S.alerta = 'HAY MÁS DE UN STOP ligado a esta posición. No se manda otro. Revisa TradingView.'; ev('notificacion', { texto: S.alerta }); }
+            }
+            if (tpN != null) S.tpPrice = tpN; S.ajuste = rec; if (rec.sl && rec.sl.ok && slN != null) S.slOk = true;
+            ev('ajuste_brackets', rec);
+            log(rec.nada ? `Fill ${pos.entry} = referencia: SL/TP ya correctos` : `Ajuste por fill ${pos.entry} (ref ${S.ref}): SL ${slA}→${slN} ${rec.sl && rec.sl.ok ? 'OK' : 'FALLO'} · TP ${tpA}→${tpN} ${rec.tp && rec.tp.ok ? 'OK' : 'FALLO'} (${rec.seg || 0} s)${rec.detalle ? ' · ' + rec.detalle : ''}`);
+            if (!rec.ok || slN == null) { S.slOk = false; S.alerta = S.alerta || `NO VEO EL STOP tras el ajuste (SL ${slN == null ? 'inseguro' : slN}). Se sigue intentando. No se toca ninguna otra orden.`; ev('notificacion', { texto: S.alerta }); if (!S.volcadoHecho && driver.volcado) { S.volcadoHecho = true; let d = null; try { d = await driver.volcado(c.symbol); } catch (e) { d = { error: String(e.message || e) }; } log('VOLCADO ajuste ' + JSON.stringify(d)); } }
           }
-          if (tpN != null) S.tpPrice = tpN; S.ajuste = rec; if (rec.sl && rec.sl.ok && slN != null) S.slOk = true;
-          ev('ajuste_brackets', rec);
-          log(rec.nada ? `Fill ${pos.entry} = referencia: SL/TP ya correctos` : `Ajuste por fill ${pos.entry} (ref ${S.ref}): SL ${slA}→${slN} ${rec.sl && rec.sl.ok ? 'OK' : 'FALLO'} · TP ${tpA}→${tpN} ${rec.tp && rec.tp.ok ? 'OK' : 'FALLO'} (${rec.seg || 0} s)`);
-          if (!rec.ok || slN == null) { S.slOk = false; S.alerta = S.alerta || `NO VEO EL STOP tras el ajuste (SL ${slN == null ? 'inseguro' : slN}). Se sigue intentando. No se toca ninguna otra orden.`; ev('notificacion', { texto: S.alerta }); if (!S.volcadoHecho && driver.volcado) { S.volcadoHecho = true; let d = null; try { d = await driver.volcado(c.symbol); } catch (e) { d = { error: String(e.message || e) }; } log('VOLCADO ajuste ' + JSON.stringify(d)); } }
-          if (!rec.nada) { await sleep(wait); continue; }
         }
         if (pos && S.slOk === false && S.slObjetivo != null && Date.now() - (S.slIntento || 0) > 1000) {
           S.slIntento = Date.now();
@@ -822,7 +840,8 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
             for (const x of r.intentos || []) ev('intento_stop', { ...x, precio: d.price, paso: stp.n });
             const tDone = Date.now(); const lat = { metodo: r.method || '?', via: r.via || '?', leerMs: tSeen - tRead, modificarMs: r.modifyMs ?? null, confirmarMs: confirmMs, apiIntentoMs: r.method === 'ui' ? r.apiAttemptMs : (r.apiMs ?? null), uiMs: r.method === 'ui' ? ((r.modifyMs ?? 0) + (confirmMs ?? 0)) : null, apiError: r.apiErr || null, modificarYConfirmarMs: tDone - t0, totalDesdeLecturaMs: tDone - tRead, maxRetrasoPorPollMs: wait, fuente: pos.pnlSrc, intentos: r.intentos || [], real: !opts.ignoreClock }; S.latency = lat; try { fs.appendFileSync(path.join(path.dirname(logFile), 'colchon-latencia.log'), JSON.stringify({ at: new Date().toISOString(), ok: v === d.price, ...lat }) + '\n'); } catch {}
             ev('mover_stop', { paso: stp.n, precio: d.price, ok: v === d.price, verificado: v ?? null, via: r.via || null, intentos: r.intentos || [] });
-            log(`LATENCIA [${lat.metodo}/${lat.via}] leer ${sg(lat.leerMs)} · modificar ${sg(lat.modificarMs)} · confirmar ${sg(lat.confirmarMs)}${lat.metodo === 'ui' ? ` · intento API ${sg(lat.apiIntentoMs)} (${lat.apiError}) · UI ${sg(lat.uiMs)}` : ''} = ${sg(lat.totalDesdeLecturaMs)} (+ hasta ${sg(wait)} entre lecturas)`);
+            const sub = (r.intentos || []).map(x => [x.metodo, x.envioMs != null ? `enviar ${x.envioMs}ms` : null, x.polls != null ? `${x.polls} lecturas` : null, x.confirmMs != null ? `verificar ${x.confirmMs}ms` : null, x.ms != null ? `total ${x.ms}ms` : null].filter(Boolean).join(' ')).join(' | ');
+            log(`LATENCIA [${lat.metodo}/${lat.via}] leer ${sg(lat.leerMs)} · modificar ${sg(lat.modificarMs)} · confirmar ${sg(lat.confirmarMs)}${lat.metodo === 'ui' ? ` · intento API ${sg(lat.apiIntentoMs)} (${lat.apiError}) · UI ${sg(lat.uiMs)}` : ''}${sub ? ' · ' + sub : ''} = ${sg(lat.totalDesdeLecturaMs)} (+ hasta ${sg(wait)} entre lecturas)`);
             log(`modify via ${r.via || '?'} (${sg(tDone - t0)}) -> verificado ${v}`, v === d.price ? 'OK' : 'NO coincide ' + (r.err || r.raw || ''));
             const stepRec = { paso: stp.n, disparoUSD: stp.triggerUsd, protegeUSD: stp.lockUsd, precio: d.price, pnlAlDisparar: pos.pnl, fuente: pos.pnlSrc, saltados: d.step - (st.step ?? 0), latencia: lat };
             if (v === d.price || r.accepted) { stepRec.enSeg = S.openAt ? Math.round((Date.now() - S.openAt) / 100) / 10 : null; stepRec.confirmado = v === d.price; S.pasos.push(stepRec); st.step = d.step + 1; S.step = st.step; if (st.step >= c.steps.length) st.locked = true; }

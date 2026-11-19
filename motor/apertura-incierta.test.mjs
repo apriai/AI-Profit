@@ -10,7 +10,7 @@ process.env.COLCHON_DUDA_MS = '700';
 function pagina(opts = {}) {
   const book = opts.book || { front: 'MNQZ2026', bid: (opts.live ?? 27727.75) - 0.25, ask: opts.live ?? 27727.75, live: opts.live ?? 27727.75, chart: opts.chart ?? 27720 };
   if (!book.account) book.account = '1';
-  let px = book.live, nid = 1, lecturas = 0, falloTrasSalida = 0;
+  let px = book.live, nid = 1, lecturas = 0, falloTrasSalida = 0, frN = 0, posRestantes = Infinity;
   const positions = opts.positions || [], orders = [], hist = [], execs = [], placed = [], closes = [], reduces = [];
   const ab = {
     _brokerMetainfo: { id: opts.broker || 'paper', title: 'Paper Trading' },
@@ -25,6 +25,8 @@ function pagina(opts = {}) {
     },
     async positions() {
       lecturas++;
+      if (posRestantes <= 0) return [];
+      posRestantes--;
       if (falloTrasSalida > 0) { falloTrasSalida--; throw new Error('relectura'); }
       if (opts.throwAlways || (opts.throwN && lecturas <= opts.throwN)) throw new Error('tv ocupado');
       if (opts.revealAt && lecturas < opts.revealAt) return [];
@@ -124,14 +126,14 @@ function pagina(opts = {}) {
   const win = { TradingView: { bottomWidgetBar: { _widgetControllers: new Map([['paper_trading', { _trading: { activeBroker: () => ab, _ordersService: { activeOrders: () => orders.filter(o => o.status === 6) } } }]]) } },
     TradingViewApi: { _activeChartWidgetWV: { value: () => ({ _chartWidget: { model: () => ({ mainSeries: () => ({
       symbol: () => 'CME_MINI:MNQ1!',
-      symbolInfo: () => ({ front_contract: book.front }),
+      symbolInfo: () => { frN++; if (opts.frontNulos && frN <= opts.frontNulos) return {}; return { front_contract: book.front }; },
       quotes: () => ({ bid: book.bid, ask: book.ask }),
       bars: () => ({ last: () => ({ value: [0, 0, 0, 0, book.chart] }) }),
     }) }) } }) } } };
   const doc = { visibilityState: 'hidden', hasFocus: () => false, querySelector: s => /accountName/.test(s) ? { innerText: 'Paper Trading' } : null };
   win.performance = globalThis.performance;
   const evaluate = async expr => new Function('window', 'document', 'performance', 'return (' + expr + ')')(win, doc, performance);
-  return { evaluate, placed, positions, orders, closes, reduces, ab, book, hist };
+  return { evaluate, placed, positions, orders, closes, reduces, ab, book, hist, limitarPos: n => { posRestantes = n; } };
 }
 
 const ok = (c, m) => { if (!c) { console.error('FAIL ' + m); process.exitCode = 1; } else console.log('PASS ' + m); };
@@ -224,6 +226,46 @@ ok(lejos.tp == null && lejos.sl === 27705, 'un objetivo calculado con la vela, y
   const bit = fs.readFileSync('/tmp/apertura-sin-id.log', 'utf8');
   ok(pg.placed.length === 1 && /no devolvió id/.test(bit) && nuevo && nuevo.parentId == null && nuevo.stopPrice === 27720.75 && viejo.stopPrice === 100 && !/sin id del stop/.test(bit), 'sin orderId, el stop suelto de la misma cantidad se mueve como en main (' + (nuevo && nuevo.stopPrice) + ' / ' + (r.err || r.alerta || '') + ')');
   await k.stop({ flatten: false }); }
+
+{ const book = { front: 'MNQZ2026', bid: 27739.75, ask: 27740, live: 27740, chart: 27740 };
+  const pg = pagina({ book, fillPx: 27720, noPB: true, broker: 'Tradovate' });
+  pg.orders.push({ id: 'USER', symbol: 'CME_MINI:MNQZ2026', side: -1, type: 3, status: 6, qty: 1, stopPrice: 100, parentId: 'manual' });
+  pg.orders.push({ id: 'USER_TP', symbol: 'CME_MINI:MNQZ2026', side: -1, type: 1, status: 6, qty: 1, limitPrice: 99999, parentId: 'manual' });
+  const k = createColchon(apiDriver(pg.evaluate), { pollMs: 40, logFile: '/tmp/apertura-ajena.log', ignoreClock: true, flatConfirm: { reads: 8, ms: 5000 }, noTicks: true });
+  const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 1, strategyId: 'prueba-be' });
+  const fin = Date.now() + 2500; let nuevo = null;
+  while (Date.now() < fin) {
+    nuevo = pg.orders.find(o => o.type === 3 && o.id !== 'USER');
+    if (nuevo && nuevo.stopPrice === 27720.75) break;
+    await dormir(40);
+  }
+  const user = pg.orders.find(o => o.id === 'USER'), tp = pg.orders.find(o => o.id === 'USER_TP');
+  ok(user && user.stopPrice === 100 && tp && tp.limitPrice === 99999 && nuevo && nuevo.stopPrice === 27720.75 && !/HAY MÁS DE UN STOP/.test(String(k.status().alerta || '')), 'una orden ya puesta no se mueve ni cuenta como stop duplicado (' + (nuevo && nuevo.stopPrice) + ' / ' + (k.status().alerta || r.err || '') + ')');
+  await k.stop({ flatten: false }); }
+
+{ const t0 = Date.now();
+  const pg = pagina({ frontNulos: 3, broker: 'Tradovate' });
+  const r = await apiDriver(pg.evaluate).openBracket({ side: 'long', symbol: 'MNQ', qty: 1, slPts: 15, tpPts: 2.5 });
+  ok(String(r).startsWith('ok') && pg.placed[0] && String(pg.placed[0].symbol).includes('MNQZ2026') && Date.now() - t0 >= 400, 'si el contrato tarda, la lectura espera y manda el fechado (' + r + ')'); }
+
+{ const t0 = Date.now();
+  const pg = pagina({ frontNulos: 99, broker: 'Tradovate' });
+  const r = await apiDriver(pg.evaluate).openBracket({ side: 'long', symbol: 'MNQ', qty: 1, slPts: 15, tpPts: 2.5 });
+  const ms = Date.now() - t0;
+  ok(pg.placed.length === 0 && /sin simbolo/i.test(String(r)) && ms >= 1800 && ms < 4500, 'si el contrato no llega en 2 s, no se envía (' + r + ', ' + ms + ' ms)'); }
+
+{ const pg = pagina({ noPB: true, broker: 'Tradovate' });
+  const d = apiDriver(pg.evaluate);
+  const r = await d.openBracket({ side: 'long', symbol: 'MNQ', qty: 1, slPts: 15, tpPts: 2.5 });
+  const sl = pg.orders.find(o => o.type === 3);
+  const destino = sl.stopPrice - 1;
+  pg.limitarPos(1);
+  const t0 = Date.now();
+  const mov = await d.modifyStop(destino, 'MNQ');
+  const ms = Date.now() - t0;
+  ok(String(r).startsWith('ok') && mov.ok && mov.verified === destino && ms < 500 && mov.polls === 1, 'en Tradovate se confirma la orden por id, sin esperar el segundo y medio (' + ms + ' ms, lecturas ' + mov.polls + ')'); }
+
+ok(srcColchon.includes('enviar ${x.envioMs}ms') && srcColchon.includes('lecturas'), 'la línea de latencia detalla el envío y las lecturas');
 
 { const pg = pagina({ reject: true });
   const r = await apiDriver(pg.evaluate).openBracket({ side: 'long', symbol: 'MNQ', qty: 20, slPts: 15, tpPts: 2.5 });

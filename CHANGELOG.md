@@ -10,6 +10,15 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.34] — 2026-11-19
+### Corregido
+- **Una orden que ya estaba trabajando no se toma como el stop ni el objetivo de Profito.** La primera lectura anota sus id y la búsqueda de main las deja fuera, también el aviso de stop duplicado.
+- **Si el gráfico todavía no trae el contrato fechado, la lectura espera hasta 2 segundos**, como antes, y no manda la orden al continuo.
+- **En Tradovate la confirmación del stop mira la orden por id** y sale en cuanto el precio está. Ya no se queda 1,5 s leyendo la posición, que no trae el stop.
+- **Si el escalón ya cabe, el stop va directo al paso.** El reajuste fino del fill, si hace falta, mueve stop y objetivo a la vez y no tapa el escalón. La línea de tiempos detalla envío, lecturas y verificación.
+### Notas
+- Main sí reajusta el stop al precio de entrada, en serie, y ese reajuste tapaba el escalón. Aquí el escalón pasa primero.
+
 ## [0.10.33] — 2026-11-19
 ### Corregido
 - **El stop y el objetivo se buscan y se mueven como en main.** No hace falta el id de la orden ni un `parentId`. Si Tradovate no devuelve id, igual se encuentra el stop de esa cantidad y se mueve con `modifyOrder`.
