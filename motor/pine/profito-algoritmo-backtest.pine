@@ -13,6 +13,9 @@
 //
 // No se opera la señal de las velas que empiezan entre las 09:30 y las 09:39,
 // hora de Nueva York. La primera vela válida de la apertura es la de las 09:40.
+//
+// EMA 200, apagada de inicio: si se enciende, solo compra cuando el cierre
+// queda por encima de la media del mismo tiempo, y solo vende cuando queda por debajo.
 strategy("Profito Algoritmo Backtest", "PA Backtest", overlay = true, pyramiding = 0, default_qty_type = strategy.fixed, default_qty_value = 1, process_orders_on_close = true, calc_on_every_tick = false)
 
 minBody = input.float(70.0, "Cuerpo Min %", group = "Señal") / 100
@@ -25,6 +28,7 @@ atrMult = input.float(1.2, "Minimo vs ATR", group = "Señal")
 entrada = input.string("Apertura de la vela de señal", "Entrada", options = ["Apertura de la vela de señal", "Cierre de la vela de señal"], group = "Operación", tooltip = "Apertura: precio de apertura de la vela coloreada. Esa vela ya tiene que haber cerrado para conocer la señal. Si el stop y el objetivo caen en la misma vela, es fallo. Cierre: se entra al cierre, sin usar el futuro.")
 rr = input.float(1.0, "Objetivo (múltiplo del riesgo)", minval = 0.1, step = 0.1, group = "Operación")
 bufferTicks = input.int(0, "Margen del stop (ticks)", minval = 0, group = "Operación")
+usarEma = input.bool(false, "EMA 200", group = "Filtro", tooltip = "Solo compras si el cierre de la vela de señal está por encima de la EMA 200 de este mismo tiempo. Solo ventas si está por debajo.")
 
 usarExc = input.bool(true, "Ignorar el inicio de la apertura de Nueva York", group = "Horario")
 excSes = input.session("0930-0940", "Ventana sin operaciones", group = "Horario")
@@ -49,6 +53,8 @@ bCond = fullWick ? (close > high[1] and open <= close[1]) : (close > open[1] and
 sCond = fullWick ? (close < low[1] and open >= close[1]) : (close < open[1] and open >= close[1])
 isBull = bull and close[1] < open[1] and bCond and okAnat and okSize
 isBear = bear and close[1] > open[1] and sCond and okAnat and okSize
+ema200 = ta.ema(close, 200)
+pasaEma = not usarEma or (isBull and close > ema200) or (isBear and close < ema200)
 
 enExc = usarExc and not na(time(timeframe.period, excSes, tz))
 puede = not enExc and barstate.isconfirmed
@@ -57,6 +63,7 @@ porApertura = entrada == "Apertura de la vela de señal"
 plot(isBull ? low - 2 * syminfo.mintick : na, "Alcista", color = #00E676, style = plot.style_circles, linewidth = 6)
 plot(isBear ? high + 2 * syminfo.mintick : na, "Bajista", color = #FF5252, style = plot.style_circles, linewidth = 6)
 barcolor(isBull ? #00E676 : isBear ? #FF5252 : na)
+plot(usarEma ? ema200 : na, "EMA 200", color = #C8E810, linewidth = 2)
 
 sesionDe() =>
     int m = hour(time, tz) * 60 + minute(time, tz)
@@ -117,7 +124,7 @@ if en and (bar_index != barEnt or porApertura)
         anotar(r == 1)
         en := false
 
-if not en and puede and (isBull or isBear)
+if not en and puede and pasaEma and (isBull or isBear)
     bool largo = isBull
     float buf = bufferTicks * syminfo.mintick
     float entradaPx = porApertura ? open : close
