@@ -27,8 +27,8 @@ assert.ok(bueno.takeProfit > fill && bueno.stopLoss < fill);
 assert.equal(bracketSeguro('long', fill, 0, tpPts, barra), null);
 assert.equal(bracketSeguro('short', 100, 15, 2.5, 130).takeProfit, 97.5);
 assert.ok(bracketSeguro('short', 100, 15, 2.5, 130).stopLoss > 100);
-assert.equal(lineaTiempos({ clickServidor: 12.2, preparar: 40, cotizacion: 8, placeOrder: 90, posicion: 1100, total: 1300 }),
-  'TIEMPOS: click→servidor 12 ms · preparar 40 ms · cotización 8 ms · placeOrder 90 ms · posición 1100 ms · total 1300 ms');
+assert.equal(lineaTiempos({ clickServidor: 12.2, preparar: 40, cotizacion: 8, snapshot: 20, placeOrder: 90, posicion: 1100, total: 1300 }),
+  'TIEMPOS: click→servidor 12 ms · preparar 40 ms · cotización 8 ms · snapshot 20 ms · placeOrder 90 ms · posición 1100 ms · total 1300 ms');
 assert.equal(lineaLatencia(480, 110), 'LATENCIA: envío 480 ms · confirmación 110 ms');
 assert.equal(PANEL_PAUSA_MS, 8000);
 const ahora = 1_000_000;
@@ -133,10 +133,11 @@ function antesDeOrden(marcas) {
 assert.match(pagina, /p==="aviso"/);
 assert.match(go, /r\.closed/);
 assert.match(go, /setPhase\("aviso"/);
-const aviso = pagina.match(/else if\(p==="aviso"\)\{[^}]+\}/)[0];
+assert.match(pagina, /else if\(p==="aviso"\)\{setAwake\(false\);card\.innerHTML=`<div class=h>Se llenó y se cerró<\/div>/);
+assert.match(pagina, /phase==="aviso"&&setPhase\("off"\),6000/);
+const aviso = pagina.slice(pagina.indexOf('else if(p==="aviso")'), pagina.indexOf('else if(p==="blocked")'));
 assert.doesNotMatch(aviso, /Bloqueado/);
 assert.doesNotMatch(aviso, /Todas las cuentas Lucid/);
-assert.match(aviso, /Se llenó y se cerró/);
 const marca = 1_700_000_000_000;
 assert.equal(detallePrecio('long', { ask: fill, askTime: marca - 250, bid: fill - 0.25 }, marca).fuente, 'ask');
 assert.equal(detallePrecio('long', { ask: fill, askTime: marca - 250, bid: fill - 0.25 }, marca).edadMs, 250);
@@ -157,7 +158,7 @@ limpiar();
   assert.equal(pg.ordenes[0].type, 2);
   assert.equal(pg.cierres(), 0);
   const texto = fs.readFileSync(logFile, 'utf8');
-  assert.match(texto, /TIEMPOS: click→servidor \d+ ms · preparar \d+ ms · cotización \d+ ms · placeOrder \d+ ms · posición \d+ ms · total \d+ ms/);
+  assert.match(texto, /TIEMPOS: click→servidor \d+ ms · preparar \d+ ms · cotización \d+ ms · snapshot \d+ ms · placeOrder \d+ ms · posición \d+ ms · total \d+ ms/);
   assert.match(texto, /PRECIO: ask 27727\.75 · edad \d+ ms · recalculado sí/);
   await k.stop({ flatten: false });
 }

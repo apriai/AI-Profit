@@ -10,6 +10,16 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.29] — 2026-11-19
+### Añadido
+- **El beneficio del DOM también decide el paso.** El P&L que ya llega del DOM (~cada 120 ms) entra como una fuente más, junto al gráfico, al bid/ask y al bróker. Gana la más alta que siga fresca. Solo cuenta si es de la misma cuenta y del mismo símbolo, en dólares de la posición. Un cero, un texto raro o el de otra cuenta no mueven el stop. El registro del paso dice `(dom)` cuando esa fue la que disparó.
+### Corregido
+- **La foto de ejecuciones y de historial, antes de enviar, no se queda colgada.** Cada lectura tiene un tope de ~300 ms. Si no llega, se envía igual con lo que se alcanzó a leer y se marca la foto como incompleta: después no se dice «no se llenó» por una lista a medias. El tiempo sale en `TIEMPOS:` como `snapshot`, aparte de placeOrder.
+- **El aviso «Se llenó y se cerró» se cierra solo a los 6 s**, igual que Bloqueado, y así se suelta la pausa del recorrido de cuentas.
+- **Si al llenarse el P&L ya pasó el disparo, el paso mueve el stop antes del reajuste.** La entrada es el precio real del fill. El reajuste sigue en orden (SL y después TP) y no baja un stop que el paso ya dejó más protegido. `TIEMPOS:` anota el orden (`paso→ajuste` o `ajuste`).
+### Notas
+- Después del fill, el stop se mueve como antes. La orden sigue siendo una sola.
+
 ## [0.10.28] — 2026-11-19
 ### Cambiado
 - **Se quitó la estrategia Rascacielo de stop fijo** (SL −$600 / TP +$104). Sigue Rascacielo (Dia Minimo+Colchon). Si una selección guardada pide el id `rascacielo`, se usa la estrategia por defecto.
