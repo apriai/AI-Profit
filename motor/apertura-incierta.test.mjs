@@ -76,8 +76,10 @@ function pagina(opts = {}) {
       const q = opts.partialQty ?? o.qty;
       const pid = 'P' + nid++;
       positions.push({ id: pid, symbol: o.symbol, side: o.side, qty: q, avgPrice: opts.fillPx ?? px, lastPrice: px });
-      if (!opts.noChildren && o.stopLoss != null) orders.push({ id: 'S' + nid++, parentId: id, symbol: o.symbol, side: -o.side, type: 3, status: 6, qty: q, stopPrice: o.stopLoss });
-      if (!opts.noChildren && o.takeProfit != null) orders.push({ id: 'T' + nid++, parentId: id, symbol: o.symbol, side: -o.side, type: 1, status: 6, qty: q, limitPrice: o.takeProfit });
+      const liga = opts.sinParent ? null : id;
+      if (!opts.noChildren && o.stopLoss != null) orders.push({ id: 'S' + nid++, parentId: liga, symbol: o.symbol, side: -o.side, type: 3, status: 6, qty: q, stopPrice: o.stopLoss });
+      if (!opts.noChildren && o.takeProfit != null) orders.push({ id: 'T' + nid++, parentId: liga, symbol: o.symbol, side: -o.side, type: 1, status: 6, qty: q, limitPrice: o.takeProfit });
+      if (opts.noOrderId) return {};
       return { orderId: id };
     },
     async editPositionBrackets(id, b) {
@@ -148,6 +150,10 @@ ok(!htmlGran.includes('Poner stop') && !htmlGran.includes('alarmaStop') && !html
 ok(htmlGran.includes('if(!accId){setPhase("blocked","Elige una cuenta");return}') && !htmlGran.includes('accId||(activa'), 'sin cuenta elegida no se opera la cuenta activa de TradingView');
 ok(htmlGran.includes('beforeunload') && htmlGran.includes('avisarPanel(false,true)'), 'al cerrar la página se apaga el panel');
 ok(htmlGran.includes('Apertura <b>') && htmlGran.includes('clic:pulsado'), 'la granja manda el clic y muestra el total');
+ok(htmlGran.includes('al-fuerte') && htmlGran.includes('NO VEO EL STOP|NO PUDE MOVER EL STOP'), 'si falta el stop, el aviso de la granja queda en rojo');
+const srcColchon = fs.readFileSync(new URL('./colchon.mjs', import.meta.url), 'utf8');
+ok(srcColchon.includes('o.status===6||o.status===4)&&(!pos||(tvRoot(o.symbol)===tvRoot(pos.symbol)&&o.side===-pos.side))') && !srcColchon.includes('o.status===6||o.status===4)&&o.parentId!=null'), 'la búsqueda del stop es la de main, sin exigir parentId');
+ok(srcColchon.includes('o.type===1&&(o.status===6||o.status===4)&&o.side===-p2.side&&tvRoot(o.symbol)===tvRoot(p2.symbol)') && !srcColchon.includes('o.parentId!=null&&o.side===-p2.side'), 'la búsqueda del objetivo es la de main');
 ok(reintentaEvaluate(js.enviar({ root: 'MNQ', side: 1, qty: 1, slPts: 15, tpPts: 2.5, accountId: '1', symbol: 'CME_MINI:MNQZ2026', front: 'MNQZ2026' }), new Error('WebSocket disconnect')) === false, 'la llamada de la orden no se reintenta ni por desconexión');
 ok(reintentaEvaluate(js.enviar({ root: 'MNQ', side: 1, qty: 1, slPts: 15, tpPts: 2.5, accountId: '1', symbol: 'CME_MINI:MNQZ2026', front: null }), new Error('Timeout')) === false, 'la llamada de la orden no se reintenta por tiempo agotado');
 ok(!/placeOrder/.test(js.preparar('MNQ', 'MNQZ2026')) && reintentaEvaluate(js.preparar('MNQ', 'MNQZ2026'), new Error('WebSocket disconnect')) === true, 'la lectura previa no lleva placeOrder y sí se puede reintentar');
@@ -203,6 +209,22 @@ ok(lejos.tp == null && lejos.sl === 27705, 'un objetivo calculado con la vela, y
   const r = await apiDriver(pg.evaluate).openBracket({ side: 'long', symbol: 'MNQ', qty: 20, slPts: 15, tpPts: 2.5 });
   ok(pg.placed.filter(o => o.type === 3 || o.type === 1).length === 0 && pg.orders.some(o => o.type === 3) && String(r).startsWith('ok'), 'Tradovate: el bracket nace en la orden de entrada, sin órdenes sueltas (' + r + ')'); }
 
+{ const book = { front: 'MNQZ2026', bid: 27739.75, ask: 27740, live: 27740, chart: 27740 };
+  const pg = pagina({ book, fillPx: 27720, noOrderId: true, sinParent: true, noPB: true, broker: 'Tradovate', revealAt: 4 });
+  pg.orders.push({ id: 'OLD', symbol: 'CME_MINI:MNQZ2026', side: -1, type: 3, status: 6, qty: 9, stopPrice: 100, parentId: null });
+  const k = createColchon(apiDriver(pg.evaluate), { pollMs: 40, logFile: '/tmp/apertura-sin-id.log', ignoreClock: true, flatConfirm: { reads: 8, ms: 5000 }, noTicks: true });
+  const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 1, strategyId: 'prueba-be' });
+  const fin = Date.now() + 2500; let nuevo = null;
+  while (Date.now() < fin) {
+    nuevo = pg.orders.find(o => o.type === 3 && o.id !== 'OLD');
+    if (nuevo && nuevo.stopPrice !== 27425) break;
+    await dormir(40);
+  }
+  const viejo = pg.orders.find(o => o.id === 'OLD');
+  const bit = fs.readFileSync('/tmp/apertura-sin-id.log', 'utf8');
+  ok(pg.placed.length === 1 && /no devolvió id/.test(bit) && nuevo && nuevo.parentId == null && nuevo.stopPrice === 27720.75 && viejo.stopPrice === 100 && !/sin id del stop/.test(bit), 'sin orderId, el stop suelto de la misma cantidad se mueve como en main (' + (nuevo && nuevo.stopPrice) + ' / ' + (r.err || r.alerta || '') + ')');
+  await k.stop({ flatten: false }); }
+
 { const pg = pagina({ reject: true });
   const r = await apiDriver(pg.evaluate).openBracket({ side: 'long', symbol: 'MNQ', qty: 20, slPts: 15, tpPts: 2.5 });
   ok(pg.positions.length === 0 && pg.closes.length === 0 && /RECHAZADA/.test(String(r)), 'un rechazo es no se llenó (' + r + ')'); }
@@ -224,6 +246,7 @@ ok(lejos.tp == null && lejos.sl === 27705, 'un objetivo calculado con la vela, y
   const k = createColchon(apiDriver(pg.evaluate), { pollMs: 40, logFile: '/tmp/apertura-stop.log', ignoreClock: true, flatConfirm: { reads: 1, ms: 0 }, noTicks: true });
   const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 20, strategyId: 'rascacielo' });
   ok(!r.ok && r.watching && /NO VEO EL STOP/.test(String(r.alerta || k.status().alerta || '')), 'sin stop confirmado no se reporta ok (' + (r.alerta || r.err) + ')');
+  ok(fs.readFileSync('/tmp/apertura-stop.log', 'utf8').includes('VOLCADO'), 'si no aparece el stop, el registro vuelca posición y órdenes');
   await k.stop({ flatten: false });
   ok(pg.closes.length === 0 && pg.positions.length === 1, 'si falta el stop no se cierra la posición'); }
 

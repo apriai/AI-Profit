@@ -12,11 +12,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 
 ## [0.10.33] — 2026-11-19
 ### Corregido
+- **El stop y el objetivo se buscan y se mueven como en main.** No hace falta el id de la orden ni un `parentId`. Si Tradovate no devuelve id, igual se encuentra el stop de esa cantidad y se mueve con `modifyOrder`.
+- **Si en el primer segundo no aparece el stop, el registro vuelca la posición y las órdenes**, y la granja lo muestra en rojo al momento.
 - **Si tras el objetivo no se puede releer la posición, no se da por cerrada.** Se reintenta unas veces y, si sigue fallando, la operación continúa con aviso.
 - **Una salida parcial en el objetivo dice cuánto queda:** «Salida parcial en el objetivo: quedan N».
 - **Si falta una de las dos marcas de tiempo, esa diferencia no se inventa.**
 ### Notas
-- No cambia los dólares de las estrategias. No hay instalador nuevo: Josue sigue probando el de 0.10.32.
+- La orden a mercado sigue saliendo con `stopLoss` y `takeProfit`, igual que main. No cambia los dólares de las estrategias.
 
 ## [0.10.32] — 2026-11-19
 ### Corregido
