@@ -34,6 +34,24 @@ export function stepsFor(symbol, qty, P = getStrategy().params) {
   return [{ n: 1, triggerUsd: triggerUsdFor(symbol, qty, P), lockUsd: lockUsdFor(symbol, qty, P), lockPts: lockPtsFor(symbol, qty, P) }];
 }
 export const roundTick = p => Math.round(p / TICK) * TICK;
+// Stop y objetivo solo si quedan del lado correcto de la entrada Y del precio vivo.
+// Un objetivo de pocos puntos calculado con el cierre de la vela puede quedar ya cruzado
+// y la orden de salida se llena en el mismo segundo que la entrada.
+export function bracketsSeguros(side, entry, price, slPts, tpPts) {
+  const s = side === 'short' || side === -1 ? -1 : 1;
+  const px = price == null || !Number.isFinite(Number(price)) ? Number(entry) : Number(price);
+  const en = Number(entry);
+  if (!Number.isFinite(en)) return { sl: null, tp: null };
+  let sl = roundTick(en - s * slPts), tp = roundTick(en + s * tpPts);
+  if (s === 1) {
+    if (!(sl < px && sl < en)) sl = null;
+    if (!(tp > px && tp > en)) tp = null;
+  } else {
+    if (!(sl > px && sl > en)) sl = null;
+    if (!(tp < px && tp < en)) tp = null;
+  }
+  return { sl, tp };
+}
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // ---- Gate de seguridad ----
@@ -167,10 +185,42 @@ export const js = {
     return {ok:v===PX,verified:v,ret:r===undefined?'undefined':r,err:er,sendMs:Math.round(T1-T0),confirmMs:Math.round(performance.now()-T1)}})()`,
   lastPrice: `(function(){try{var ms=window.TradingViewApi._activeChartWidgetWV.value()._chartWidget.model().mainSeries();var b=ms.bars().last();var fr=null;try{var si=ms.symbolInfo&&ms.symbolInfo();fr=si&&si.front_contract||null}catch(e){}return {symbol:ms.symbol(),price:b.value[4],front:fr}}catch(e){return {error:e.message}}})()`,
   place: o => `(async function(){${PAGE}var ab=tvBroker(tvTrading());if(!tvBrokerId(ab))return {error:'No active broker'};var r=await ab.placeOrder(${JSON.stringify(o)});return {ok:r!==false,orderId:r&&(r.orderId||r.id)||null}})()`,
-  // tras enviar: espera el fill (posición visible). Si no llega, busca la orden en el historial (status 5 = rechazada) y devuelve el motivo
-  fill: (root, side, qty) => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t),T=performance.now();while(performance.now()-T<6000){var p=await tvPos(ab,${JSON.stringify(root)});if(p)return {filled:true,ms:Math.round(performance.now()-T)};await new Promise(function(z){setTimeout(z,150)})}
-    var h=[];try{h=await ab.ordersHistory()}catch(e){}var o=(h||[]).filter(function(x){return x&&x.type===2&&x.side===${side}&&x.qty===${qty}&&tvRoot(x.symbol)===${JSON.stringify(root)}}).pop();
-    return {filled:false,status:o?o.status:null,message:o&&o.message?(o.message.text||String(o.message)):null}})()`,
+  // Espera el fill. Una posición que nace y muere en la ventana, o una lectura que falla, no es "no se llenó".
+  // status 2 = llena, 5 = rechazada, 6 = trabajando. No cierra nada.
+  fill: (root, side, qty, tradeSymbol, waitMs = 6000) => `(async function(){${PAGE}var ab=tvBroker(tvTrading()),R=${JSON.stringify(root)},SIDE=${Number(side)},QTY=${Number(qty)},SYM=${JSON.stringify(tradeSymbol || '')},WAIT=${Number(waitMs) > 0 ? Number(waitMs) : 6000};
+    var T=performance.now(),fallo=false,limpio=false;
+    var reciente=function(tm){var n=Number(tm);if(!isFinite(n))return false;if(n<1e12)n*=1000;var d=Date.now()-n;return d<30000&&d>-5000};
+    var leer=async function(){var p=await tvPos(ab,R);if(tvPos.lastErr)fallo=true;else limpio=true;return p};
+    while(performance.now()-T<WAIT){var p=await leer();if(p)return {filled:true,open:true,ms:Math.round(performance.now()-T),entry:p.avgPrice};await new Promise(function(z){setTimeout(z,150)})}
+    var p2=await leer();if(p2)return {filled:true,open:true,ms:Math.round(performance.now()-T),entry:p2.avgPrice,via:'relectura'};
+    var h=[];try{h=await ab.ordersHistory()}catch(e){fallo=true}
+    var mismo=function(x){return x&&Number(x.type)===2&&Number(x.side)===SIDE&&Number(x.qty)===QTY&&tvRoot(x.symbol)===R};
+    var o=(h||[]).filter(mismo).pop();
+    var ex=[];try{if(typeof ab.allExecutions==='function')ex=(await ab.allExecutions())||[]}catch(e){fallo=true}
+    if(!ex.length&&SYM&&typeof ab.executions==='function'){try{ex=(await ab.executions(SYM))||[]}catch(e){fallo=true}}
+    var hits=(ex||[]).filter(function(x){return x&&Number(x.side)===SIDE&&Number(x.qty)===QTY&&tvRoot(x.symbol)===R&&reciente(x.time)});
+    if(o&&Number(o.status)===5)return {filled:false,status:5,message:o.message?(o.message.text||String(o.message)):null};
+    if((o&&Number(o.status)===2)||hits.length){var p3=await leer();if(p3)return {filled:true,open:true,ms:Math.round(performance.now()-T),entry:p3.avgPrice,via:'ejecucion'};if(tvPos.lastErr)return {filled:false,uncertain:true,sawFill:true,status:o?Number(o.status):2};return {filled:true,open:false,alreadyFlat:true,status:o?Number(o.status):2}}
+    if(fallo||!limpio)return {filled:false,uncertain:true,status:o?Number(o.status):null};
+    return {filled:false,status:o?Number(o.status):null,message:o&&o.message?(o.message.text||String(o.message)):null}})()`,
+  // Con la posición ya abierta: pone SL y TP desde el precio real de entrada. Nunca cierra.
+  // Si el precio vivo ya pasó ese nivel, no arma esa pata (se llenaría al momento).
+  adopt: (root, slPts, tpPts) => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t),R=${JSON.stringify(root)},SLP=${Number(slPts)},TPP=${Number(tpPts)};
+    var p=await tvPos(ab,R);if(!p)return {error:'sin posicion'};
+    var s=p.side===1?1:-1,tick=0.25,rnd=function(x){return Math.round(x/tick)*tick};
+    var entry=Number(p.avgPrice),px=p.lastPrice!=null?Number(p.lastPrice):tvChartPx();if(!isFinite(px))px=entry;
+    var sl=rnd(entry-s*SLP),tp=rnd(entry+s*TPP);
+    if(s===1){if(!(sl<px&&sl<entry))sl=null;if(!(tp>px&&tp>entry))tp=null}else{if(!(sl>px&&sl>entry))sl=null;if(!(tp<px&&tp<entry))tp=null}
+    if(sl==null&&tp==null)return {ok:false,error:'el precio ya pasó el stop y el objetivo',entry:entry};
+    var b={};if(sl!=null)b.stopLoss=sl;if(tp!=null)b.takeProfit=tp;
+    var noPB=tvNoPosBrackets(ab),via=null,err=null;
+    if(!noPB&&typeof ab.editPositionBrackets==='function'){try{var r1=await ab.editPositionBrackets(String(p.id),b);if(r1!==false)via='editPositionBrackets';else err='edit false'}catch(e){err=String(e&&e.message||e)}}
+    var kids=[];try{kids=await tvAllOrders(t,ab)}catch(e){}
+    var has=function(tp){return kids.some(function(o){return o&&o.type===tp&&(o.status===6||o.status===4)&&o.side===-s&&tvRoot(o.symbol)===R})};
+    var sym=p.symbol,q=Math.abs(Number(p.qty));
+    if(sl!=null&&!has(3)&&!has(4)){try{var rs=await ab.placeOrder({symbol:sym,side:-s,type:3,qty:q,stopPrice:sl,parentId:String(p.id),parentType:2});if(rs===false)err=(err?err+'; ':'')+'stop no aceptado';else via=via||'placeOrder'}catch(e){err=String(e&&e.message||e)}}
+    if(tp!=null&&!has(1)){try{var rt=await ab.placeOrder({symbol:sym,side:-s,type:1,qty:q,limitPrice:tp,parentId:String(p.id),parentType:2});if(rt===false)err=(err?err+'; ':'')+'objetivo no aceptado';else via=via||'placeOrder'}catch(e){err=String(e&&e.message||e)}}
+    return {ok:!!via,via:via,sl:sl,tp:tp,entry:entry,error:err}})()`,
   accountId: `(function(){${PAGE}var ab=tvBroker(tvTrading());try{return String(tvWv(ab.currentAccount()))}catch(e){return null}})()`,
   modify: (root, price, waitMs = 3000) => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t);if(!tvBrokerId(ab))return {error:'No active broker'};var R=${JSON.stringify(root)},PX=${Number(price)};var p=await tvPos(ab,R);if(!p)return {error:'sin posicion'};
     // Paper: editPositionBrackets (reenviando el TP). Tradovate (supportPositionBrackets:false): modifyOrder sobre la orden stop hija, con tope de 3 s. Siempre la MISMA orden; nunca cancela ni recrea.
@@ -264,12 +314,31 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
         return 'error: ' + ((ts && ts.error) || 'sin símbolo del bróker');
       }
       const s = side === 'long' ? 1 : -1, px = lp.price;
-      const o = { symbol: ts.symbol, side: s, type: 2, qty, stopLoss: roundTick(px - s * slPts), takeProfit: roundTick(px + s * tpPts) };
-      const r = await evaluate(js.place(o)); if (r.error) return 'error: ' + r.error;
-      const f = await evaluate(js.fill(symbol, s, qty));
+      // Sin SL/TP en la orden a mercado: esos precios salían del cierre de la vela. Con un objetivo
+      // de 2.5 pts, si el fill queda del otro lado, el bróker abre y cierra en el mismo segundo.
+      const o = { symbol: ts.symbol, side: s, type: 2, qty };
+      const r = await evaluate(js.place(o)); if (r.error) return 'error: ' + r.error; if (r.ok === false) return 'error: el bróker no aceptó la orden';
+      const waitMs = Number(process.env.COLCHON_FILL_MS) > 0 ? Number(process.env.COLCHON_FILL_MS) : 6000;
+      let f = await evaluate(js.fill(symbol, s, qty, ts.symbol, waitMs));
+      const adoptar = async () => {
+        const a = await evaluate(js.adopt(symbol, slPts, tpPts));
+        const entry = (a && a.entry) || (f && f.entry) || px;
+        last.open = { ref: entry, sl: a ? a.sl : null, tp: a ? a.tp : null };
+        const pendiente = a && a.ok ? '' : ` · SL/TP no quedaron puestos (${(a && a.error) || 'revisa TradingView'}). No se cierra la posición`;
+        return `ok market ${qty} ${ts.symbol} @${entry} SL ${a && a.sl != null ? a.sl : '—'} TP ${a && a.tp != null ? a.tp : '—'}${pendiente} · fill visto en ${((f.ms || 0) / 1000).toFixed(2)} s`;
+      };
+      if (f && f.filled && f.open) return adoptar();
+      if (!(f && f.filled) && (f && f.uncertain || !f)) {
+        for (let i = 0; i < 4; i++) {
+          if (i) await new Promise(z => setTimeout(z, 200));
+          let p = null; try { p = await evaluate(js.position(symbol)); } catch (e) { p = { transient: String(e.message || e) }; }
+          if (p && !p.error && !p.transient && p.entry != null) { f = { filled: true, open: true, entry: p.entry, ms: f && f.ms }; return adoptar(); }
+        }
+        return 'error: no pude confirmar si la orden se llenó. No se cierra nada. Revisa la cuenta en TradingView.';
+      }
+      if (f.filled && f.alreadyFlat) return 'error: la orden sí se llenó y ya no hay posición. No se envió ninguna orden de cierre.';
       if (!f.filled) return `error: la orden no se llenó${f.status === 5 ? ' (RECHAZADA por TradingView)' : ''}: ${f.message || 'sin posición tras 6 s'}`;
-      last.open = { ref: px, sl: o.stopLoss, tp: o.takeProfit };
-      return `ok market ${qty} ${ts.symbol} @~${px} SL ${o.stopLoss} TP ${o.takeProfit} · fill visto en ${(f.ms / 1000).toFixed(2)} s`;
+      return adoptar();
     },
     // TP: api (tope 3 s) -> relectura por id. Misma orden; nunca cancela ni recrea.
     async modifyTp(price, symbol) {
@@ -538,6 +607,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
       if (accountId && S.accountId && S.accountId !== String(accountId)) { S.state = 'error'; S.error = 'La cuenta activa no es la elegida: no se opera'; log(S.error); return { ok: false, err: S.error, status: S }; }
       const op = await drv.openBracket({ ...c, slPts, tpPts }); log('open ->', op);
       { const lo = drv.lastOpen ? drv.lastOpen() : null; Object.assign(S, { ajusteHecho: false, ajuste: null, slPts, tpPts, ref: lo ? lo.ref : null, tpRef: lo ? lo.tp : null }); }
+      // Si la apertura queda en duda, no se aplana: cerrar aquí fue un cierre en el mismo segundo.
       if (String(op).startsWith('error')) { S.state = 'error'; S.error = op; S.reason = 'error'; summarize(); return { ok: false, err: op, status: S }; }
       loopP = loop(c, true).finally(() => { acctGuard.testActive = false; });
       return { ok: true, status: S };

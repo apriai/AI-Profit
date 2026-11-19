@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.26] — 2026-11-19
+### Corregido
+- **Abrir ya no cierra la posición en el mismo segundo ni dice que no se llenó si sí se llenó.** La orden a mercado salía con el stop y el objetivo calculados con el cierre de la vela. En Rascacielo, con 20 MNQ, el objetivo son 2,5 puntos: si el precio real queda del otro lado, el bróker abre y cierra a la vez. Ahora la orden a mercado va sola. Cuando la posición se ve, el stop y el objetivo se ponen desde el precio de entrada. Si la lectura falla o la posición ya no está, no se manda ninguna orden de cierre.
+### Notas
+- No cambia los dólares de Rascacielo (SL −$600 / TP +$104, stop fijo).
+
 ## [0.10.25] — 2026-11-19
 ### Cambiado
 - **El sonido del círculo suena cada vez que vuelve a aparecer.** En la vela que se está formando, Burbuja doble suena al pasar de sin círculo a círculo. Si el círculo se apaga y vuelve en esa misma vela, suena otra vez. Mientras sigue a la vista, no se repite. Al cerrar la vela se olvida. El interruptor «Sonido de la señal» sigue igual. BUY y SELL siguen en silencio.
