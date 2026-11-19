@@ -27,11 +27,25 @@ jobs:
           $ErrorActionPreference = 'Continue'
           $nsis = "C:\Program Files (x86)\NSIS"
           $ok = $false
-          foreach ($i in 1..4) {
+          foreach ($i in 1..2) {
             choco install nsis --version=3.11.0 -y --no-progress
             if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath "$nsis\makensis.exe")) { $ok = $true; break }
-            Write-Output "Intento $i de NSIS fallo. Se reintenta."
-            Start-Sleep -Seconds 15
+            Write-Output "Intento $i de Chocolatey fallo. Se reintenta."
+            Start-Sleep -Seconds 10
+          }
+          if (-not $ok) {
+            Write-Output "Chocolatey no respondio. Se baja el zip de NSIS 3.11."
+            $dest = "C:\nsis-311"
+            New-Item -ItemType Directory -Force -Path $dest | Out-Null
+            $zip = "$env:RUNNER_TEMP\nsis-3.11.zip"
+            Invoke-WebRequest -Uri "https://github.com/tauri-apps/binary-releases/releases/download/nsis-3.11/nsis-3.11.zip" -OutFile $zip -UseBasicParsing
+            $hash = (Get-FileHash -Algorithm SHA1 -Path $zip).Hash
+            if ($hash -ne "EF7FF767E5CBD9EDD22ADD3A32C9B8F4500BB10D") { throw "El zip de NSIS no coincide ($hash)" }
+            Expand-Archive -Path $zip -DestinationPath $dest -Force
+            $exe = Get-ChildItem -Path $dest -Recurse -Filter makensis.exe | Select-Object -First 1
+            if (-not $exe) { throw "El zip de NSIS no trae makensis.exe" }
+            $nsis = $exe.DirectoryName
+            $ok = $true
           }
           if (-not $ok) { throw "No se pudo instalar NSIS 3.11" }
           Add-Content -Path $env:GITHUB_PATH -Value $nsis
