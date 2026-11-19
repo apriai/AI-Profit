@@ -10,6 +10,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.28] — 2026-11-19
+### Cambiado
+- **Se quitó la estrategia Rascacielo de stop fijo** (SL −$600 / TP +$104). Sigue Rascacielo (Dia Minimo+Colchon). Si una selección guardada pide el id `rascacielo`, se usa la estrategia por defecto.
+- **Evaluación con trailing ahora se llama Evaluación con rascacielos.** El id sigue siendo `evaluacion`. SL −$630 / TP +$630. En vez de tres escalones hay un solo colchón, el mismo del día mínimo: protege ~$100 netos, se mueve una vez y el trade sigue hasta el TP o el SL. En 50K los dólares se duplican.
+### Notas
+- No cambia cómo el motor mueve el stop. Solo qué estrategia se elige.
+
 ## [0.10.27] — 2026-11-19
 ### Corregido
 - **Si la posición llega tarde, se vigila hasta un minuto y se gestiona.** Ya no se da por terminada a los 14 s con «se llenó y no aparece la posición». Si aparece dentro de ese minuto, entra al bucle de siempre. No se reenvía la orden.

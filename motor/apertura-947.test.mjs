@@ -146,14 +146,14 @@ assert.equal(lineaPrecio({ fuente: 'ask', precio: fill, edadMs: 40, recalculado:
 
 limpiar();
 {
-  const pg = fakePage(); globalThis.__ask = 27727.75; globalThis.__bid = 27727.5; globalThis.__bar = 27724.25; globalThis.__askTime = Date.now() - 180; pg.setPx(27727.75);
+  const pg = fakePage(); globalThis.__ask = 27727.75; globalThis.__bid = 27727.5; globalThis.__bar = 27700; globalThis.__askTime = Date.now() - 180; pg.setPx(27727.75);
   const { k, marcas } = motor(pg);
-  const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 20, strategyId: 'rascacielo', accountId: '1', accountName: 'Paper Trading', tClick: Date.now() - 15 });
+  const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 20, strategyId: 'evaluacion-simple', accountId: '1', accountName: 'Paper Trading', tClick: Date.now() - 15 });
   assert.equal(r.ok, true, r.err);
   assert.deepEqual(antesDeOrden(marcas), ['preparar', 'cotizacion']);
   assert.equal(marcas.filter(x => x === 'place').length, 1);
-  assert.equal(pg.ordenes[0].takeProfit, 27730.25);
-  assert.equal(pg.ordenes[0].stopLoss, 27712.75);
+  assert.equal(pg.ordenes[0].takeProfit, 27743.5);
+  assert.equal(pg.ordenes[0].stopLoss, 27712);
   assert.equal(pg.ordenes[0].type, 2);
   assert.equal(pg.cierres(), 0);
   const texto = fs.readFileSync(logFile, 'utf8');
@@ -166,7 +166,7 @@ limpiar();
 {
   const pg = fakePage(); globalThis.__cerrarYa = true; globalThis.__ask = 27727.75; globalThis.__bar = 27724.25; pg.setPx(27727.75);
   const { k, marcas } = motor(pg);
-  const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 1, strategyId: 'rascacielo', accountId: '1', accountName: 'Paper Trading', tClick: Date.now() });
+  const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 1, strategyId: 'evaluacion-simple', accountId: '1', accountName: 'Paper Trading', tClick: Date.now() });
   assert.equal(r.filled, true);
   assert.equal(r.closed, true);
   assert.match(r.err, /se llenó y se cerró: entrada 27727\.75 salida 27726\.75/);
@@ -201,7 +201,7 @@ limpiar();
 {
   const pg = fakePage(); globalThis.__mostrarEnMs = 350; globalThis.__ask = 20000;
   const { k, marcas } = motor(pg);
-  const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 1, strategyId: 'rascacielo', accountId: '1', accountName: 'Paper Trading', tClick: Date.now() });
+  const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 1, strategyId: 'evaluacion-simple', accountId: '1', accountName: 'Paper Trading', tClick: Date.now() });
   assert.equal(r.ok, true, r.err);
   assert.equal(marcas.filter(x => x === 'place').length, 1);
   assert.equal(pg.cierres(), 0);
@@ -223,7 +223,7 @@ limpiar();
 {
   const pg = fakePage(); globalThis.__mostrarEnMs = 700; globalThis.__ask = 20000;
   const { k, marcas } = motor(pg, { fillWaitMs: 120, adoptMs: 2500 });
-  const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 1, strategyId: 'rascacielo', accountId: '1', accountName: 'Paper Trading', tClick: Date.now() });
+  const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 1, strategyId: 'evaluacion-simple', accountId: '1', accountName: 'Paper Trading', tClick: Date.now() });
   assert.equal(r.ok, true, r.err);
   assert.equal(marcas.filter(x => x === 'place').length, 1);
   assert.equal(k.status().state, 'running');

@@ -60,7 +60,7 @@ assert(DEFAULT_STRATEGY === 'evaluacion-simple', 'default sigue Evaluación');
 assert(getStrategy('evaluacion-simple').params.DEFAULT_QTY.MNQ === 8, 'Evaluación default 8 MNQ');
 assert(STRATEGY_ORDER.includes('dos-disparos'), 'incluye dos-disparos');
 
-const ids = ['evaluacion-simple', 'evaluacion', 'dia-minimo-colchon', 'rascacielo', 'prueba-be', 'dos-disparos'];
+const ids = ['evaluacion-simple', 'evaluacion', 'dia-minimo-colchon', 'prueba-be', 'dos-disparos'];
 const rows = {};
 for (const id of ids) {
   const raw = getStrategy(id);
@@ -175,8 +175,6 @@ assert(d25.includes('SL −$300') && d25.includes('TP +$630') && d25.includes('2
 assert(d50.includes('SL −$600') && d50.includes('TP +$1,260') && !d50.includes('$300'), 'texto dos disparos 50K');
 const beTxt = textoEnPagina(getStrategy('prueba-be'), 2);
 assert(beTxt.includes('+$30') && beTxt.includes('+3 ticks') && !beTxt.includes('+6 ticks'), 'Fast BE 50K dobla el disparo y deja los ticks');
-const ras = textoEnPagina(getStrategy('rascacielo'), 2);
-assert(ras.includes('SL −$1,200') && ras.includes('TP +$208'), 'texto Rascacielo 50K');
 const col = textoEnPagina(getStrategy('dia-minimo-colchon'), 2);
 assert(col.includes('SL −$1,200') && col.includes('TP +$3,200') && col.includes('$200'), 'texto colchón 50K');
 const propiaVista = { id: 'propia-abc123', name: 'Mía', propia: true, params: { SL_USD: 400, TP_USD: 800, STEPS: [{ trigger: 100, lock: 50 }] } };
@@ -203,7 +201,7 @@ assert(p50.includes('SL −$800') && p50.includes('TP +$1,600') && p50.includes(
   ctx.stratId = 'evaluacion';
   vm.runInContext('out2=textoCuentaHtml();', ctx);
   const trail = String(ctx.out2).replace(/<[^>]+>/g, ' ');
-  assert(trail.includes('+$400') && trail.includes('protege $200') && trail.includes('protege $400'), 'el trailing de 50K dobla los escalones');
+  assert(trail.includes('SL −$1,260') && trail.includes('TP +$1,260') && trail.includes('protege ~$200') && !trail.includes('+$400'), 'Evaluación con rascacielos en 50K muestra un solo colchón');
   ctx.accs.accounts[0] = { id: 'C', name: 'CUENTA88421', balance: 25100, scale: 1, plan: '25K', start: 25000, maxMicros: 20, maxMinis: 2, type: 'eval' };
   ctx.stratId = 'evaluacion-simple';
   vm.runInContext('out3=textoCuentaHtml(); sc3=accPlan().scale;', ctx);
