@@ -40,6 +40,10 @@ function pagina(opts = {}) {
         orders.push({ id, parentId: o.parentId || null, symbol: o.symbol, side: o.side, type: o.type, status: 6, qty: o.qty, stopPrice: o.stopPrice ?? null, limitPrice: o.limitPrice ?? null });
         return { orderId: id };
       }
+      if (opts.rejectForeign) {
+        hist.push({ id: 'Z' + nid++, symbol: 'CME_MINI:ESZ2026', type: 2, side: o.side, qty: o.qty, status: 5 });
+        return {};
+      }
       if (opts.reject) {
         const id = 'R' + nid++;
         hist.push({ id, symbol: o.symbol, type: 2, side: o.side, qty: o.qty, status: 5, message: { text: 'rechazada' } });
@@ -93,13 +97,20 @@ function pagina(opts = {}) {
         const p = positions[0];
         const cruza = p.side === 1 ? x.limitPrice <= px + 1e-9 : x.limitPrice >= px - 1e-9;
         if (cruza) {
-          const q = Math.min(Math.abs(Number(x.qty) || p.qty), Math.abs(Number(p.qty)));
+          let q = Math.min(Math.abs(Number(x.qty) || p.qty), Math.abs(Number(p.qty)));
+          if (Number(opts.leaveQty) > 0 && p.qty > Number(opts.leaveQty)) q = p.qty - Number(opts.leaveQty);
           execs.push({ id: x.id + 'f', orderId: x.id, parentId: x.parentId, symbol: p.symbol, side: x.side, qty: q, price: px, time: Date.now() });
           hist.push({ id: x.id, parentId: x.parentId, symbol: p.symbol, type: 1, side: x.side, qty: q, status: 2, limitPrice: x.limitPrice });
           p.qty -= q;
-          if (p.qty <= 0) positions.splice(positions.indexOf(p), 1);
-          for (let i = orders.length - 1; i >= 0; i--) if (orders[i] !== x && orders[i].type === 3 && String(orders[i].parentId) === String(x.parentId)) orders.splice(i, 1);
-          x.status = 2;
+          if (p.qty <= 0) {
+            positions.splice(positions.indexOf(p), 1);
+            for (let i = orders.length - 1; i >= 0; i--) if (orders[i] !== x && orders[i].type === 3 && String(orders[i].parentId) === String(x.parentId)) orders.splice(i, 1);
+            x.status = 2;
+          } else {
+            x.qty = p.qty;
+            const so = orders.find(o => o !== x && o.type === 3 && String(o.parentId) === String(x.parentId));
+            if (so) so.qty = p.qty;
+          }
         }
       }
       return true;
@@ -125,9 +136,13 @@ const dormir = ms => new Promise(r => setTimeout(r, ms));
 { const t0 = 1000;
   const info = lineaTiempos({ clic: t0, enviado: t0, llegada: t0 + 12, llamada1Inicio: t0 + 92, llamada1Fin: t0 + 232, placeMs: 90, placeFin: t0 + 322, orderIdEn: t0 + 322, bracketEn: t0 + 532, fin: t0 + 532 });
   ok(info.linea === 'TIEMPOS: clic->servidor 12ms, verificaciones 80ms, llamada1 140ms, placeOrder 90ms, confirmado 210ms, total 532ms', info.linea);
-  ok(info.total === 532 && info.detalle.startsWith('TIEMPOS detalle:'), 'el detalle no sustituye a la línea'); }
+  ok(info.total === 532 && info.detalle.startsWith('TIEMPOS detalle:'), 'el detalle no sustituye a la línea');
+  const sinClic = lineaTiempos({ clic: null, llegada: 5000, fin: 5500 });
+  ok(sinClic.total === 500, 'sin clic el total sale de la llegada al servidor (' + sinClic.total + ')'); }
 const htmlGran = fs.readFileSync(new URL('./Granja-de-Cuentas-v2.html', import.meta.url), 'utf8');
 ok(!htmlGran.includes('Poner stop') && !htmlGran.includes('alarmaStop') && !htmlGran.includes('poner-stop'), 'no hay alarma ni botón de poner stop');
+ok(htmlGran.includes('if(!accId){setPhase("blocked","Elige una cuenta");return}') && !htmlGran.includes('accId||(activa'), 'sin cuenta elegida no se opera la cuenta activa de TradingView');
+ok(htmlGran.includes('beforeunload') && htmlGran.includes('avisarPanel(false,true)'), 'al cerrar la página se apaga el panel');
 ok(htmlGran.includes('Apertura <b>') && htmlGran.includes('clic:pulsado'), 'la granja manda el clic y muestra el total');
 ok(reintentaEvaluate(js.enviar({ root: 'MNQ', side: 1, qty: 1, slPts: 15, tpPts: 2.5, accountId: '1', symbol: 'CME_MINI:MNQZ2026', front: 'MNQZ2026' }), new Error('WebSocket disconnect')) === false, 'la llamada de la orden no se reintenta ni por desconexión');
 ok(reintentaEvaluate(js.enviar({ root: 'MNQ', side: 1, qty: 1, slPts: 15, tpPts: 2.5, accountId: '1', symbol: 'CME_MINI:MNQZ2026', front: null }), new Error('Timeout')) === false, 'la llamada de la orden no se reintenta por tiempo agotado');
@@ -345,6 +360,17 @@ ok(objetivo.tpReached && objetivo.sl == null, 'si el precio ya pasó el objetivo
   ok(sm && sm.pnlFinalUSD === 490 && sm.salida === 27740, 'el resumen usa la salida real, no los $104 del objetivo (' + (sm && sm.pnlFinalUSD) + ')'); }
 
 { const book = { front: 'MNQZ2026', bid: 27739.75, ask: 27740, live: 27740, chart: 27720 };
+  const pg = pagina({ book, fillPx: 27727.75, leaveQty: 8 });
+  const k = createColchon(apiDriver(pg.evaluate), { pollMs: 40, logFile: '/tmp/apertura-parcial.log', ignoreClock: true, flatConfirm: { reads: 3, ms: 1000 }, noTicks: true });
+  const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 20, strategyId: 'rascacielo' });
+  ok(r.ok && !r.closed && k.status().state === 'running' && pg.positions[0] && pg.positions[0].qty === 8 && pg.orders.some(o => o.type === 3), 'si el objetivo solo cierra una parte, la operación sigue (' + (r.err || k.status().state) + ')');
+  await k.stop({ flatten: false }); }
+
+{ const pg = pagina({ rejectForeign: true });
+  const r = await apiDriver(pg.evaluate).openBracket({ side: 'long', symbol: 'MNQ', qty: 20, slPts: 15, tpPts: 2.5 });
+  ok(!/RECHAZADA/.test(String(r)) && /no devolvió id/.test(String(r)), 'un rechazo de otro símbolo no cuenta como esta orden (' + r + ')'); }
+
+{ const book = { front: 'MNQZ2026', bid: 27739.75, ask: 27740, live: 27740, chart: 27720 };
   const pg = pagina({ book, fillPx: 27727.75, modFail: true });
   const d = apiDriver(pg.evaluate);
   const r = await d.openBracket({ side: 'long', symbol: 'MNQ', qty: 20, slPts: 15, tpPts: 2.5, steps: [] });
@@ -385,6 +411,8 @@ ok(objetivo.tpReached && objetivo.sl == null, 'si el precio ya pasó el objetivo
   delete process.env.COLCHON_FULLREAD_MS; }
 
 ok(puedeRecorrerCuentas('idle') === true, 'sin panel y sin trade se puede recorrer las cuentas');
+acctGuard.panelAbierto = true; acctGuard.panelHasta = Date.now() - 1000;
+ok(puedeRecorrerCuentas('idle') === true && acctGuard.panelAbierto === false, 'el panel abierto caduca a los 2 minutos sin latido');
 acctGuard.panelAbierto = true;
 ok(puedeRecorrerCuentas('idle') === false, 'con el panel abierto no se cambia de cuenta');
 acctGuard.panelAbierto = false;

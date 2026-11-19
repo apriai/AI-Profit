@@ -10,6 +10,16 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.32] — 2026-11-19
+### Corregido
+- **Si el objetivo solo cierra una parte, la operación sigue** con lo que queda en la cuenta.
+- **El panel abierto no se queda pegado.** Al cerrar o recargar la página se apaga, y si no llega un latido en 2 minutos también.
+- **Sin hora de clic, el total de la apertura sale de la llegada al servidor.**
+- **Los avisos dicen lo que pasó.** Si el límite se movió y no se vio la salida, no dice que no se movió. Si la orden no trae id, no dice que la llamada se cortó. Un rechazo de otro símbolo no cuenta como esta orden.
+- **Sin una cuenta elegida en el panel, no se opera** la que esté activa en TradingView.
+### Notas
+- No cambia los dólares de las estrategias.
+
 ## [0.10.31] — 2026-11-19
 ### Cambiado
 - **Cada apertura anota sus tiempos y la granja muestra el total.** Desde el clic en BUY o SELL: llegada al servidor, verificaciones, la lectura, el placeOrder, la confirmación y el total, en milisegundos. Una línea en `colchon.log`, más el detalle. Escribir el registro no espera ni frena la orden.

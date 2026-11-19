@@ -13,12 +13,13 @@ export const SIZES = { NQ: 2, MNQ: 20 }; const PT_USD = { NQ: 20, MNQ: 2 }; expo
 export function lineaTiempos(m = {}) {
   const n = v => v == null || !Number.isFinite(Number(v)) ? '—' : Math.max(0, Math.round(Number(v))) + 'ms';
   const d = (a, b) => (Number.isFinite(Number(a)) && Number.isFinite(Number(b))) ? Number(b) - Number(a) : null;
-  const clic = Number(m.clic), llegada = Number(m.llegada), enviado = Number.isFinite(Number(m.enviado)) ? Number(m.enviado) : clic;
+  const num = v => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; };
+  const clic = num(m.clic), llegada = num(m.llegada), enviado = num(m.enviado) || clic;
   const verif = d(llegada, m.llamada1Inicio);
   const l1 = d(m.llamada1Inicio, m.llamada1Fin);
   const place = Number.isFinite(Number(m.placeMs)) ? Number(m.placeMs) : d(m.placeInicio, m.placeFin);
   const conf = d(m.placeFin || m.orderIdEn, m.bracketEn || m.fillEn || m.fin);
-  const base = Number.isFinite(clic) ? clic : llegada;
+  const base = clic || llegada;
   const total = d(base, m.fin);
   const linea = `TIEMPOS: clic->servidor ${n(d(enviado, llegada))}, verificaciones ${n(verif)}, llamada1 ${n(l1)}, placeOrder ${n(place)}, confirmado ${n(conf)}, total ${n(total)}`;
   const baseRel = Number.isFinite(base) ? base : 0;
@@ -314,7 +315,7 @@ export const js = {
     var id=r&&(r.orderId||r.id)?String(r.orderId||r.id):null;
     var marca={antesPlace:Math.round(tA-t0),placeMs:Math.round(tB-t0)};
     if(!id){var hh=[];try{hh=await ab.ordersHistory()||[]}catch(e){}
-      var rech=hh.filter(function(o){return o&&VISTOS.indexOf(String(o.id))<0&&Number(o.status)===5&&Number(o.type)===2});
+      var rech=hh.filter(function(o){return o&&VISTOS.indexOf(String(o.id))<0&&Number(o.status)===5&&Number(o.type)===2&&Number(o.side)===SIDE&&tvRoot(o.symbol)===R});
       if(rech.length)return {sent:false,error:'la orden no se llenó (RECHAZADA por TradingView)',antesPlace:marca.antesPlace,placeMs:marca.placeMs};
       return {sent:true,dudoso:true,sinId:true,sl:sl,tp:tp,bid:bid,ask:ask,front:fr||null,antesPlace:marca.antesPlace,placeMs:marca.placeMs}}
     return {sent:true,orderId:id,sl:sl,tp:tp,bid:bid,ask:ask,symbol:SYM,front:fr||null,antesPlace:marca.antesPlace,placeMs:marca.placeMs}})()`,
@@ -424,7 +425,7 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
     async stop() { return last.pos ? last.pos.stop : null; },
     async lastPrice() { try { const r = await evaluate(js.lastPrice); return r && typeof r.price === 'number' ? r.price : null; } catch { return null; } },
     async openBracket({ side, symbol, qty, slPts, tpPts, steps, accountId, accountName, confirmReal, cron } = {}) {
-      last.open = null; vigilP = null;
+      last.open = null; vigilP = null; prepVisto = null;
       const marca = k => { if (cron) cron[k] = Date.now(); };
       const s = side === 'long' ? 1 : -1;
       const front = frenteCache.symbol === symbol && frenteCache.front ? frenteCache.front : null;
@@ -495,7 +496,9 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
         if (st.pos && st.pos.side === side && st.pos.qty > 0) vio = true;
         else if (st.pos && st.pos.side !== side) return 'error: Apareció una posición del otro lado. No se toca. Revisa TradingView.';
         else {
-          const alerta = 'La llamada se cortó. No se reenvía la orden. Sigo mirando por si aparece la posición.';
+          const alerta = res && res.corte
+            ? 'La llamada se cortó. No se reenvía la orden. Sigo mirando por si aparece la posición.'
+            : 'La orden no devolvió id. No se reenvía. Sigo mirando por si aparece la posición.';
           last.open = { dudoso: true, vigilando: true, pedirSaldo: true, alerta, orderId: orderId || null };
           const dudaMs = Number(process.env.COLCHON_DUDA_MS) > 0 ? Number(process.env.COLCHON_DUDA_MS) : 45000;
           vigilP = (async () => {
@@ -552,7 +555,7 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
         return 'error: ' + alerta;
       }
       if (cron && !cron.fillEn) cron.fillEn = Date.now();
-      const pos = st.pos;
+      let pos = st.pos;
       const plan = (pos.price != null) ? planAlAbrir({ side, entry: pos.entry, price: pos.price, steps, slPts, tpPts, usdPerPoint: (PT_USD[symbol] || 0) * pos.qty }) : null;
       let tpFallo = null;
       if (plan && plan.tpReached) {
@@ -572,10 +575,20 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
         }
         const pnl = salida != null && pos.entry != null ? Math.round((salida - pos.entry) * s * (PT_USD[symbol] || 0) * (qtyCerrada || Math.min(pos.qty, qty)) * 100) / 100 : null;
         if (salida != null) {
-          last.open = { tpHit: true, ref: pos.entry, tp: plan.tp, price: pos.price, salida, salidaReal: pnl, qty: qtyCerrada || Math.min(pos.qty, qty), orderId, pedirSaldo: true, alerta: null };
-          return `ok market ${qtyCerrada || Math.min(pos.qty, qty)} @${pos.entry} objetivo ya pasado: el límite ligado salió a ${salida}`;
+          const queda = await estado(symbol, orderId, pos.id);
+          const resto = queda.pos && queda.pos.side === side ? queda.pos.qty : 0;
+          if (!(resto > 0)) {
+            last.open = { tpHit: true, ref: pos.entry, tp: plan.tp, price: pos.price, salida, salidaReal: pnl, qty: qtyCerrada || Math.min(pos.qty, qty), orderId, pedirSaldo: true, alerta: null };
+            return `ok market ${qtyCerrada || Math.min(pos.qty, qty)} @${pos.entry} objetivo ya pasado: el límite ligado salió a ${salida}`;
+          }
+          st = queda;
+          pos = queda.pos;
+        } else {
+          const movio = !!(mov && (mov.ok || mov.ya || mov.verified != null));
+          tpFallo = movio
+            ? 'El objetivo ya estaba pasado. El límite ligado se movió, pero no vi la salida. El stop sigue. No mandé otra orden.'
+            : 'El objetivo ya estaba pasado. No pude mover el límite ligado y no mandé otra orden. El stop sigue.';
         }
-        tpFallo = 'El objetivo ya estaba pasado. No moví el límite ligado y no mandé otra orden. El stop sigue.';
       }
       let visto = { ok: false, stops: [], doble: false };
       const hasta = Date.now() + 1000;
@@ -944,11 +957,22 @@ export const js_readAccounts = (all, only = null) => `(async function(){${PAGE}v
 // Exclusión mutua entre la lectura de todas las cuentas (cambia de cuenta) y una prueba (fija su cuenta):
 // - con una prueba activa (o arrancando) solo se lee la cuenta activa, sin cambiar nada;
 // - una prueba que arranca espera como máximo ~2.5 s a una lectura completa en curso y luego sigue.
-export const acctGuard = { testActive: false, enviando: false, panelAbierto: false, barridoPendiente: false, fullRead: null, saldoPendiente: false, alLiberar: null, alSoltarEnvio: null, alCerrarPanel: null };
+export const PANEL_ABIERTA_MS = 120000;
+export const acctGuard = { testActive: false, enviando: false, panelAbierto: false, panelHasta: 0, barridoPendiente: false, fullRead: null, saldoPendiente: false, alLiberar: null, alSoltarEnvio: null, alCerrarPanel: null };
+// El panel sigue abierto solo si llegó un latido en los últimos 2 minutos.
+export function panelSigueAbierto(ahora = Date.now()) {
+  if (!acctGuard.panelAbierto) return false;
+  if (acctGuard.panelHasta && ahora > acctGuard.panelHasta) { acctGuard.panelAbierto = false; acctGuard.panelHasta = 0; return false; }
+  return true;
+}
+export function marcarPanel(abierto, ahora = Date.now()) {
+  if (abierto) { acctGuard.panelAbierto = true; acctGuard.panelHasta = ahora + PANEL_ABIERTA_MS; }
+  else { acctGuard.panelAbierto = false; acctGuard.panelHasta = 0; }
+}
 // El barrido que cambia de cuenta se pausa con el panel de operar abierto o con un trade en curso.
 export function puedeRecorrerCuentas(estado) {
   const st = estado !== undefined ? estado : colchon.status().state;
-  if (acctGuard.panelAbierto || acctGuard.testActive || st === 'running') return false;
+  if (panelSigueAbierto() || acctGuard.testActive || st === 'running') return false;
   return true;
 }
 // Al soltar la prueba se avisa para que corra lo que quedó en cola (saldo, vista previa). No se tira.

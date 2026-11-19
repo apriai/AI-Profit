@@ -9,6 +9,6 @@ Antes de usar esto en una cuenta de evaluación, pruébalo en una cuenta demo o 
 5. El `parentId` del stop y del objetivo es el id de la orden de entrada, o el id de la posición.
 6. La posición trae `lastPrice`. Si no lo trae, el stop igual debe verse del lado bueno del bid (compra) o del ask (venta).
 7. Cierra a mano una parte, o deja que salga el objetivo. El stop que sobra tiene que cancelarse con el bracket. No debe quedar un stop trabajando con la cuenta ya plana.
-8. Si la granja dice «NO VEO EL STOP», suena el aviso y aparece el botón «Poner stop». Ese botón no se pulsa solo.
+8. Si la granja dice «NO VEO EL STOP», el aviso queda en el panel de la operación. No hay botón para poner otro stop: Tradovate no quita el que ya está.
 
 No uses una cuenta fondeada para esta prueba.
