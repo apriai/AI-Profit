@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.25] — 2026-11-19
+### Cambiado
+- **El sonido del círculo suena cada vez que vuelve a aparecer.** En la vela que se está formando, Burbuja doble suena al pasar de sin círculo a círculo. Si el círculo se apaga y vuelve en esa misma vela, suena otra vez. Mientras sigue a la vista, no se repite. Al cerrar la vela se olvida. El interruptor «Sonido de la señal» sigue igual. BUY y SELL siguen en silencio.
+### Notas
+- No abre, no mueve y no cierra órdenes.
+
 ## [0.10.24] — 2026-11-18
 ### Corregido
 - **El icono de Profito se ve nítido en Windows.** La carita verde se pinta a 1024 y de ahí salen los tamaños 16, 20, 24, 32, 40, 48, 64, 96, 128 y 256, sin agrandar un dibujo chico. La ventana de la granja (Chrome en modo aplicación) usa el favicon de 192 y de 512 y el manifiesto. El acceso del instalador, el del menú Inicio y el icono junto al reloj usan ese mismo `.ico`.
