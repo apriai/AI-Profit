@@ -52,6 +52,40 @@ export function bracketsSeguros(side, entry, price, slPts, tpPts) {
   }
   return { sl, tp };
 }
+// Al confirmar el fill: si el precio ya alcanzó un escalón, el stop nace en ese nivel
+// (el más alto que aún queda del lado bueno del precio vivo) y la gestión sigue desde el siguiente.
+// Si el precio ya pasó el objetivo, la estrategia termina ahí: no se deja el trade sin objetivo.
+export function planAlAbrir({ side, entry, price, steps, slPts, tpPts, usdPerPoint }) {
+  const s = side === 'short' || side === -1 ? -1 : 1;
+  const en = Number(entry);
+  const px = Number.isFinite(Number(price)) ? Number(price) : en;
+  if (!Number.isFinite(en)) return { sl: null, tp: null, tpPlace: null, tpReached: false, stepIndex: null, nextStep: 0, locked: false, pnl: null };
+  const tp = roundTick(en + s * tpPts);
+  const pnl = Number(usdPerPoint) > 0 ? Math.round((px - en) * s * Number(usdPerPoint) * 100) / 100 : null;
+  const tpReached = Number.isFinite(tp) && (s === 1 ? px >= tp - 1e-9 : px <= tp + 1e-9);
+  const list = Array.isArray(steps) ? steps : [];
+  const safe = lock => s === 1 ? lock < px - 1e-9 : lock > px + 1e-9;
+  let chosen = null;
+  if (pnl != null && !tpReached) {
+    for (let k = list.length - 1; k >= 0; k--) {
+      if (pnl + 1e-9 < Number(list[k].triggerUsd)) continue;
+      const lock = roundTick(s === 1 ? en + Number(list[k].lockPts) : en - Number(list[k].lockPts));
+      if (!safe(lock)) continue;
+      chosen = { index: k, step: list[k], sl: lock };
+      break;
+    }
+  }
+  let sl = chosen ? chosen.sl : roundTick(en - s * slPts);
+  if (!safe(sl)) sl = null;
+  const tpPlace = !tpReached && (s === 1 ? tp > px : tp < px) ? tp : null;
+  return {
+    pnl, tp, tpReached, sl: tpReached ? null : sl, tpPlace,
+    stepIndex: chosen ? chosen.index : null,
+    step: chosen ? chosen.step : null,
+    nextStep: chosen ? chosen.index + 1 : 0,
+    locked: !!(chosen && chosen.index + 1 >= list.length),
+  };
+}
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // ---- Gate de seguridad ----
@@ -203,15 +237,13 @@ export const js = {
     if((o&&Number(o.status)===2)||hits.length){var p3=await leer();if(p3)return {filled:true,open:true,ms:Math.round(performance.now()-T),entry:p3.avgPrice,via:'ejecucion'};if(tvPos.lastErr)return {filled:false,uncertain:true,sawFill:true,status:o?Number(o.status):2};return {filled:true,open:false,alreadyFlat:true,status:o?Number(o.status):2}}
     if(fallo||!limpio)return {filled:false,uncertain:true,status:o?Number(o.status):null};
     return {filled:false,status:o?Number(o.status):null,message:o&&o.message?(o.message.text||String(o.message)):null}})()`,
-  // Con la posición ya abierta: pone SL y TP desde el precio real de entrada. Nunca cierra.
-  // Si el precio vivo ya pasó ese nivel, no arma esa pata (se llenaría al momento).
-  adopt: (root, slPts, tpPts) => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t),R=${JSON.stringify(root)},SLP=${Number(slPts)},TPP=${Number(tpPts)};
+  // Precios ya decididos (stop del escalón alcanzado, u objetivo). Null = no armar esa pata. Nunca cierra.
+  adopt: (root, slPrice, tpPrice) => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t),R=${JSON.stringify(root)};
     var p=await tvPos(ab,R);if(!p)return {error:'sin posicion'};
-    var s=p.side===1?1:-1,tick=0.25,rnd=function(x){return Math.round(x/tick)*tick};
-    var entry=Number(p.avgPrice),px=p.lastPrice!=null?Number(p.lastPrice):tvChartPx();if(!isFinite(px))px=entry;
-    var sl=rnd(entry-s*SLP),tp=rnd(entry+s*TPP);
-    if(s===1){if(!(sl<px&&sl<entry))sl=null;if(!(tp>px&&tp>entry))tp=null}else{if(!(sl>px&&sl>entry))sl=null;if(!(tp<px&&tp<entry))tp=null}
-    if(sl==null&&tp==null)return {ok:false,error:'el precio ya pasó el stop y el objetivo',entry:entry};
+    var s=p.side===1?1:-1,entry=Number(p.avgPrice),px=p.lastPrice!=null?Number(p.lastPrice):tvChartPx();if(!isFinite(px))px=entry;
+    var sl=${slPrice == null ? 'null' : Number(slPrice)},tp=${tpPrice == null ? 'null' : Number(tpPrice)};
+    if(s===1){if(!(sl!=null&&sl<px))sl=null;if(!(tp!=null&&tp>px))tp=null}else{if(!(sl!=null&&sl>px))sl=null;if(!(tp!=null&&tp<px))tp=null}
+    if(sl==null&&tp==null)return {ok:false,error:'el precio ya pasó el stop y el objetivo',entry:entry,price:px};
     var b={};if(sl!=null)b.stopLoss=sl;if(tp!=null)b.takeProfit=tp;
     var noPB=tvNoPosBrackets(ab),via=null,err=null;
     if(!noPB&&typeof ab.editPositionBrackets==='function'){try{var r1=await ab.editPositionBrackets(String(p.id),b);if(r1!==false)via='editPositionBrackets';else err='edit false'}catch(e){err=String(e&&e.message||e)}}
@@ -296,7 +328,7 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
     async position(symbol) { const p = await evaluate(js.position(symbol)); if (p && p.error) throw new Error(p.error); if (p && p.transient) return p; last.pos = p; return p; },
     async stop() { return last.pos ? last.pos.stop : null; },
     async lastPrice() { try { const r = await evaluate(js.lastPrice); return r && typeof r.price === 'number' ? r.price : null; } catch { return null; } },
-    async openBracket({ side, symbol, qty, slPts, tpPts }) {
+    async openBracket({ side, symbol, qty, slPts, tpPts, steps }) {
       let lp = await evaluate(js.lastPrice); if (lp.error) return 'error: ' + lp.error;
       const cs = String(lp.symbol).replace(/^.*:/, ''), chartRoot = /^MNQ/.test(cs) ? 'MNQ' : /^NQ/.test(cs) ? 'NQ' : cs;
       if (chartRoot !== symbol) return `error: el chart está en ${lp.symbol}; pon ${symbol}1! en el chart`;
@@ -321,11 +353,30 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
       const waitMs = Number(process.env.COLCHON_FILL_MS) > 0 ? Number(process.env.COLCHON_FILL_MS) : 6000;
       let f = await evaluate(js.fill(symbol, s, qty, ts.symbol, waitMs));
       const adoptar = async () => {
-        const a = await evaluate(js.adopt(symbol, slPts, tpPts));
-        const entry = (a && a.entry) || (f && f.entry) || px;
-        last.open = { ref: entry, sl: a ? a.sl : null, tp: a ? a.tp : null };
+        let pos = null;
+        try { pos = await evaluate(js.position(symbol)); } catch (e) { pos = { transient: String(e.message || e) }; }
+        // Solo el precio del bróker decide si un escalón o el objetivo ya se cumplieron. El cierre de la vela no.
+        const confiable = !!(pos && !pos.error && !pos.transient && pos.priceSrc === 'broker' && pos.entry != null && pos.price != null);
+        const entry = (confiable ? pos.entry : null) || (f && f.entry) || px;
+        const vivo = confiable ? pos.price : entry;
+        const plan = planAlAbrir({ side, entry, price: vivo, steps, slPts, tpPts, usdPerPoint: (PT_USD[symbol] || 0) * qty });
+        if (plan.tpReached) {
+          const cerrado = await evaluate(js.flatten(symbol));
+          if (cerrado && cerrado.ok !== false && !cerrado.error) {
+            last.open = { tpHit: true, ref: entry, tp: plan.tp, price: vivo };
+            return `ok market ${qty} ${ts.symbol} @${entry} objetivo ya pasado (${plan.tp}): cierre a mercado · fill visto en ${((f.ms || 0) / 1000).toFixed(2)} s`;
+          }
+        }
+        const a = await evaluate(js.adopt(symbol, plan.sl, plan.tpPlace));
+        const puesto = a && a.ok && plan.step && a.sl === plan.sl;
+        last.open = {
+          ref: (a && a.entry) || entry, sl: a ? a.sl : plan.sl, tp: a ? a.tp : plan.tpPlace,
+          step: puesto ? plan.nextStep : 0, locked: puesto ? plan.locked : false,
+          paso: puesto ? { paso: plan.step.n, disparoUSD: plan.step.triggerUsd, protegeUSD: plan.step.lockUsd, precio: plan.sl, enSeg: 0, confirmado: true, saltados: plan.stepIndex } : null,
+        };
+        const nota = puesto ? ` · paso ${plan.step.n} ya alcanzado, stop en ${plan.sl}` : '';
         const pendiente = a && a.ok ? '' : ` · SL/TP no quedaron puestos (${(a && a.error) || 'revisa TradingView'}). No se cierra la posición`;
-        return `ok market ${qty} ${ts.symbol} @${entry} SL ${a && a.sl != null ? a.sl : '—'} TP ${a && a.tp != null ? a.tp : '—'}${pendiente} · fill visto en ${((f.ms || 0) / 1000).toFixed(2)} s`;
+        return `ok market ${qty} ${ts.symbol} @${(a && a.entry) || entry} SL ${a && a.sl != null ? a.sl : '—'} TP ${a && a.tp != null ? a.tp : '—'}${nota}${pendiente} · fill visto en ${((f.ms || 0) / 1000).toFixed(2)} s`;
       };
       if (f && f.filled && f.open) return adoptar();
       if (!(f && f.filled) && (f && f.uncertain || !f)) {
@@ -434,7 +485,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
   const log = (...a) => { const s = `${new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York' })} ET ${a.join(' ')}`; S.log.push(s); S.log = S.log.slice(-40); try { fs.appendFileSync(logFile, s + '\n'); } catch {} };
   async function check() { let acc; try { acc = await (await D()).account(); } catch (e) { driver = null; return { account: {}, paper: false, msg: 'Sin conexión con TradingView (CDP 9222): ' + e.message }; } const ok = isPaper(acc.name, acc.broker), real = !ok && realAllowed(acc.name, allow()); return { account: acc, paper: ok, real, realLabel: real ? realLabel(acc.name) : null, msg: ok ? 'Paper/Demo OK' : real ? `CUENTA REAL · ${realLabel(acc.name)}` : (acc.name ? 'No pude leer esa cuenta de TradingView' : 'No veo la cuenta en TradingView') }; }
   async function loop(c, paper) {
-    const st = { locked: false, fails: 0, uiTried: false }; const driver = await D(); const real = S.mode === 'real';
+    const st = { locked: !!S.locked, fails: 0, uiTried: false, step: S.step || 0 }; const driver = await D(); const real = S.mode === 'real';
     const FZ = fuenteCfg(opts.fuenteFile, opts.fuente), SRC = {}, ticks = {}, leadN = {}; let lead = null; S.fuenteModo = FZ.modo; S.fuenteLider = null; S.fuentes = {};
     const pv = PT_USD[c.symbol] * c.qty, sd = c.side === 'long' ? 1 : -1, wait = FZ.modo === 'grafica' ? poll : Math.min(poll, FZ.pollMs);
     const pnlAt = px => S.entry == null || px == null ? null : Math.round((px - S.entry) * sd * pv * 100) / 100;
@@ -606,7 +657,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
       const drv = await D(); try { S.accountId = drv.accountId ? await drv.accountId() : null; } catch { S.accountId = null; }
       if (accountId && S.accountId && S.accountId !== String(accountId)) { S.state = 'error'; S.error = 'La cuenta activa no es la elegida: no se opera'; log(S.error); return { ok: false, err: S.error, status: S }; }
       const op = await drv.openBracket({ ...c, slPts, tpPts }); log('open ->', op);
-      { const lo = drv.lastOpen ? drv.lastOpen() : null; Object.assign(S, { ajusteHecho: false, ajuste: null, slPts, tpPts, ref: lo ? lo.ref : null, tpRef: lo ? lo.tp : null }); }
+      { const lo = drv.lastOpen ? drv.lastOpen() : null; Object.assign(S, { ajusteHecho: !!(lo && (lo.tpHit || lo.sl != null || lo.tp != null)), ajuste: null, slPts, tpPts, ref: lo ? lo.ref : null, tpRef: lo ? lo.tp : null, step: lo && lo.step ? lo.step : 0, locked: !!(lo && lo.locked), lockPrice: lo && lo.step ? lo.sl : null, tpPrice: lo ? lo.tp : null }); if (lo && lo.paso) S.pasos = [lo.paso]; if (lo && lo.tpHit) { S.entry = lo.ref; S.openAt = Date.now(); S.closeAt = Date.now(); S.tpPrice = lo.tp; S.reason = 'tp'; S.state = 'done'; log(`Objetivo ya pasado al confirmar el fill (${lo.tp}): cierre a mercado`); summarize(); acctGuard.testActive = false; return { ok: true, closed: 'tp', status: S }; } }
       // Si la apertura queda en duda, no se aplana: cerrar aquí fue un cierre en el mismo segundo.
       if (String(op).startsWith('error')) { S.state = 'error'; S.error = op; S.reason = 'error'; summarize(); return { ok: false, err: op, status: S }; }
       loopP = loop(c, true).finally(() => { acctGuard.testActive = false; });

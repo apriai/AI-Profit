@@ -1,6 +1,7 @@
 // La apertura no puede decir "no se llenó" si el bróker sí llenó, ni cerrar la posición por esa duda.
 import assert from 'node:assert/strict';
-import { apiDriver, bracketsSeguros, createColchon, js } from './colchon.mjs';
+import { apiDriver, bracketsSeguros, createColchon, js, planAlAbrir, stepsFor } from './colchon.mjs';
+import { getStrategy } from './strategies.mjs';
 
 process.env.COLCHON_FILL_MS = '350';
 
@@ -102,6 +103,30 @@ ok(real.sl === 27712.75 && real.tp === 27730.25, 'desde el fill, SL 15 pts y TP 
   assert.doesNotMatch(js.adopt('MNQ', 15, 2.5), /closePosition/);
   await k.stop({ flatten: false });
   ok(pg.positions.length === 1 && pg.closes.length === 0, 'detener sin aplanar no llama a closePosition'); }
+
+const pasosEval = stepsFor('MNQ', 8, getStrategy('evaluacion').params);
+const enPaso = planAlAbrir({ side: 'long', entry: 20000, price: 20012.5, steps: pasosEval, slPts: 39.5, tpPts: 39.5, usdPerPoint: 16 });
+ok(enPaso.stepIndex === 0 && enPaso.sl === 20000 && enPaso.nextStep === 1 && enPaso.tpPlace === 20039.5 && !enPaso.tpReached, 'con +$200 el stop nace en el paso 1 (entrada), no en el stop inicial (' + JSON.stringify(enPaso) + ')');
+const salto = planAlAbrir({ side: 'long', entry: 20000, price: 20031.25, steps: pasosEval, slPts: 39.5, tpPts: 39.5, usdPerPoint: 16 });
+ok(salto.step && salto.step.n === 3 && salto.sl === 20012.5 && salto.nextStep === 3 && salto.locked, 'si el precio ya está en el paso 3, el stop nace ahí (' + JSON.stringify({ n: salto.step && salto.step.n, sl: salto.sl }) + ')');
+const cruzado = planAlAbrir({ side: 'long', entry: 100, price: 105, steps: [{ n: 1, triggerUsd: 1, lockUsd: 20, lockPts: 20 }], slPts: 10, tpPts: 50, usdPerPoint: 1 });
+ok(cruzado.stepIndex == null && cruzado.sl === 90 && cruzado.sl < 105, 'un stop de escalón ya cruzado no se pone; queda el inicial si aún es válido (' + cruzado.sl + ')');
+const objetivo = planAlAbrir({ side: 'long', entry: 27727.75, price: 27740, steps: [], slPts: 15, tpPts: 2.5, usdPerPoint: 40 });
+ok(objetivo.tpReached && objetivo.tp === 27730.25 && objetivo.sl == null, 'si el precio ya pasó el objetivo, el plan no arma un stop del lado malo');
+
+{ const pg = pagina({ chart: 20000, live: 20012.5, fillPx: 20000 });
+  const k = createColchon(apiDriver(pg.evaluate), { pollMs: 40, logFile: '/tmp/apertura-paso.log', ignoreClock: true, flatConfirm: { reads: 3, ms: 1000 }, noTicks: true });
+  const r = await k.start({ side: 'long', symbol: 'MNQ', qty: 8, strategyId: 'evaluacion' });
+  await new Promise(z => setTimeout(z, 250));
+  const sl = pg.orders.find(o => o.type === 3);
+  ok(r.ok && k.status().step === 1 && sl && sl.stopPrice === 20000 && pg.closes.length === 0, `el stop queda en el paso 1 y la gestión sigue desde ahí (step ${k.status().step}, SL ${sl && sl.stopPrice})`);
+  ok(k.status().pasos && k.status().pasos[0] && k.status().pasos[0].paso === 1, 'el paso 1 queda anotado al abrir');
+  await k.stop({ flatten: false }); }
+
+{ const pg = pagina({ chart: 27720, live: 27740, fillPx: 27727.75 });
+  const r = await apiDriver(pg.evaluate).openBracket({ side: 'long', symbol: 'MNQ', qty: 20, slPts: 15, tpPts: 2.5, steps: [] });
+  ok(pg.closes.length === 1 && pg.positions.length === 0 && pg.orders.every(o => o.type !== 3), 'objetivo ya pasado: un solo cierre a mercado, sin stop del lado malo (' + r + ')');
+  ok(String(r).includes('objetivo ya pasado') && !String(r).includes('no se llenó'), 'el cierre es el objetivo, no un fallo de fill'); }
 
 if (process.exitCode) process.exit(process.exitCode);
 console.log('apertura-incierta ok');
