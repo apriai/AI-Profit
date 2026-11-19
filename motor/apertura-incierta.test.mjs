@@ -1,7 +1,7 @@
 // La orden a mercado sale CON el stop y el objetivo, calculados con el bid/ask de ahora.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { apiDriver, bracketEntrada, bracketsSeguros, createColchon, drenarCola, encolarSiOcupado, encolarUltimo, js, liberarPrueba, planAlAbrir, puedeRecorrerCuentas, readAccounts, reintentaEvaluate, stepsFor, acctGuard } from './colchon.mjs';
+import { apiDriver, bracketEntrada, bracketsSeguros, createColchon, drenarCola, encolarSiOcupado, encolarUltimo, js, liberarPrueba, lineaTiempos, planAlAbrir, puedeRecorrerCuentas, readAccounts, reintentaEvaluate, stepsFor, acctGuard } from './colchon.mjs';
 import { getStrategy } from './strategies.mjs';
 
 process.env.COLCHON_FILL_MS = '400';
@@ -122,6 +122,13 @@ function pagina(opts = {}) {
 const ok = (c, m) => { if (!c) { console.error('FAIL ' + m); process.exitCode = 1; } else console.log('PASS ' + m); };
 const dormir = ms => new Promise(r => setTimeout(r, ms));
 
+{ const t0 = 1000;
+  const info = lineaTiempos({ clic: t0, enviado: t0, llegada: t0 + 12, llamada1Inicio: t0 + 92, llamada1Fin: t0 + 232, placeMs: 90, placeFin: t0 + 322, orderIdEn: t0 + 322, bracketEn: t0 + 532, fin: t0 + 532 });
+  ok(info.linea === 'TIEMPOS: clic->servidor 12ms, verificaciones 80ms, llamada1 140ms, placeOrder 90ms, confirmado 210ms, total 532ms', info.linea);
+  ok(info.total === 532 && info.detalle.startsWith('TIEMPOS detalle:'), 'el detalle no sustituye a la línea'); }
+const htmlGran = fs.readFileSync(new URL('./Granja-de-Cuentas-v2.html', import.meta.url), 'utf8');
+ok(!htmlGran.includes('Poner stop') && !htmlGran.includes('alarmaStop') && !htmlGran.includes('poner-stop'), 'no hay alarma ni botón de poner stop');
+ok(htmlGran.includes('Apertura <b>') && htmlGran.includes('clic:pulsado'), 'la granja manda el clic y muestra el total');
 ok(reintentaEvaluate(js.enviar({ root: 'MNQ', side: 1, qty: 1, slPts: 15, tpPts: 2.5, accountId: '1', symbol: 'CME_MINI:MNQZ2026', front: 'MNQZ2026' }), new Error('WebSocket disconnect')) === false, 'la llamada de la orden no se reintenta ni por desconexión');
 ok(reintentaEvaluate(js.enviar({ root: 'MNQ', side: 1, qty: 1, slPts: 15, tpPts: 2.5, accountId: '1', symbol: 'CME_MINI:MNQZ2026', front: null }), new Error('Timeout')) === false, 'la llamada de la orden no se reintenta por tiempo agotado');
 ok(!/placeOrder/.test(js.preparar('MNQ', 'MNQZ2026')) && reintentaEvaluate(js.preparar('MNQ', 'MNQZ2026'), new Error('WebSocket disconnect')) === true, 'la lectura previa no lleva placeOrder y sí se puede reintentar');

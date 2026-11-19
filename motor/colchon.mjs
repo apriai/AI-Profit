@@ -9,6 +9,23 @@ import { dataDir, TV_CLI, TV_PKG } from './rutas.mjs';
 const DIR = dataDir();
 export const CFG = { SL_USD: 600, TP_USD: 1600, NET_USD: 100, SLIP_TICKS: 1, TRIGGER_EXTRA_USD: 15, POLL_MS: 500 };
 export const SIZES = { NQ: 2, MNQ: 20 }; const PT_USD = { NQ: 20, MNQ: 2 }; export const TICK = 0.25;
+// Una línea de tiempos de la apertura. No toca el disco: quien llama la escribe sin esperar.
+export function lineaTiempos(m = {}) {
+  const n = v => v == null || !Number.isFinite(Number(v)) ? '—' : Math.max(0, Math.round(Number(v))) + 'ms';
+  const d = (a, b) => (Number.isFinite(Number(a)) && Number.isFinite(Number(b))) ? Number(b) - Number(a) : null;
+  const clic = Number(m.clic), llegada = Number(m.llegada), enviado = Number.isFinite(Number(m.enviado)) ? Number(m.enviado) : clic;
+  const verif = d(llegada, m.llamada1Inicio);
+  const l1 = d(m.llamada1Inicio, m.llamada1Fin);
+  const place = Number.isFinite(Number(m.placeMs)) ? Number(m.placeMs) : d(m.placeInicio, m.placeFin);
+  const conf = d(m.placeFin || m.orderIdEn, m.bracketEn || m.fillEn || m.fin);
+  const base = Number.isFinite(clic) ? clic : llegada;
+  const total = d(base, m.fin);
+  const linea = `TIEMPOS: clic->servidor ${n(d(enviado, llegada))}, verificaciones ${n(verif)}, llamada1 ${n(l1)}, placeOrder ${n(place)}, confirmado ${n(conf)}, total ${n(total)}`;
+  const baseRel = Number.isFinite(base) ? base : 0;
+  const det = ['clic', 'enviado', 'llegada', 'llamada1Inicio', 'llamada1Fin', 'llamada2Inicio', 'placeInicio', 'placeFin', 'orderIdEn', 'fillEn', 'bracketEn', 'fin']
+    .filter(k => Number.isFinite(Number(m[k]))).map(k => `${k} +${Math.max(0, Math.round(Number(m[k]) - baseRel))}ms`).join(', ');
+  return { linea, detalle: 'TIEMPOS detalle: ' + (det || '—'), total: Number.isFinite(total) ? Math.max(0, Math.round(total)) : null };
+}
 // Holgura mínima: ni el stop ni el objetivo pueden quedar a menos de 2 ticks del lado del libro que los dispararía.
 export const HOLGURA_TICKS = 2;
 // Si el objetivo de la estrategia es corto (Rascacielo son 2,5 pts), el límite de entrada queda al menos
@@ -291,14 +308,16 @@ export const js = {
     if(!isFinite(bid)||!isFinite(ask)||ask<bid||bid<=0)return {sent:false,error:'sin bid/ask. No se envía.'};
     var sl,tp;if(SIDE===1){sl=rnd(ask-SLP);tp=rnd(Math.max(ask+TPP,bid+F*TICK,ask+HOL*TICK));if(!(sl<=bid-HOL*TICK+1e-9))return {sent:false,error:'el stop quedaría del lado malo del bid',bid:bid,ask:ask};if(!(tp>=ask+HOL*TICK-1e-9))return {sent:false,error:'el objetivo quedaría del lado malo del ask',bid:bid,ask:ask}}
     else{sl=rnd(bid+SLP);tp=rnd(Math.min(bid-TPP,ask-F*TICK,bid-HOL*TICK));if(!(sl>=ask+HOL*TICK-1e-9))return {sent:false,error:'el stop quedaría del lado malo del ask'};if(!(tp<=bid-HOL*TICK+1e-9))return {sent:false,error:'el objetivo quedaría del lado malo del bid'}}
-    var r;try{r=await ab.placeOrder({symbol:SYM,side:SIDE,type:2,qty:QTY,stopLoss:sl,takeProfit:tp})}catch(e){return {sent:true,dudoso:true,error:String(e&&e.message||e),sl:sl,tp:tp,bid:bid,ask:ask,front:fr||null}}
-    if(r===false)return {sent:false,error:'el bróker no aceptó la orden',sl:sl,tp:tp,bid:bid,ask:ask,front:fr||null};
+    var t0=performance.now(),tA=performance.now(),r,tB;
+    try{r=await ab.placeOrder({symbol:SYM,side:SIDE,type:2,qty:QTY,stopLoss:sl,takeProfit:tp});tB=performance.now()}catch(e){tB=performance.now();return {sent:true,dudoso:true,error:String(e&&e.message||e),sl:sl,tp:tp,bid:bid,ask:ask,front:fr||null,antesPlace:Math.round(tA-t0),placeMs:Math.round(tB-t0)}}
+    if(r===false)return {sent:false,error:'el bróker no aceptó la orden',sl:sl,tp:tp,bid:bid,ask:ask,front:fr||null,antesPlace:Math.round(tA-t0),placeMs:Math.round(tB-t0)};
     var id=r&&(r.orderId||r.id)?String(r.orderId||r.id):null;
+    var marca={antesPlace:Math.round(tA-t0),placeMs:Math.round(tB-t0)};
     if(!id){var hh=[];try{hh=await ab.ordersHistory()||[]}catch(e){}
       var rech=hh.filter(function(o){return o&&VISTOS.indexOf(String(o.id))<0&&Number(o.status)===5&&Number(o.type)===2});
-      if(rech.length)return {sent:false,error:'la orden no se llenó (RECHAZADA por TradingView)'};
-      return {sent:true,dudoso:true,sinId:true,sl:sl,tp:tp,bid:bid,ask:ask,front:fr||null}}
-    return {sent:true,orderId:id,sl:sl,tp:tp,bid:bid,ask:ask,symbol:SYM,front:fr||null}})()`,
+      if(rech.length)return {sent:false,error:'la orden no se llenó (RECHAZADA por TradingView)',antesPlace:marca.antesPlace,placeMs:marca.placeMs};
+      return {sent:true,dudoso:true,sinId:true,sl:sl,tp:tp,bid:bid,ask:ask,front:fr||null,antesPlace:marca.antesPlace,placeMs:marca.placeMs}}
+    return {sent:true,orderId:id,sl:sl,tp:tp,bid:bid,ask:ask,symbol:SYM,front:fr||null,antesPlace:marca.antesPlace,placeMs:marca.placeMs}})()`,
   // Posición de ESTE símbolo y solo las órdenes cuyo parentId es esta posición o esta orden de entrada.
   estado: (root, orderId, posId) => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t),R=${JSON.stringify(root)},OID=${JSON.stringify(orderId || '')},PID=${JSON.stringify(posId || '')};
     var pos=null,err=null;try{pos=await tvPos(ab,R)}catch(e){err=String(e&&e.message||e)}
@@ -314,15 +333,6 @@ export const js = {
     var execs=ex.filter(function(x){return x&&tvRoot(x.symbol)===R&&(String(x.orderId||x.id)===OID||(x.parentId!=null&&String(x.parentId)===OID)||hist.some(function(o){return String(o.id)===String(x.orderId||'')}))}).map(function(x){return {id:String(x.id),orderId:x.orderId!=null?String(x.orderId):null,side:+x.side,qty:Math.abs(+x.qty),price:+x.price,time:+x.time}});
     var bid=null,ask=null;try{var ms=window.TradingViewApi._activeChartWidgetWV.value()._chartWidget.model().mainSeries(),qq=ms.quotes&&ms.quotes();if(qq){bid=qq.bid!=null?Number(qq.bid):null;ask=qq.ask!=null?Number(qq.ask):null}}catch(e){}
     return {err:err,bid:bid,ask:ask,pos:pos?{id:String(pos.id),side:pos.side===1?'long':'short',qty:Math.abs(Number(pos.qty)||0),entry:pos.avgPrice,price:pos.lastPrice!=null?pos.lastPrice:null}:null,ordenes:ordenes,hist:hist,execs:execs,mercado:mercado}})()`,
-  // El usuario pulsa «Poner stop»: una sola orden stop ligada a esta posición. No se manda sola.
-  ponerStop: (root, side, qty, price, parentId) => `(async function(){${PAGE}var ab=tvBroker(tvTrading());if(!tvBrokerId(ab))return {error:'No active broker'};
-    var R=${JSON.stringify(root)},SIDE=${Number(side)},QTY=${Number(qty)},PX=${Number(price)},PID=${JSON.stringify(parentId || '')};
-    var pos;try{pos=await tvPos(ab,R)}catch(e){return {error:'lectura'}}
-    if(!pos||pos.side!==SIDE)return {error:'no veo la posición de esta operación'};
-    var q=Math.min(QTY,Math.abs(Number(pos.qty)||0));if(!(q>0)||!isFinite(PX))return {error:'sin precio o cantidad'};
-    var r;try{r=await ab.placeOrder({symbol:pos.symbol,side:-SIDE,type:3,qty:q,stopPrice:PX,parentId:PID||String(pos.id),parentType:2})}catch(e){return {error:String(e&&e.message||e)}}
-    if(r===false)return {error:'el bróker no aceptó el stop'};
-    return {ok:true,orderId:r&&(r.orderId||r.id)?String(r.orderId||r.id):null,qty:q,price:PX}})()`,
   accountId: `(function(){${PAGE}var ab=tvBroker(tvTrading());try{return String(tvWv(ab.currentAccount()))}catch(e){return null}})()`,
   modify: (root, price, waitMs = 3000) => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t);if(!tvBrokerId(ab))return {error:'No active broker'};var R=${JSON.stringify(root)},PX=${Number(price)};var p=await tvPos(ab,R);if(!p)return {error:'sin posicion'};
     // Paper: editPositionBrackets (reenviando el TP). Tradovate (supportPositionBrackets:false): modifyOrder sobre la orden stop hija, con tope de 3 s. Siempre la MISMA orden; nunca cancela ni recrea.
@@ -413,16 +423,19 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
     async position(symbol) { const p = await evaluate(js.position(symbol)); if (p && p.error) throw new Error(p.error); if (p && p.transient) return p; last.pos = p; return p; },
     async stop() { return last.pos ? last.pos.stop : null; },
     async lastPrice() { try { const r = await evaluate(js.lastPrice); return r && typeof r.price === 'number' ? r.price : null; } catch { return null; } },
-    async openBracket({ side, symbol, qty, slPts, tpPts, steps, accountId, accountName, confirmReal } = {}) {
+    async openBracket({ side, symbol, qty, slPts, tpPts, steps, accountId, accountName, confirmReal, cron } = {}) {
       last.open = null; vigilP = null;
+      const marca = k => { if (cron) cron[k] = Date.now(); };
       const s = side === 'long' ? 1 : -1;
       const front = frenteCache.symbol === symbol && frenteCache.front ? frenteCache.front : null;
       const leer = async id => {
         let prep = null, prepErr = null;
+        if (cron && !cron._l1) cron._l1 = Date.now();
         for (let intento = 0; intento < 2 && !prep; intento++) {
           try { prep = await evaluate(js.preparar(symbol, front, id || '')); }
           catch (e) { prepErr = e; prep = null; }
         }
+        if (cron) { cron.llamada1Inicio = cron._l1; cron.llamada1Fin = Date.now(); }
         if (!prep) return { ok: false, error: 'no pude leer la cuenta ni el precio. No se envía.' + (prepErr ? ' ' + prepErr.message : '') };
         return prep;
       };
@@ -447,10 +460,17 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
       else frenteCache = { symbol, front: null, at: 0 };
       const vistos = new Set((prep.histIds || []).map(String));
       let res;
+      marca('llamada2Inicio');
       acctGuard.enviando = true;
       try { res = await evaluate(js.enviar({ root: symbol, side: s, qty, slPts, tpPts, accountId: esperado, symbol: prep.symbol, front: prep.front, histIds: prep.histIds || [] })); }
       catch (e) { res = { dudoso: true, corte: true, error: String(e.message || e) }; }
       finally { acctGuard.enviando = false; try { if (typeof acctGuard.alSoltarEnvio === 'function') acctGuard.alSoltarEnvio(); } catch {} }
+      if (cron && res && Number.isFinite(res.antesPlace) && Number.isFinite(res.placeMs) && cron.llamada2Inicio) {
+        cron.placeInicio = cron.llamada2Inicio + res.antesPlace;
+        cron.placeFin = cron.llamada2Inicio + res.placeMs;
+        cron.orderIdEn = cron.placeFin;
+        cron.placeMs = res.placeMs - res.antesPlace;
+      }
       if (res && res.front) frenteCache = { symbol, front: res.front, at: Date.now() };
       if (res && res.sent === false) return 'error: ' + (res.error || 'no enviada');
       let orderId = res && res.orderId ? String(res.orderId) : '';
@@ -531,6 +551,7 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
         last.open = { dudoso: true, pedirSaldo: true, alerta, orderId: orderId || null };
         return 'error: ' + alerta;
       }
+      if (cron && !cron.fillEn) cron.fillEn = Date.now();
       const pos = st.pos;
       const plan = (pos.price != null) ? planAlAbrir({ side, entry: pos.entry, price: pos.price, steps, slPts, tpPts, usdPerPoint: (PT_USD[symbol] || 0) * pos.qty }) : null;
       let tpFallo = null;
@@ -561,7 +582,7 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
       do {
         const e2 = await estado(symbol, orderId, pos.id);
         visto = stopLigado(e2.pos ? e2 : { ...e2, pos }, side);
-        if (visto.ok || visto.doble) break;
+        if (visto.ok || visto.doble) { if (visto.ok && cron && !cron.bracketEn) cron.bracketEn = Date.now(); break; }
         if (Date.now() >= hasta) break;
         await sleep(150);
       } while (Date.now() < hasta);
@@ -616,7 +637,6 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
       return { ok: !!(u && u.ok), method: 'ui', via: 'ui-interno', verified: u ? (u.verified ?? null) : null, apiErr, apiAttemptMs, modifyMs: (u && u.sendMs) ?? (Date.now() - u0), confirmMs: (u && u.confirmMs) ?? 0, intentos };
     },
     async flatten(symbol) { const r = await evaluate(js.flatten(symbol)); return r.error ? 'error: ' + r.error : 'ok'; },
-    async ponerStop(symbol, side, qty, price, parentId) { return evaluate(js.ponerStop(symbol, side, qty, price, parentId)); },
   };
 }
 
@@ -823,6 +843,8 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
     strategies: () => ({ ok: true, default: DEFAULT_STRATEGY, strategies: listStrategies() }),
     async accounts() { try { const r = await (await D()).accounts(); return { ok: true, ...r, accounts: r.accounts.map(a => { const papel = isPaper(a.name || '', `${r.broker || ''} ${r.brokerId || ''}`), tiene = !!String(a.name || '').trim(), re = tiene && !papel; const hint = accountHintFor(a.name); const tipo = tipoDe({ id: a.name, name: a.name, type: hint.type }); const acc = { id: a.name, name: a.name, ...hint, ...(a.balance != null ? { balance: a.balance } : {}), ...(a.equity != null ? { equity: a.equity } : {}), type: tipo }; const rules = rulesFor({ id: a.name, name: a.name, ...acc }); const pnl = acc.balance != null ? Math.round((acc.balance - rules.start) * 100) / 100 : null; return { ...a, type: tipo, ...(acc.balance != null ? { balance: acc.balance, totalPnl: pnl } : { totalPnl: null }), allowed: tiene, real: re, realLabel: re ? realLabel(a.name) : null, plan: rules.size, ...(acc.planSaldo ? { planSaldo: acc.planSaldo } : {}), scale: rules.scale, start: rules.start, planStart: rules.start, dd: rules.dd, dailyLoss: rules.dailyLoss, profitTarget: rules.profitTarget, lockTriggerOver: rules.lockTriggerOver, lockFloorOver: rules.lockFloorOver, atRisk: rules.atRisk, maxMinis: maxQtyFor('NQ', acc), maxMicros: maxQtyFor('MNQ', acc) }; }) }; } catch (e) { driver = null; return { ok: false, err: 'Sin conexión con TradingView: ' + e.message, accounts: [] }; } },
     async start(args = {}) {
+      if (!Number.isFinite(Number(args.llegada))) args.llegada = Date.now();
+      args.cron = args.cron || { clic: Number(args.clic) || null, enviado: Number(args.enviado) || Number(args.clic) || null, llegada: Number(args.llegada) };
       if (S.state === 'running') return { ok: false, err: 'Ya hay una prueba corriendo' };
       if (acctGuard.testActive) return { ok: false, err: 'esperando lectura…', waitingLectura: true };
       acctGuard.testActive = true;
@@ -838,7 +860,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
         return r || { ok: false, err: 'No se pudo iniciar' };
       } catch (e) { liberarPrueba(); if (S.state === 'running') S.state = 'error'; return { ok: false, err: String(e.message || e) }; }
     },
-    async _start({ side = 'long', symbol = DEFAULT.symbol, qty, accountId, strategyId, confirmReal } = {}) {
+    async _start({ side = 'long', symbol = DEFAULT.symbol, qty, accountId, strategyId, confirmReal, clic, enviado, llegada, cron } = {}) {
       const strat = getStrategy(strategyId == null || strategyId === '' ? DEFAULT_STRATEGY : strategyId); if (!strat) return { ok: false, err: `Estrategia desconocida: ${strategyId}` };
       if (!['long', 'short'].includes(side) || !(symbol in SIZES)) return { ok: false, err: 'Parámetros inválidos' };
       qty = qty == null || qty === '' ? ((strat.params.DEFAULT_QTY || {})[symbol] ?? (symbol === DEFAULT.symbol ? DEFAULT.qty : 1)) : Number(qty);
@@ -851,14 +873,18 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
       stopReq = false;
       log(`Inicio [${strat.name}] ${side === 'long' ? 'COMPRA' : 'VENTA'} ${qty} ${symbol} · SL -$${P.SL_USD} (${slPts} pts) · TP +$${P.TP_USD} (${tpPts} pts) · ${P.STEPS ? (!c.steps.length ? 'stop fijo (sin movimientos)' : 'escalones ' + c.steps.map(x => `+$${x.triggerUsd}→+$${x.lockUsd} (${x.lockPts} pts)`).join(' · ')) : `colchón +$${lockUsdFor(symbol, qty, P)} (${lockPtsFor(symbol, qty, P)} pts, ≈ +$${P.NET_USD} netos), disparo +$${triggerUsdFor(symbol, qty, P)} (${triggerPtsFor(symbol, qty, P)} pts)`}${nombreElegido ? ' · cuenta pedida ' + nombreElegido : ''}`);
       const drv = await D();
-      const op = await drv.openBracket({ ...c, slPts, tpPts, accountName: nombreElegido || null, confirmReal }); log('open ->', op);
+      const reloj = cron || { clic: Number(clic) || null, enviado: Number(enviado) || Number(clic) || null, llegada: Number(llegada) || Date.now() };
+      const op = await drv.openBracket({ ...c, slPts, tpPts, accountName: nombreElegido || null, confirmReal, cron: reloj }); log('open ->', op);
+      reloj.fin = Date.now();
+      const infoT = lineaTiempos(reloj);
+      S.tiempos = { total: infoT.total, texto: infoT.linea };
+      setImmediate(() => { try { fs.appendFile(logFile, infoT.linea + '\n' + infoT.detalle + '\n', () => {}); } catch {} });
       const prep = drv.lastPrep ? drv.lastPrep() : null;
       if (prep) { S.mode = prep.paper ? 'paper' : prep.real ? 'real' : 'simulacion'; S.realLabel = prep.real ? realLabel(prep.accountName) : null; S.account = { name: prep.accountName, broker: prep.broker }; S.accountId = prep.accountId; if (prep.rollover) log('El contrato del gráfico cambió respecto al anterior. Se usa el de ahora: ' + prep.front); }
       if (String(op).startsWith('blocked:')) { S.state = 'blocked'; S.error = op.slice(9); return { ok: false, blocked: true, needConfirm: /REAL/.test(op), err: S.error, status: S }; }
       const lo = drv.lastOpen ? drv.lastOpen() : null;
       Object.assign(S, { ajusteHecho: false, ajuste: null, slPts, tpPts, ref: lo ? lo.ref : null, tpRef: lo ? lo.tp : null, step: lo && lo.step ? lo.step : 0, locked: !!(lo && lo.locked), lockPrice: lo && lo.step ? lo.sl : null, tpPrice: lo ? lo.tp : null, slOk: !!(lo && lo.slOk), slObjetivo: lo ? (lo.slObjetivo ?? null) : null, orderId: lo ? (lo.orderId || null) : null, posId: lo ? (lo.posId || null) : null, alerta: (lo && lo.alerta) || null, salidaReal: lo ? (lo.salidaReal ?? null) : null, salidaPrecio: lo ? (lo.salida ?? null) : null });
       if (lo && lo.paso) S.pasos = [lo.paso];
-      S.sinStop = !!(lo && lo.slOk === false);
       if (String(op).startsWith('vigilando')) {
         S.alerta = (lo && lo.alerta) || op.slice(11);
         S.state = 'running';
@@ -867,7 +893,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
           const lo2 = drv.lastOpen ? drv.lastOpen() : null;
           if (lo2 && lo2.alerta) S.alerta = lo2.alerta;
           if (!found) { S.state = 'error'; S.error = S.alerta; S.reason = 'error'; summarize(); return; }
-          if (lo2) Object.assign(S, { ref: lo2.ref, orderId: lo2.orderId || null, posId: lo2.posId || null, slObjetivo: lo2.slObjetivo ?? null, slOk: false, sinStop: true, entry: lo2.ref });
+          if (lo2) Object.assign(S, { ref: lo2.ref, orderId: lo2.orderId || null, posId: lo2.posId || null, slObjetivo: lo2.slObjetivo ?? null, slOk: false, entry: lo2.ref });
           await loop(c, true);
         }).finally(() => { liberarPrueba(); });
         return { ok: false, watching: true, alerta: S.alerta, status: S };
@@ -877,15 +903,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
       loopP = loop(c, true).finally(() => { liberarPrueba(); });
       if (lo && lo.pedirSaldo) { try { const f = colchonHooks.despuesDeOperar; if (typeof f === 'function') f({ motivo: 'apertura' }); } catch {} }
       if (lo && !lo.slOk) return { ok: false, watching: true, alerta: S.alerta, status: S };
-      return { ok: true, status: S };
-    },
-    async ponerStop() {
-      if (S.state !== 'running') return { ok: false, err: 'No hay una operación en curso' };
-      if (S.slObjetivo == null) return { ok: false, err: 'No tengo el precio del stop de esta operación' };
-      const drv = await D();
-      const colocado = drv.ponerStop ? await drv.ponerStop(S.symbol, S.side === 'long' ? 1 : -1, S.qty, S.slObjetivo, S.posId || S.orderId) : { error: 'sin driver' };
-      if (colocado && colocado.ok) { S.sinStop = false; S.slOk = true; S.alerta = null; log('El usuario puso el stop en ' + colocado.price); }
-      return colocado && colocado.ok ? { ok: true, price: colocado.price, status: S } : { ok: false, err: (colocado && colocado.error) || 'no se pudo poner el stop', status: S };
+      return { ok: true, tiempos: S.tiempos, status: S };
     },
     async stop({ flatten = false } = {}) { stopReq = true; if (flatten && (S.mode === 'paper' || S.mode === 'real')) log('flatten ->', await (await D()).flatten(S.symbol)); await loopP; return { ok: true, status: S }; },
     status: () => S,

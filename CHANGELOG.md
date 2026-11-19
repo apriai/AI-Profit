@@ -10,6 +10,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.31] — 2026-11-19
+### Cambiado
+- **Cada apertura anota sus tiempos y la granja muestra el total.** Desde el clic en BUY o SELL: llegada al servidor, verificaciones, la lectura, el placeOrder, la confirmación y el total, en milisegundos. Una línea en `colchon.log`, más el detalle. Escribir el registro no espera ni frena la orden.
+- **Se quitó el botón «Poner stop» y la alarma.** Si no se ve el stop, queda el aviso de siempre en el panel. Tradovate no quita un stop que ya está.
+### Notas
+- No cambia los dólares de las estrategias.
+
 ## [0.10.30] — 2026-11-19
 ### Corregido
 - **Si el objetivo ya se pasó, no se manda otra orden a mercado.** Se mueve el límite que ya va ligado a la entrada, para que la salida siga dentro del bracket. Si ese movimiento no se confirma, el stop sigue y no se da por cerrado.

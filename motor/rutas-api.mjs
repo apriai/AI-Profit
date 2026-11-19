@@ -85,8 +85,7 @@ export function manejar(q, r, deps) {
           if (!acctGuard.panelAbierto && typeof acctGuard.alCerrarPanel === 'function') { try { acctGuard.alCerrarPanel(); } catch {} }
           out = { ok: true, abierto: !!acctGuard.panelAbierto };
         }
-        else if (q.url.startsWith('/api/colchon/start') && q.method === 'POST') out = await deps.colchon.start(j);
-        else if (q.url.startsWith('/api/colchon/poner-stop') && q.method === 'POST') out = await deps.colchon.ponerStop();
+        else if (q.url.startsWith('/api/colchon/start') && q.method === 'POST') { j.llegada = Date.now(); out = await deps.colchon.start(j); }
         else if (q.url.startsWith('/api/colchon/stop') && q.method === 'POST') out = await deps.colchon.stop(j);
         else out = { ok: false, err: 'ruta desconocida' };
       } catch (e) { out = { ok: false, err: String(e.message || e) }; }
