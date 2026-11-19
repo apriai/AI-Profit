@@ -769,34 +769,43 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
         } else if (pos && S.emptyN) { ev('anomalia', { kind: 'lectura_vacia_transitoria', lecturas: S.emptyN }); log(`lectura vacía transitoria (${S.emptyN}): la posición sigue`); S.emptyN = 0; S.emptySince = null; }
         if (pos && pos.entry != null && paper && !S.ajusteHecho && S.ref != null && pos.price != null) {
           S.ajusteHecho = true;
-          const plan = planAlAbrir({ side: c.side, entry: pos.entry, price: pos.price, steps: S.steps, slPts: S.slPts, tpPts: S.tpPts, usdPerPoint: pv });
-          const pnlYa = pos.pnl != null ? pos.pnl : pnlAt(pos.price);
-          const anticipo = decide({ ...pos, pnl: pnlYa, price: pos.price }, sl0, st, c);
-          if (anticipo.action === 'modify') {
-            log(`Fill ${pos.entry}: el escalón ya cabe (+$${pnlYa}). El stop va al paso, sin reajustar el fill antes.`);
-          } else {
-            const slN = plan.sl, tpN = plan.tpPlace, slA = sl0, tpA = S.tpRef;
-            const rec = { ref: S.ref, fill: pos.entry, slAntes: slA, slNuevo: slN, tpAntes: tpA, tpNuevo: tpN, stopId: pos.stopId ?? null, paso: plan.step ? plan.step.n : null };
-            if (plan.step) { S.step = plan.nextStep; st.step = plan.nextStep; S.locked = plan.locked; if (slN != null) S.lockPrice = slN; S.slObjetivo = slN; }
-            if ((slA === slN || slN == null) && (tpA === tpN || tpN == null)) { rec.ok = slN != null; rec.nada = true; }
-            else { const t0 = Date.now();
-              const [slR, tpR] = await Promise.all([
-                slN == null || slA === slN ? { ok: slN != null, ya: true } : driver.modifyStop(slN, c.symbol),
-                tpN == null ? { ok: true, ya: true } : (driver.modifyTp ? driver.modifyTp(tpN, c.symbol) : { ok: false, err: 'sin modifyTp' }),
-              ]);
-              rec.sl = slR; rec.tp = tpR;
-              rec.ok = !!(slR && slR.ok && tpR && tpR.ok); rec.seg = Math.round((Date.now() - t0) / 100) / 10;
-              const trozo = x => !x ? '—' : [x.ya ? 'ya' : (x.ok ? 'OK' : 'FALLO'), x.envioMs != null ? `enviar ${x.envioMs}ms` : null, x.polls != null ? `${x.polls} lecturas` : null, x.confirmMs != null ? `verificar ${x.confirmMs}ms` : null].filter(Boolean).join(' ');
-              rec.detalle = `SL ${trozo(slR)} · TP ${trozo(tpR)}`;
-              let dobles = [];
-              try { const w = driver.working ? await driver.working(c.symbol) : []; const ajenas = new Set(((driver.lastPrep && driver.lastPrep()) || {}).trabIds || []); dobles = w.filter(o => o.type === 3 && !ajenas.has(String(o.id))); } catch { dobles = []; }
-              if (dobles.length > 1) { rec.doble = true; S.alerta = 'HAY MÁS DE UN STOP ligado a esta posición. No se manda otro. Revisa TradingView.'; ev('notificacion', { texto: S.alerta }); }
+          const basePlan = { side: c.side, entry: pos.entry, steps: S.steps, slPts: S.slPts, tpPts: S.tpPts, usdPerPoint: pv };
+          let plan = planAlAbrir({ ...basePlan, price: pos.price });
+          let slN = plan.sl, tpN = plan.tpPlace, slA = sl0, tpA = S.tpRef;
+          const marcarPaso = p => { if (!p || !p.step) return; S.step = p.nextStep; st.step = p.nextStep; S.locked = p.locked; if (p.sl != null) { S.lockPrice = p.sl; S.slObjetivo = p.sl; } };
+          marcarPaso(plan);
+          const rec = { ref: S.ref, fill: pos.entry, slAntes: slA, slNuevo: slN, tpAntes: tpA, tpNuevo: tpN, stopId: pos.stopId ?? null, paso: plan.step ? plan.step.n : null, una: true };
+          if ((slA === slN || slN == null) && (tpA === tpN || tpN == null)) { rec.ok = slN != null; rec.nada = true; }
+          else { const t0 = Date.now();
+            let job = slN == null || slA === slN ? Promise.resolve({ ok: slN != null, ya: true }) : driver.modifyStop(slN, c.symbol);
+            const tpJob = tpN == null ? Promise.resolve({ ok: true, ya: true }) : (driver.modifyTp ? driver.modifyTp(tpN, c.symbol) : Promise.resolve({ ok: false, err: 'sin modifyTp' }));
+            let slR;
+            for (;;) {
+              const listo = await Promise.race([job.then(r => r), sleep(40).then(() => null)]);
+              if (listo) { slR = listo; break; }
+              let px = null; try { px = driver.lastPrice ? await driver.lastPrice() : null; } catch {}
+              if (px == null) continue;
+              const mas = planAlAbrir({ ...basePlan, price: px });
+              const sube = mas.step && mas.sl != null && (c.side === 'long' ? mas.sl > slN + 1e-9 : mas.sl < slN - 1e-9);
+              if (!sube) continue;
+              slN = mas.sl; plan = mas; marcarPaso(mas); rec.slNuevo = slN; rec.paso = mas.step.n; rec.adelantado = true;
+              log(`Escalón ${mas.step.n} durante el ajuste: el stop va a ${slN} sin esperar el ajuste del fill.`);
+              job = driver.modifyStop(slN, c.symbol);
             }
-            if (tpN != null) S.tpPrice = tpN; S.ajuste = rec; if (rec.sl && rec.sl.ok && slN != null) S.slOk = true;
-            ev('ajuste_brackets', rec);
-            log(rec.nada ? `Fill ${pos.entry} = referencia: SL/TP ya correctos` : `Ajuste por fill ${pos.entry} (ref ${S.ref}): SL ${slA}→${slN} ${rec.sl && rec.sl.ok ? 'OK' : 'FALLO'} · TP ${tpA}→${tpN} ${rec.tp && rec.tp.ok ? 'OK' : 'FALLO'} (${rec.seg || 0} s)${rec.detalle ? ' · ' + rec.detalle : ''}`);
-            if (!rec.ok || slN == null) { S.slOk = false; S.alerta = S.alerta || `NO VEO EL STOP tras el ajuste (SL ${slN == null ? 'inseguro' : slN}). Se sigue intentando. No se toca ninguna otra orden.`; ev('notificacion', { texto: S.alerta }); if (!S.volcadoHecho && driver.volcado) { S.volcadoHecho = true; let d = null; try { d = await driver.volcado(c.symbol); } catch (e) { d = { error: String(e.message || e) }; } log('VOLCADO ajuste ' + JSON.stringify(d)); } }
+            const tpR = await tpJob;
+            rec.sl = slR; rec.tp = tpR;
+            rec.ok = !!(slR && slR.ok && tpR && tpR.ok); rec.seg = Math.round((Date.now() - t0) / 100) / 10;
+            const trozo = x => !x ? '—' : [x.ya ? 'ya' : (x.ok ? 'OK' : 'FALLO'), x.envioMs != null ? `enviar ${x.envioMs}ms` : null, x.polls != null ? `${x.polls} lecturas` : null, x.confirmMs != null ? `verificar ${x.confirmMs}ms` : null].filter(Boolean).join(' ');
+            rec.detalle = `SL ${trozo(slR)} · TP ${trozo(tpR)}`;
+            let dobles = [];
+            try { const w = driver.working ? await driver.working(c.symbol) : []; const ajenas = new Set(((driver.lastPrep && driver.lastPrep()) || {}).trabIds || []); dobles = w.filter(o => o.type === 3 && !ajenas.has(String(o.id))); } catch { dobles = []; }
+            if (dobles.length > 1) { rec.doble = true; S.alerta = 'HAY MÁS DE UN STOP ligado a esta posición. No se manda otro. Revisa TradingView.'; ev('notificacion', { texto: S.alerta }); }
           }
+          if (tpN != null) S.tpPrice = tpN; S.ajuste = rec; if (rec.sl && rec.sl.ok && slN != null) S.slOk = true;
+          ev('ajuste_brackets', rec);
+          const cual = rec.adelantado ? `paso ${rec.paso} adelantado` : (plan.step ? `paso ${plan.step.n}` : 'distancia del fill');
+          log(rec.nada ? `Fill ${pos.entry} = referencia: SL/TP ya correctos` : `Ajuste por fill ${pos.entry} (ref ${S.ref}): una decisión ${cual} SL ${slA}→${slN} ${rec.sl && rec.sl.ok ? 'OK' : 'FALLO'} · TP ${tpA}→${tpN} ${rec.tp && rec.tp.ok ? 'OK' : 'FALLO'} (${rec.seg || 0} s)${rec.detalle ? ' · ' + rec.detalle : ''}`);
+          if (!rec.ok || slN == null) { S.slOk = false; S.alerta = S.alerta || `NO VEO EL STOP tras el ajuste (SL ${slN == null ? 'inseguro' : slN}). Se sigue intentando. No se toca ninguna otra orden.`; ev('notificacion', { texto: S.alerta }); if (!S.volcadoHecho && driver.volcado) { S.volcadoHecho = true; let d = null; try { d = await driver.volcado(c.symbol); } catch (e) { d = { error: String(e.message || e) }; } log('VOLCADO ajuste ' + JSON.stringify(d)); } }
         }
         if (pos && S.slOk === false && S.slObjetivo != null && Date.now() - (S.slIntento || 0) > 1000) {
           S.slIntento = Date.now();

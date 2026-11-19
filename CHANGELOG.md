@@ -10,6 +10,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.35] — 2026-11-19
+### Corregido
+- **Al llenarse hay una sola decisión de stop.** Si un escalón ya cabe, el stop va a ese nivel. Si no, va a la distancia de la estrategia desde el precio real. Nunca son dos movimientos seguidos.
+- **El objetivo se mueve a la vez y no frena el stop.** Si durante ese ajuste el precio llega a un escalón más alto, ese paso sale enseguida, sin esperar a que termine el ajuste del fill.
+### Notas
+- La confirmación en Tradovate sigue mirando la orden por id. Una orden que ya estaba abierta no se toca.
+
 ## [0.10.34] — 2026-11-19
 ### Corregido
 - **Una orden que ya estaba trabajando no se toma como el stop ni el objetivo de Profito.** La primera lectura anota sus id y la búsqueda de main las deja fuera, también el aviso de stop duplicado.

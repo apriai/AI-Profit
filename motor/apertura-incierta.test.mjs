@@ -10,7 +10,8 @@ process.env.COLCHON_DUDA_MS = '700';
 function pagina(opts = {}) {
   const book = opts.book || { front: 'MNQZ2026', bid: (opts.live ?? 27727.75) - 0.25, ask: opts.live ?? 27727.75, live: opts.live ?? 27727.75, chart: opts.chart ?? 27720 };
   if (!book.account) book.account = '1';
-  let px = book.live, nid = 1, lecturas = 0, falloTrasSalida = 0, frN = 0, posRestantes = Infinity;
+  let px = book.live, nid = 1, lecturas = 0, falloTrasSalida = 0, frN = 0, posRestantes = Infinity, slGen = 0;
+  const mods = [];
   const positions = opts.positions || [], orders = [], hist = [], execs = [], placed = [], closes = [], reduces = [];
   const ab = {
     _brokerMetainfo: { id: opts.broker || 'paper', title: 'Paper Trading' },
@@ -96,6 +97,15 @@ function pagina(opts = {}) {
     async modifyOrder(o) {
       if (opts.modFail) return false;
       const x = orders.find(q => q.id === o.id); if (!x) return false;
+      const rec = { id: o.id, stop: o.stopPrice ?? null, limit: o.limitPrice ?? null, t0: Date.now(), t1: 0 };
+      mods.push(rec);
+      const mine = o.stopPrice != null ? ++slGen : 0;
+      if (o.stopPrice != null && opts.pausaSl && mods.filter(m => m.stop != null).length === 1) {
+        if (typeof opts.alEmpezarSl === 'function') opts.alEmpezarSl();
+        await new Promise(r => setTimeout(r, opts.pausaSl));
+      }
+      rec.t1 = Date.now();
+      if (o.stopPrice != null && mine !== slGen) { rec.pisado = true; return true; }
       if (o.stopPrice != null) x.stopPrice = o.stopPrice;
       if (o.limitPrice != null) x.limitPrice = o.limitPrice;
       if (x.type === 1 && positions.length) {
@@ -133,7 +143,7 @@ function pagina(opts = {}) {
   const doc = { visibilityState: 'hidden', hasFocus: () => false, querySelector: s => /accountName/.test(s) ? { innerText: 'Paper Trading' } : null };
   win.performance = globalThis.performance;
   const evaluate = async expr => new Function('window', 'document', 'performance', 'return (' + expr + ')')(win, doc, performance);
-  return { evaluate, placed, positions, orders, closes, reduces, ab, book, hist, limitarPos: n => { posRestantes = n; } };
+  return { evaluate, placed, positions, orders, closes, reduces, ab, book, hist, mods, limitarPos: n => { posRestantes = n; } };
 }
 
 const ok = (c, m) => { if (!c) { console.error('FAIL ' + m); process.exitCode = 1; } else console.log('PASS ' + m); };
@@ -266,6 +276,42 @@ ok(lejos.tp == null && lejos.sl === 27705, 'un objetivo calculado con la vela, y
   ok(String(r).startsWith('ok') && mov.ok && mov.verified === destino && ms < 500 && mov.polls === 1, 'en Tradovate se confirma la orden por id, sin esperar el segundo y medio (' + ms + ' ms, lecturas ' + mov.polls + ')'); }
 
 ok(srcColchon.includes('enviar ${x.envioMs}ms') && srcColchon.includes('lecturas'), 'la línea de latencia detalla el envío y las lecturas');
+
+{ const book = { front: 'MNQZ2026', bid: 27721.75, ask: 27722, live: 27722, chart: 27722 };
+  const pg = pagina({ book, fillPx: 27720, noPB: true, broker: 'Tradovate' });
+  const k = createColchon(apiDriver(pg.evaluate), { pollMs: 40, logFile: '/tmp/apertura-normal.log', ignoreClock: true, flatConfirm: { reads: 8, ms: 5000 }, noTicks: true });
+  await k.start({ side: 'long', symbol: 'MNQ', qty: 1, strategyId: 'prueba-be' });
+  await dormir(150);
+  const stops = pg.mods.filter(m => m.stop != null);
+  const sl = pg.orders.find(o => o.type === 3);
+  ok(stops.length === 1 && sl && sl.stopPrice === 27405, 'caso normal: un solo stop a la distancia del fill (' + (sl && sl.stopPrice) + ', ' + stops.length + ')');
+  await k.stop({ flatten: false }); }
+
+{ const book = { front: 'MNQZ2026', bid: 27729.75, ask: 27730, live: 27730, chart: 27730 };
+  const pg = pagina({ book, fillPx: 27720, noPB: true, broker: 'Tradovate' });
+  const k = createColchon(apiDriver(pg.evaluate), { pollMs: 40, logFile: '/tmp/apertura-ya-paso.log', ignoreClock: true, flatConfirm: { reads: 8, ms: 5000 }, noTicks: true });
+  await k.start({ side: 'long', symbol: 'MNQ', qty: 1, strategyId: 'prueba-be' });
+  await dormir(150);
+  const stops = pg.mods.filter(m => m.stop != null);
+  const sl = pg.orders.find(o => o.type === 3);
+  ok(stops.length === 1 && sl && sl.stopPrice === 27720.75 && !stops.some(m => m.stop === 27405), 'si el escalón ya cabe al fill, un solo stop a ese nivel (' + (sl && sl.stopPrice) + ')');
+  await k.stop({ flatten: false }); }
+
+{ const book = { front: 'MNQZ2026', bid: 27721.75, ask: 27722, live: 27722, chart: 27722 };
+  let pg;
+  const pg0 = pagina({ book, fillPx: 27720, noPB: true, broker: 'Tradovate', pausaSl: 350, alEmpezarSl() { book.chart = 27730; book.live = 27730; if (pg && pg.positions[0]) pg.positions[0].lastPrice = 27730; } });
+  pg = pg0;
+  const k = createColchon(apiDriver(pg.evaluate), { pollMs: 40, logFile: '/tmp/apertura-adelanta.log', ignoreClock: true, flatConfirm: { reads: 8, ms: 5000 }, noTicks: true });
+  await k.start({ side: 'long', symbol: 'MNQ', qty: 1, strategyId: 'prueba-be' });
+  const espera = Date.now() + 800;
+  while (Date.now() < espera && !(pg.mods[0] && pg.mods[0].t1)) await dormir(20);
+  const stops = pg.mods.filter(m => m.stop != null);
+  const tp = pg.mods.find(m => m.limit != null);
+  const sl = pg.orders.find(o => o.type === 3);
+  const bit = fs.readFileSync('/tmp/apertura-adelanta.log', 'utf8');
+  ok(stops.length >= 2 && stops[0].stop === 27405 && stops[1].stop === 27720.75 && stops[1].t0 < stops[0].t1 && sl && sl.stopPrice === 27720.75 && /durante el ajuste/.test(bit), 'si el escalón llega durante el ajuste, el paso sale sin esperarlo (' + stops.map(m => m.stop).join(' → ') + ')');
+  ok(tp && tp.t0 < stops[0].t1, 'el objetivo sale en paralelo y no espera al stop');
+  await k.stop({ flatten: false }); }
 
 { const pg = pagina({ reject: true });
   const r = await apiDriver(pg.evaluate).openBracket({ side: 'long', symbol: 'MNQ', qty: 20, slPts: 15, tpPts: 2.5 });
