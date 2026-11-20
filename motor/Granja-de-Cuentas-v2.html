@@ -5750,7 +5750,7 @@ else if(p==="choose"){setAwake(true);if(sym!=="MNQ"){sym="MNQ";qty=defQ(sym)}car
 else if(p==="aviso"){setAwake(false);card.innerHTML=`<div class=h>Se llenó y se cerró</div><div class=msg>${extra||"La orden se llenó y ya no hay posición."}</div>`;card.style.display="block";setTimeout(()=>phase==="aviso"&&setPhase("off"),6000)}
 else if(p==="blocked"){setAwake(false);card.innerHTML=`<div class=h>Bloqueado</div><div class="msg no">${extra||chk.msg}</div><div class=msg>Todas las cuentas Lucid se pueden operar, aunque el nombre no empiece por LFE o LFF. Paper y demo también. Hace falta que la cuenta esté activa en TradingView.</div>`;card.style.display="block";setTimeout(()=>phase==="blocked"&&setPhase("off"),6000)}
 else if(p==="running"){setAwake(true);bub.textContent="Operando…";bub.style.display="block"}
-else if(p==="summary"){setAwake(false);bub.textContent="Prueba terminada";bub.style.display="block"}
+else if(p==="summary"){setAwake(false);bub.textContent="Operación terminada";bub.style.display="block"}
 else if(p==="off"){prevBot=null;setTimeout(()=>{const b=pill()&&pill().querySelector("b");if(b&&b.textContent==="Durmiendo")b.textContent=S()&&S().botEnabled()?"Activo":"Pausado"},50);live.style.display="none"}}
 async function go(side){vistaPreviaSoltar();const tClick=Date.now();card.querySelectorAll("button").forEach(b=>b.disabled=true);
  if(!accId){setPhase("blocked","Elige una cuenta");return}const sa=accs&&accs.ok&&accs.accounts.find(a=>String(a.id)===String(accId));
@@ -6261,7 +6261,7 @@ function hook(){const G=window.__granja&&window.__granja.pet;if(!G||!G.renderer|
  if(cfg.kind!=="perro"||cfg.body!==A.perro.b||cfg.accent!==A.perro.a){try{applyPet(G,cfg)}catch(err){console.warn("mascota",err)}}
  (function lab(){const p=window.__pet.screen();if(p&&cfg.name){tag.textContent=cfg.name;tag.style.left=p.x+"px";tag.style.top=(p.y-8)+"px";tag.style.display="block"}else tag.style.display="none";requestAnimationFrame(lab)})()}
 setTimeout(hook,600);})();</script>
-<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.43</div>
+<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.44</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/api/version",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
 <script>/* 0.7.0: Profito duerme al abrir (granja en pausa), riega con laptop durante un trade, y etiquetas de cuentas con saldo y etapa. Solo visual: no toca el motor de trading. */
 (function(){

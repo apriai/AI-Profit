@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.44] — 2026-11-20
+### Cambiado
+- Al terminar una operación, el globo del agente dice «Operación terminada».
+### Notas
+- El resumen sigue diciendo «Resumen · Prueba» cuando no hay nombre de estrategia, y la confirmación de cuenta real sigue igual.
+
 ## [0.10.43] — 2026-11-20
 ### Arreglado
 - **El granjero y la mascota ya no atraviesan la silla** junto a la casa. Usa el mismo disco sólido que el cerezo: si el camino pasa por encima, lo rodean, y si ya estaban dentro, el lazo los saca. Dormir en el banco sigue igual.
