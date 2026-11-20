@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.35] — 2026-11-20
+### Cambiado
+- **Los ojos del Profito dormido en la pista son la misma «u» del granjero.** Y la pista queda centrada en el panel.
+### Notas
+- No cambia el stop, el objetivo ni los contratos.
+
 ## [0.10.34] — 2026-11-20
 ### Cambiado
 - **La pista de «Ajustar a último Profito» es corta.** El texto solo dice «Desliza». Apagado, el tirador es el Profito gris dormido, con las mismas z que usa cuando duerme. Activado, es el Profito despierto en Verde Profit (`#C8E810`), el verde de marca.

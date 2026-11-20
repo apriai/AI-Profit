@@ -143,7 +143,7 @@ assert.equal(pagina.velas[1].abierta, 26808);
 assert.equal(pagina.precio.ask, 26810);
 
 const html = fs.readFileSync(new URL('./Granja-de-Cuentas-v2.html', import.meta.url), 'utf8');
-assert.match(html, /ajp-shimmer">Desliza</);assert.match(html, /width:168px/);assert.match(html, /<span class="zzz"><i>z<\/i><i>z<\/i><i>z<\/i><\/span>/);assert.equal(html.split('@keyframes zz{').length - 1, 1, 'reusa la animación de sueño, no crea otra');
+assert.match(html, /ajp-shimmer">Desliza</);assert.match(html, /width:168px/);assert.match(html, /align-items:center/);assert.match(html, /border-radius:0 0 8px 8px/);assert.match(html, /<span class="zzz"><i>z<\/i><i>z<\/i><i>z<\/i><\/span>/);assert.equal(html.split('@keyframes zz{').length - 1, 1, 'reusa la animación de sueño, no crea otra');
 assert.match(html, /data-ajp-knob/);
 assert.match(html, /#C8E810/);
 assert.match(html, /#0D0A09/);
