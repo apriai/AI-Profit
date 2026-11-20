@@ -38,7 +38,7 @@ assert.equal(html.includes('tocar("wuhu")'), false);
 assert.equal(html.includes('__tlClic'), false);
 assert.ok(html.includes('function play(big){if(muted||!ac||ac.state!=="running")return false;'));
 assert.ok(html.includes('function playPerdida(){'));
-assert.ok(html.includes('>v0.10.40</div>'));
+assert.ok(html.includes('>v0.10.41</div>'));
 
 const granja = fs.readFileSync(path.join(root, 'acceso', 'abrir-granja.ps1'), 'utf8');
 assert.ok(granja.includes('--autoplay-policy=no-user-gesture-required'), 'el acceso pide autoplay');

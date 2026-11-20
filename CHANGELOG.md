@@ -10,6 +10,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.41] — 2026-11-20
+### Arreglado
+- El instalador vuelve a copiar `motor/ajustar-profito.mjs`. Sin ese archivo el servidor no arrancaba (`ERR_MODULE_NOT_FOUND` desde `rutas-api.mjs`).
+
 ## [0.10.40] — 2026-11-20
 ### Cambiado
 - **El tirador dormido es el Profito blanco aprobado.** Respira, lleva las z y la barra ya no se pone gris. Con círculo, el despierto tiene un borde verde que brilla. El texto dice «Ajustar a último Profito» y, al soltar al final, «Activo». Ese brillo recorre las letras también apagado. Al completar el desliz suena el desbloqueo.
