@@ -10,6 +10,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.36] — 2026-11-20
+### Cambiado
+- **Los ojos del Profito dormido en la pista son más chicos, más finos y más separados**, como en el granjero: una «u» oscura a cada lado de la cara, a media altura. Los del despierto usan la misma posición.
+- **El HTML abierto como archivo deja deslizar la pista**, para probar dormir y despertar sin TradingView. Dentro de la app, sin círculo, sigue bloqueada.
+### Notas
+- No cambia el stop, el objetivo ni los contratos.
+
 ## [0.10.35] — 2026-11-20
 ### Cambiado
 - **Los ojos del Profito dormido en la pista son la misma «u» del granjero.** Y la pista queda centrada en el panel.
