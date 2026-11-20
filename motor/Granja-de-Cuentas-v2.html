@@ -5750,7 +5750,7 @@ else if(p==="choose"){setAwake(true);if(sym!=="MNQ"){sym="MNQ";qty=defQ(sym)}car
 else if(p==="aviso"){setAwake(false);card.innerHTML=`<div class=h>Se llenó y se cerró</div><div class=msg>${extra||"La orden se llenó y ya no hay posición."}</div>`;card.style.display="block";setTimeout(()=>phase==="aviso"&&setPhase("off"),6000)}
 else if(p==="blocked"){setAwake(false);card.innerHTML=`<div class=h>Bloqueado</div><div class="msg no">${extra||chk.msg}</div><div class=msg>Todas las cuentas Lucid se pueden operar, aunque el nombre no empiece por LFE o LFF. Paper y demo también. Hace falta que la cuenta esté activa en TradingView.</div>`;card.style.display="block";setTimeout(()=>phase==="blocked"&&setPhase("off"),6000)}
 else if(p==="running"){setAwake(true);bub.textContent="Operando…";bub.style.display="block"}
-else if(p==="summary"){setAwake(false);bub.textContent="Operación terminada";bub.style.display="block"}
+else if(p==="summary"){setAwake(false)}
 else if(p==="off"){prevBot=null;setTimeout(()=>{const b=pill()&&pill().querySelector("b");if(b&&b.textContent==="Durmiendo")b.textContent=S()&&S().botEnabled()?"Activo":"Pausado"},50);live.style.display="none"}}
 async function go(side){vistaPreviaSoltar();const tClick=Date.now();card.querySelectorAll("button").forEach(b=>b.disabled=true);
  if(!accId){setPhase("blocked","Elige una cuenta");return}const sa=accs&&accs.ok&&accs.accounts.find(a=>String(a.id)===String(accId));

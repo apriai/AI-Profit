@@ -46,7 +46,7 @@ else if(p==="choose"){setAwake(true);card.innerHTML=`<div class=h>¿Qué hago? <
  card.querySelectorAll("[data-s]").forEach(b=>b.onclick=e=>{e.stopPropagation();go(b.dataset.s)})}
 else if(p==="blocked"){setAwake(false);card.innerHTML=`<div class=h>Bloqueado</div><div class="msg no">${extra||chk.msg}</div><div class=msg>Pon TradingView en <b>Paper Trading</b> o en una cuenta <b>demo de Tradovate</b>. Las cuentas Lucid (LFE/LFF) se operan si están activas en TradingView y confirmadas. Una cuenta que no sea Lucid ni demo sigue bloqueada.</div>`;card.style.display="block";setTimeout(()=>phase==="blocked"&&setPhase("off"),6000)}
 else if(p==="running"){setAwake(true);bub.textContent="Operando…";bub.style.display="block"}
-else if(p==="summary"){setAwake(false);bub.textContent="Operación terminada";bub.style.display="block"}
+else if(p==="summary"){setAwake(false)}
 else if(p==="off"){restoreBot();setTimeout(()=>{const b=pill()&&pill().querySelector("b");if(b&&b.textContent==="Durmiendo")b.textContent=S()&&S().botEnabled()?"Activo":"Pausado"},50);live.style.display="none"}}
 async function go(side){card.querySelectorAll("button").forEach(b=>b.disabled=true);chk=await J("/api/colchon/check");
  if(!chk.paper&&!chk.real){setPhase("blocked",chk.msg);return}
