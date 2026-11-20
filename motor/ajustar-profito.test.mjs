@@ -143,9 +143,11 @@ assert.equal(pagina.velas[1].abierta, 26808);
 assert.equal(pagina.precio.ask, 26810);
 
 const html = fs.readFileSync(new URL('./Granja-de-Cuentas-v2.html', import.meta.url), 'utf8');
-assert.match(html, /ajp-shimmer">Desliza</);assert.match(html, /width:168px/);assert.match(html, /align-items:center/);assert.match(html, /border-radius:0 0 4px 4px/);
+assert.match(html, /ajp-shimmer">Desliza</);assert.match(html, /width:168px/);assert.match(html, /align-items:center/);assert.match(html, /border-radius:0 0 2\.2px 2\.2px/);
 assert.match(html, /border:1px solid #0D0A09/);
-assert.match(html, /ajp:not\(\.on\) \.ajp-ojo:first-of-type\{left:1px\}/);
+assert.match(html, /ajp-ojo:first-of-type\{left:9\.4px\}/);
+assert.match(html, /ajp:not\(\.on\) \.ajp-ojo:first-of-type\{left:8px\}/);
+assert.match(html, /circle at 68% 26%/);
 assert.match(html, /location\.protocol==="file:"/);
 assert.match(html, /const off=ajpSolo\?false:!\(r\.habilitada\|\|ajp\.marcado\)/);assert.match(html, /<span class="zzz"><i>z<\/i><i>z<\/i><i>z<\/i><\/span>/);assert.equal(html.split('@keyframes zz{').length - 1, 1, 'reusa la animación de sueño, no crea otra');
 assert.match(html, /data-ajp-knob/);
