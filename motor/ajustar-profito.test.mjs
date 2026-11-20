@@ -143,10 +143,12 @@ assert.equal(pagina.velas[1].abierta, 26808);
 assert.equal(pagina.precio.ask, 26810);
 
 const html = fs.readFileSync(new URL('./Granja-de-Cuentas-v2.html', import.meta.url), 'utf8');
-assert.match(html, /Desliza → Ajustar a último Profito/);
+assert.match(html, /ajp-shimmer">Desliza</);assert.match(html, /width:168px/);assert.match(html, /<span class="zzz"><i>z<\/i><i>z<\/i><i>z<\/i><\/span>/);assert.equal(html.split('@keyframes zz{').length - 1, 1, 'reusa la animación de sueño, no crea otra');
 assert.match(html, /data-ajp-knob/);
-assert.match(html, /#00E676/);
-assert.match(html, /#FF5252/);
+assert.match(html, /#C8E810/);
+assert.match(html, /#0D0A09/);
+assert.match(html, /ajp-ojo/);
+assert.equal(html.includes('#00E676'), false, 'el despierto usa el verde de marca, no otro');
 assert.match(html, /cubic-bezier\(\.34,1\.56,\.64,1\)/);
 assert.match(html, /cursor:not-allowed/);
 assert.match(html, /Sin círculo Profito en las últimas 4 velas/);
