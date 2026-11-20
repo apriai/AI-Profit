@@ -1,9 +1,8 @@
 // Casilla «Ajustar a último Profito». No abre órdenes: elige la vela y arma stop, TP y contratos.
-import { barraEnMs, duracionMarcoMs, velaEnVivo } from './pine-algo.mjs';
+import { barraEnMs, duracionMarcoMs } from './pine-algo.mjs';
 
 export const TICK = 0.25;
 export const PV = { MNQ: 2, NQ: 20 };
-const SESGO_MS = 3000;
 
 export function roundTick(p) {
   const n = Number(p);
@@ -18,24 +17,37 @@ function raiz(sim) {
   return x;
 }
 
-// La vela viva y las 3 cerradas de justo antes. Una barra más vieja, o una que aún no es la de ahora, no entra.
-export function velasEnVentana(velas, resolucion, ahora) {
+function duracionDe(resolucion) {
+  return duracionMarcoMs(resolucion) ?? 60 * 1000;
+}
+
+// La vela viva sale de la serie principal. Si no viene, se calcula con el reloj y la duración del marco.
+// No hace falta que esa vela esté en la lista del estudio: el estudio solo trae velas con círculo.
+export function velaVivaMs(vivaBarra, resolucion, ahora) {
+  const directa = barraEnMs(vivaBarra);
+  if (directa != null) return directa;
+  const now = Number(ahora);
+  if (!Number.isFinite(now)) return null;
+  return Math.floor(now / duracionDe(resolucion)) * duracionDe(resolucion);
+}
+
+function enLasCuatro(t, liveT, resolucion) {
+  if (t == null || liveT == null) return false;
+  const dur = duracionDe(resolucion);
+  const k = Math.round((liveT - t) / dur);
+  return k >= 0 && k <= 3 && Math.abs(liveT - t - k * dur) < 1500;
+}
+
+// La vela viva y las 3 cerradas de justo antes. Una barra más vieja no entra.
+export function velasEnVentana(velas, resolucion, ahora, vivaBarra) {
+  const liveT = velaVivaMs(vivaBarra, resolucion, ahora);
+  if (liveT == null) return [];
   const lista = (Array.isArray(velas) ? velas : []).map(v => {
     const t = barraEnMs(v && v.barra);
     if (t == null) return null;
     return { ...v, t };
   }).filter(Boolean);
-  const vivas = lista.filter(v => velaEnVivo(v.barra, resolucion, ahora));
-  if (!vivas.length) return [];
-  const now = Number(ahora);
-  const started = vivas.filter(v => v.t <= now + SESGO_MS);
-  const pool = started.length ? started : vivas;
-  const live = pool.reduce((a, b) => (a.t >= b.t ? a : b));
-  const dur = duracionMarcoMs(resolucion) ?? 60 * 1000;
-  return lista.filter(v => {
-    const k = Math.round((live.t - v.t) / dur);
-    return k >= 0 && k <= 3 && Math.abs(live.t - v.t - k * dur) < 1500;
-  }).sort((a, b) => b.t - a.t);
+  return lista.filter(v => enLasCuatro(v.t, liveT, resolucion)).sort((a, b) => b.t - a.t);
 }
 
 export function tieneCirculo(v) {
@@ -107,13 +119,8 @@ function normal(c) {
 }
 
 // La vela guardada sigue contando mientras su inicio caiga en la viva o en las 3 de antes.
-function sigueEnVentana(barra, ventana, resolucion) {
-  const t = barraEnMs(barra);
-  if (t == null || !ventana.length) return false;
-  const live = ventana.reduce((a, b) => (a.t >= b.t ? a : b));
-  const dur = duracionMarcoMs(resolucion) ?? 60 * 1000;
-  const k = Math.round((live.t - t) / dur);
-  return k >= 0 && k <= 3 && Math.abs(live.t - t - k * dur) < 1500;
+function sigueEnVentana(barra, liveT, resolucion) {
+  return enLasCuatro(barraEnMs(barra), liveT, resolucion);
 }
 
 // marcado: el tirador está al final. guardado trae la barra del círculo y su apertura.
@@ -124,7 +131,8 @@ export function revisarAjuste({ marcado = false, guardado = null, lectura = null
   const now = Number.isFinite(+ahora) ? +ahora : Date.now();
   const on = !!marcado;
   const mismo = !lectura || !lectura.simbolo || raiz(lectura.simbolo) === raiz(symbol);
-  const ventana = mismo && lectura ? velasEnVentana(lectura.velas, lectura.resolucion, now) : [];
+  const viva = mismo && lectura ? velaVivaMs(lectura.vivaBarra, lectura.resolucion, now) : null;
+  const ventana = mismo && lectura ? velasEnVentana(lectura.velas, lectura.resolucion, now, lectura.vivaBarra) : [];
   const reciente = ventana.find(tieneCirculo) || null;
   const pv = PV[raiz(symbol)] || PV.MNQ;
   let calc = null;
@@ -145,11 +153,10 @@ export function revisarAjuste({ marcado = false, guardado = null, lectura = null
     }
   } else if (on && guardado && Number.isFinite(+guardado.stop)) {
     const abierta = Number.isFinite(+guardado.abierta) ? +guardado.abierta : +guardado.stop;
-    const dentro = !ventana.length || guardado.barra == null || sigueEnVentana(guardado.barra, ventana, lectura && lectura.resolucion);
-    if (!mismo || !ventana.length) {
+    if (!mismo || viva == null) {
       calc = { ...guardado, abierta: roundTick(abierta) };
       conservado = true;
-    } else if (!dentro) {
+    } else if (guardado.barra != null && !sigueEnVentana(guardado.barra, viva, lectura && lectura.resolucion)) {
       dormir = true;
     } else {
       const nuevo = calcularDesdeVela({

@@ -173,6 +173,81 @@ assert.equal(pagina.velas[0].abierta, 26800);
 assert.equal(pagina.velas[0].alcista, true);
 assert.equal(pagina.velas[1].abierta, 26808);
 assert.equal(pagina.precio.ask, 26810);
+assert.equal(pagina.vivaBarra, b310, 'la vela viva es la última fila de la serie principal');
+assert.equal(pagina.barra, b310, 'el sonido sigue mirando la última fila del estudio');
+
+const t0 = 1795184400;
+const barras = [0, 1, 2, 3].map(i => t0 + i * 60);
+const viva1m = barras[3];
+const ahora1m = barraEnMs(viva1m) + 36 * 1000;
+const precio1m = { bid: 26230, ask: 26230.25, last: 26230 };
+const lectura1m = (velas, vivaBarra) => ({ velas, resolucion: '1', simbolo: 'CME_MINI:MNQZ2026', precio: precio1m, vivaBarra });
+for (const k of [1, 2, 3]) {
+  const barra = viva1m - k * 60;
+  const suelto = revisarAjuste({ lectura: lectura1m([vela(barra, 26222.75, true)], viva1m), symbol: 'MNQ', riesgoUsd: 630, maxQty: 20, ahora: ahora1m });
+  assert.equal(suelto.habilitada, true, `círculo ${k} velas antes, sin la viva en la lista`);
+  const puestoK = revisarAjuste({ marcado: true, lectura: lectura1m([vela(barra, 26222.75, true)], viva1m), symbol: 'MNQ', riesgoUsd: 630, maxQty: 20, ahora: ahora1m });
+  assert.equal(puestoK.guardado.stop, 26222.75, `el stop es la apertura a ${k} velas`);
+  assert.equal(puestoK.guardado.barra, barra);
+}
+const cuatro = viva1m - 4 * 60;
+assert.equal(revisarAjuste({ lectura: lectura1m([vela(cuatro, 26222.75, true)], viva1m), symbol: 'MNQ', riesgoUsd: 630, maxQty: 20, ahora: ahora1m }).habilitada, false, 'a 4 velas no despierta');
+const duermeLejos = revisarAjuste({
+  marcado: true,
+  guardado: { barra: cuatro, abierta: 26222.75, stop: 26222.75, tp: 26230, qty: 8, lado: 'long' },
+  lectura: lectura1m([vela(cuatro, 26222.75, true)], viva1m),
+  symbol: 'MNQ', riesgoUsd: 630, maxQty: 20, ahora: ahora1m,
+});
+assert.equal(duermeLejos.dormir, true, 'a 4 velas se duerme, aunque la ventana del estudio venga vacía');
+assert.equal(duermeLejos.guardado, null);
+const sinFilaViva = revisarAjuste({
+  lectura: { velas: [vela(viva1m - 2 * 60, 26222.75, true)], resolucion: '1', simbolo: 'CME_MINI:MNQZ2026', precio: precio1m },
+  symbol: 'MNQ', riesgoUsd: 630, maxQty: 20, ahora: ahora1m,
+});
+assert.equal(sinFilaViva.habilitada, true, 'sin vivaBarra el reloj ubica la vela viva');
+const vaciaPeroCerca = revisarAjuste({
+  marcado: true,
+  guardado: { barra: viva1m - 2 * 60, abierta: 26222.75, stop: 26222.75, tp: 1, qty: 8, lado: 'long' },
+  lectura: lectura1m([], viva1m),
+  symbol: 'MNQ', riesgoUsd: 630, maxQty: 20, ahora: ahora1m,
+});
+assert.equal(vaciaPeroCerca.dormir, false, 'a 2 velas no se congela ni se duerme');
+assert.equal(vaciaPeroCerca.conservado, false);
+assert.equal(vaciaPeroCerca.guardado.stop, 26222.75);
+
+const circuloViejo = barras[1];
+const estudioEsp = {
+  id: () => 's1',
+  metaInfo: () => ({ description: 'Profito Algoritmo', plots: [{ id: 'plot_0', type: 'line' }, { id: 'plot_1', type: 'line' }], styles: { plot_0: { title: 'Alcista' }, plot_1: { title: 'Bajista' } } }),
+  data: () => ({ bars: () => ({ _items: [{ value: [circuloViejo, 1, NaN] }] }) }),
+  isVisible: () => true,
+};
+const esp = vm.runInContext(exprSenal({ nombre: ALGO_NOMBRE }), vm.createContext({
+  window: {
+    TradingViewApi: {
+      activeChart: () => ({
+        getAllStudies: () => [{ id: 's1', name: 'Profito Algoritmo' }],
+        getStudyById: () => ({ isVisible: () => true }),
+        resolution: () => '1',
+        symbol: () => 'CME_MINI:MNQZ2026',
+      }),
+      _activeChartWidgetWV: { value: () => ({ _chartWidget: { model: () => ({
+        model: () => ({ dataSources: () => [estudioEsp] }),
+        mainSeries: () => ({
+          bars: () => ({ _items: barras.map((t, i) => ({ value: [t, i === 1 ? 26222.75 : 26200 + i, 26240, 26190, 26210] })) }),
+          quotes: () => precio1m,
+        }),
+      }) } }) },
+    },
+  },
+}));
+assert.equal(esp.vivaBarra, viva1m);
+assert.equal(esp.barra, circuloViejo, 'el sonido no pasa a la vela viva si el círculo es viejo');
+assert.equal(esp.velas.length, 1);
+assert.equal(esp.velas[0].abierta, 26222.75, 'la apertura sale de la serie principal por tiempo');
+const desdePagina = revisarAjuste({ lectura: { ...esp, simbolo: esp.simbolo }, symbol: 'MNQ', riesgoUsd: 630, maxQty: 20, ahora: ahora1m });
+assert.equal(desdePagina.habilitada, true);
+assert.equal(revisarAjuste({ marcado: true, lectura: { ...esp, simbolo: esp.simbolo }, symbol: 'MNQ', riesgoUsd: 630, maxQty: 20, ahora: ahora1m }).guardado.stop, 26222.75);
 
 const html = fs.readFileSync(new URL('./Granja-de-Cuentas-v2.html', import.meta.url), 'utf8');
 assert.match(html, /Ajustar a último Profito/);assert.match(html, /width:196px/);assert.match(html, /align-items:center/);
