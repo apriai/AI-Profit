@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { preparar } from './preparar.mjs';
+import { MOTOR, preparar } from './preparar.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dest = fs.mkdtempSync(path.join(os.tmpdir(), 'stage-profito-'));
@@ -25,6 +25,7 @@ const debe = [
   'motor/sonidos/clic-burbuja.wav',
   'motor/sonidos/despertar-wuhu.wav',
   'motor/rutas-api.mjs',
+  'motor/ajustar-profito.mjs',
   'acceso/profito-estado.mjs',
   'acceso/aviso-actualizacion.mjs',
   'acceso/aviso-actualizacion.ps1',
@@ -81,6 +82,18 @@ for (const name of fs.readdirSync(accesoDir)) {
   for (const citado of archivosCitados(texto)) {
     if (citado === name || !fs.existsSync(path.join(accesoDir, citado))) continue;
     assert.ok(fs.existsSync(path.join(dest, 'acceso', citado)), `${name} usa ${citado} y no está en el paquete`);
+  }
+}
+const enMotor = new Set(MOTOR);
+for (const nombre of MOTOR) {
+  if (!nombre.endsWith('.mjs')) continue;
+  const texto = fs.readFileSync(path.join(root, 'motor', nombre), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '');
+  for (const m of texto.matchAll(/(?:from\s+|import\s*\(\s*)['"](\.\/[^'"]+\.mjs)['"]/g)) {
+    const rel = path.posix.normalize(path.posix.join(path.posix.dirname(nombre), m[1]));
+    assert.ok(enMotor.has(rel), `${nombre} importa ${rel} y no está en MOTOR`);
+    assert.ok(fs.existsSync(path.join(dest, 'motor', rel)), `${rel} no se copió al paquete`);
   }
 }
 console.log('preparar ok', version);

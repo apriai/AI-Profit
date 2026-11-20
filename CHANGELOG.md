@@ -10,6 +10,62 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.41] — 2026-11-20
+### Arreglado
+- El instalador vuelve a copiar `motor/ajustar-profito.mjs`. Sin ese archivo el servidor no arrancaba (`ERR_MODULE_NOT_FOUND` desde `rutas-api.mjs`).
+
+## [0.10.40] — 2026-11-20
+### Cambiado
+- **El tirador dormido es el Profito blanco aprobado.** Respira, lleva las z y la barra ya no se pone gris. Con círculo, el despierto tiene un borde verde que brilla. El texto dice «Ajustar a último Profito» y, al soltar al final, «Activo». Ese brillo recorre las letras también apagado. Al completar el desliz suena el desbloqueo.
+- **Las barras de Cuenta y Estrategia quedan centradas**, del mismo ancho. El nombre ya no empuja el selector.
+- **Si el círculo se apaga y la vela sigue entre las últimas 4,** el stop se queda en la apertura guardada y el objetivo y los contratos se recalculan cada segundo con el precio vivo. Cuando esa vela sale de las 4, el tirador se duerme solo y suena una vez el tono bajito de una operación perdida. Apagarlo a mano no suena.
+### Notas
+- No abre la orden. El dibujo dormido es el de `assets/profito-dormido.png`.
+
+## [0.10.39] — 2026-11-20
+### Cambiado
+- **Sin círculo, el tirador es el Profito dormido:** la cara real con los ojos tapados y una «u» fina en el mismo lugar, en gris, y las z de la granja. Con círculo, se ve el Profito despierto (ojos abiertos, verde) y ya se puede deslizar. Activado, sigue despierto y la pista se ilumina.
+- **El HTML abierto como archivo tiene un botón Demo** para pasar de sin círculo a con círculo y ver los tres estados. Dentro de la app, sin círculo, sigue bloqueado.
+### Notas
+- El dibujo dormido está en `assets/profito-dormido.png`, hecho a partir de `assets/profito-icon-1024.png`.
+
+## [0.10.38] — 2026-11-20
+### Cambiado
+- **El tirador de la pista es el dibujo real del Profito despierto** (`assets/profito-icon-1024.png`, la misma cara que `assets/favicon-512.png`). Apagado, esa imagen se ve en gris y siguen las z de la granja. No hay un dibujo aparte del Profito dormido.
+### Notas
+- El HTML abierto como archivo sigue dejando probar el deslizador. Dentro de la app, sin círculo, sigue bloqueado.
+
+## [0.10.37] — 2026-11-20
+### Cambiado
+- **El Profito despierto de la pista es la esfera verde lima de la granja:** brillo arriba a la derecha, borde más oscuro y dos ojos en píldora vertical, juntos y un poco arriba del centro. Los ojos dormidos, en «u», usan el mismo lugar.
+### Notas
+- No cambia el stop, el objetivo ni los contratos. El HTML abierto como archivo sigue dejando probar el deslizador.
+
+## [0.10.36] — 2026-11-20
+### Cambiado
+- **Los ojos del Profito dormido en la pista son más chicos, más finos y más separados**, como en el granjero: una «u» oscura a cada lado de la cara, a media altura. Los del despierto usan la misma posición.
+- **El HTML abierto como archivo deja deslizar la pista**, para probar dormir y despertar sin TradingView. Dentro de la app, sin círculo, sigue bloqueada.
+### Notas
+- No cambia el stop, el objetivo ni los contratos.
+
+## [0.10.35] — 2026-11-20
+### Cambiado
+- **Los ojos del Profito dormido en la pista son la misma «u» del granjero.** Y la pista queda centrada en el panel.
+### Notas
+- No cambia el stop, el objetivo ni los contratos.
+
+## [0.10.34] — 2026-11-20
+### Cambiado
+- **La pista de «Ajustar a último Profito» es corta.** El texto solo dice «Desliza». Apagado, el tirador es el Profito gris dormido, con las mismas z que usa cuando duerme. Activado, es el Profito despierto en Verde Profit (`#C8E810`), el verde de marca.
+### Notas
+- No cambia el stop, el objetivo ni los contratos.
+
+## [0.10.33] — 2026-11-20
+### Añadido
+- **«Ajustar a último Profito» en el panel de operar.** Se prende deslizando el círculo de Profito hasta el final de la pista (el mismo verde o rojo del indicador). Si no se suelta al final, el círculo vuelve con un rebote. Tocarlo o devolverlo lo apaga. Solo se puede deslizar si hay un círculo del algoritmo en la vela abierta o en las 3 velas cerradas de justo antes. Si no hay, la pista queda atenuada, el círculo gris y el cursor no lo permite. Al activarla, el stop queda en la apertura de la vela del círculo más reciente, el objetivo a la misma distancia del otro lado, y los contratos salen del riesgo en dólares de la estrategia, sin pasar el tope de la cuenta (25K o 50K). Si el círculo se va, se quedan esos números mientras siga activada. Si aparece otro, se recalculan. No abre la orden: BUY o SELL siguen mandando, con el stop y el objetivo en la misma orden. Si el stop quedaría del lado incorrecto del precio vivo, no se envía y el panel lo dice.
+### Notas
+- No cambia el sonido del algoritmo ni cómo se mueve el stop después de entrar.
+
 ## [0.10.32] — 2026-11-19
 ### Cambiado
 - **La explicación bajo Estrategia ya no se repite.** Solo queda el texto corto. Si el stop se mueve una vez (Fast Breakeven) se añade «Se mueve una sola vez.» Si es un colchón o tiene escalones, «Solo sube, nunca baja.» Si el stop no se mueve, el texto corto queda igual. Los dólares siguen saliendo de la cuenta, 25K o 50K.
