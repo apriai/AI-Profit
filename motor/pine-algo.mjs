@@ -661,7 +661,20 @@ try{
   var ix=indices(mi||{});
   var info=elegido.src?ultimo(elegido.src):null;
   if(!info||info.time==null) return {ok:true, enGrafico:lista.length, visible:true, barra:null, alcista:false, bajista:false, resolucion:res, simbolo:sim, velas:[]};
-  var velas=[], abiertas={};
+  function guardarAbierta(map, time, ap){
+    if(ap==null||time==null) return;
+    map[String(time)]=ap;
+    if(finito(time)&&time>1e8&&time<1e12) map[String(Math.round(time*1000))]=ap;
+    else if(finito(time)&&time>=1e12) map[String(Math.round(time/1000))]=ap;
+  }
+  function tomarAbierta(map, time){
+    if(time==null) return null;
+    if(map[String(time)]!=null) return map[String(time)];
+    if(finito(time)&&time>1e8&&time<1e12&&map[String(Math.round(time*1000))]!=null) return map[String(Math.round(time*1000))];
+    if(finito(time)&&time>=1e12&&map[String(Math.round(time/1000))]!=null) return map[String(Math.round(time/1000))];
+    return null;
+  }
+  var velas=[], abiertas={}, vivaBarra=null;
   try{
     var ms=window.TradingViewApi._activeChartWidgetWV.value()._chartWidget.model().mainSeries();
     var fils=filas(ms, 12);
@@ -669,14 +682,15 @@ try{
       var ib=infoDe(fils[bi]);
       if(!ib||ib.time==null) continue;
       var ap=abiertaDe(ib.value);
-      if(ap!=null) abiertas[String(ib.time)]=ap;
+      if(ap!=null) guardarAbierta(abiertas, ib.time, ap);
+      vivaBarra=ib.time;
     }
   }catch(eM){}
   var filsS=elegido.src?filas(elegido.src, 12):[];
   for(var si=0;si<filsS.length;si++){
     var is=infoDe(filsS[si]);
     if(!is||is.time==null) continue;
-    velas.push({barra:is.time, abierta:abiertas[String(is.time)]!=null?abiertas[String(is.time)]:null, alcista:plotEn(is, ix.al), bajista:plotEn(is, ix.ba)});
+    velas.push({barra:is.time, abierta:tomarAbierta(abiertas, is.time), alcista:plotEn(is, ix.al), bajista:plotEn(is, ix.ba)});
   }
   var precio=null;
   try{
@@ -685,7 +699,7 @@ try{
     function num(v){var x=typeof v==='number'?v:+v; return typeof x==='number'&&isFinite(x)&&x>0?x:null}
     precio={bid:num(qq.bid), ask:num(qq.ask), last:num(qq.last!=null?qq.last:qq.trade)};
   }catch(eQ){}
-  return {ok:true, enGrafico:lista.length, visible:true, barra:info.time, alcista:plotEn(info, ix.al), bajista:plotEn(info, ix.ba), resolucion:res, simbolo:sim, velas:velas, precio:precio};
+  return {ok:true, enGrafico:lista.length, visible:true, barra:info.time, alcista:plotEn(info, ix.al), bajista:plotEn(info, ix.ba), resolucion:res, simbolo:sim, velas:velas, precio:precio, vivaBarra:vivaBarra};
 }catch(e){ return {ok:false}; }
 })()`;
 }
@@ -745,7 +759,7 @@ export function crearAlgoTv({
     senalEnCurso = true;
     try {
       const r = await evaluar(exprSenal({ nombre: ALGO_NOMBRE }));
-      if (r && r.ok) lecturaProfito = { velas: Array.isArray(r.velas) ? r.velas : [], resolucion: r.resolucion || '', simbolo: r.simbolo || '', precio: r.precio || null, leido: Date.now() };
+      if (r && r.ok) lecturaProfito = { velas: Array.isArray(r.velas) ? r.velas : [], resolucion: r.resolucion || '', simbolo: r.simbolo || '', precio: r.precio || null, vivaBarra: r.vivaBarra != null ? r.vivaBarra : null, leido: Date.now() };
       const d = decidirToque(estadoSenal, r || {});
       if (d.rebaseline) log(`Señal Profito Algoritmo: marco reanudado (${d.resolucion || '?'} ${d.simbolo || '?'}, barra ${d.barra})`);
       if (d.pasada) log(`Señal Profito Algoritmo: vela pasada ignorada (${d.resolucion || '?'} ${d.simbolo || '?'}, barra ${d.barra})`);
