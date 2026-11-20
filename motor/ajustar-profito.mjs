@@ -95,8 +95,10 @@ export function textoAjuste(c) {
 
 function normal(c) {
   if (!c || !Number.isFinite(+c.stop)) return null;
+  const abierta = Number.isFinite(+c.abierta) ? roundTick(c.abierta) : roundTick(c.stop);
   return {
     barra: c.barra ?? null,
+    abierta,
     stop: roundTick(c.stop),
     tp: Number.isFinite(+c.tp) ? roundTick(c.tp) : null,
     qty: Number.isInteger(c.qty) && c.qty >= 1 ? c.qty : null,
@@ -104,35 +106,78 @@ function normal(c) {
   };
 }
 
-// marcado: la casilla está prendida. guardado: el último cálculo que sí se pudo armar.
-// Si el círculo se va, se devuelve ese guardado. Si aparece otro, se recalcula.
+// La vela guardada sigue contando mientras su inicio caiga en la viva o en las 3 de antes.
+function sigueEnVentana(barra, ventana, resolucion) {
+  const t = barraEnMs(barra);
+  if (t == null || !ventana.length) return false;
+  const live = ventana.reduce((a, b) => (a.t >= b.t ? a : b));
+  const dur = duracionMarcoMs(resolucion) ?? 60 * 1000;
+  const k = Math.round((live.t - t) / dur);
+  return k >= 0 && k <= 3 && Math.abs(live.t - t - k * dur) < 1500;
+}
+
+// marcado: el tirador está al final. guardado trae la barra del círculo y su apertura.
+// Si el círculo se apaga y esa vela sigue entre las 4, el stop no se mueve y el TP y los
+// contratos se recalculan con el precio de ahora. Si ya salió de las 4, el tirador se duerme.
+// Un círculo más nuevo, dentro de la ventana, reemplaza al guardado.
 export function revisarAjuste({ marcado = false, guardado = null, lectura = null, symbol = 'MNQ', riesgoUsd, maxQty, ahora } = {}) {
   const now = Number.isFinite(+ahora) ? +ahora : Date.now();
   const on = !!marcado;
   const mismo = !lectura || !lectura.simbolo || raiz(lectura.simbolo) === raiz(symbol);
   const ventana = mismo && lectura ? velasEnVentana(lectura.velas, lectura.resolucion, now) : [];
   const reciente = ventana.find(tieneCirculo) || null;
+  const pv = PV[raiz(symbol)] || PV.MNQ;
   let calc = null;
   let conservado = false;
+  let dormir = false;
   if (reciente) {
     const nuevo = calcularDesdeVela({
       abierta: reciente.abierta,
       precio: lectura && lectura.precio,
       riesgoUsd,
-      pv: PV[raiz(symbol)] || PV.MNQ,
+      pv,
       maxQty,
     });
     if (nuevo) {
       nuevo.barra = reciente.barra;
-      const mismoBarra = guardado && String(guardado.barra) === String(reciente.barra);
-      if (nuevo.qty == null && mismoBarra && guardado.qty >= 1 && guardado.lado) {
-        calc = { ...guardado, stop: nuevo.stop, barra: reciente.barra, lado: nuevo.lado || guardado.lado };
-        if (!nuevo.lado) calc = { ...guardado, stop: nuevo.stop, barra: reciente.barra };
-      } else calc = nuevo;
+      nuevo.abierta = roundTick(reciente.abierta);
+      calc = nuevo;
     }
   } else if (on && guardado && Number.isFinite(+guardado.stop)) {
-    calc = { ...guardado };
-    conservado = true;
+    const abierta = Number.isFinite(+guardado.abierta) ? +guardado.abierta : +guardado.stop;
+    const dentro = !ventana.length || guardado.barra == null || sigueEnVentana(guardado.barra, ventana, lectura && lectura.resolucion);
+    if (!mismo || !ventana.length) {
+      calc = { ...guardado, abierta: roundTick(abierta) };
+      conservado = true;
+    } else if (!dentro) {
+      dormir = true;
+    } else {
+      const nuevo = calcularDesdeVela({
+        abierta,
+        precio: lectura && lectura.precio,
+        riesgoUsd,
+        pv,
+        maxQty,
+      });
+      if (nuevo) {
+        nuevo.barra = guardado.barra ?? null;
+        nuevo.abierta = roundTick(abierta);
+        calc = nuevo;
+      }
+    }
+  }
+  if (dormir) {
+    return {
+      habilitada: false,
+      marcado: false,
+      texto: '',
+      conservado: false,
+      tono: null,
+      guardado: null,
+      firma: 'dormir',
+      log: 'Ajustar a último Profito: la vela salió de las últimas 4 y el tirador se duerme',
+      dormir: true,
+    };
   }
   const completo = normal(calc);
   const tono = reciente ? (reciente.alcista ? 'alcista' : 'bajista') : (on && guardado && (guardado.tono === 'alcista' || guardado.tono === 'bajista') ? guardado.tono : null);
@@ -142,6 +187,6 @@ export function revisarAjuste({ marcado = false, guardado = null, lectura = null
   let log = null;
   if (on && completo && !conservado) log = `Ajustar a último Profito: vela ${completo.barra} · stop ${completo.stop} · TP ${completo.tp ?? '—'} · ${completo.qty ?? 0} contratos`;
   if (on && conservado && completo) log = `Ajustar a último Profito: se conserva el último cálculo (stop ${completo.stop}, ${completo.qty ?? 0} contratos)`;
-  const firma = on && completo ? `${completo.barra}|${completo.stop}|${completo.qty ?? ''}|${conservado ? 'c' : 'n'}` : '';
-  return { habilitada, marcado: on, texto, conservado, tono, guardado: on ? completo : null, firma, log };
+  const firma = on && completo ? `${completo.barra}|${completo.stop}|${completo.tp ?? ''}|${completo.qty ?? ''}|${conservado ? 'c' : 'n'}` : '';
+  return { habilitada, marcado: on, texto, conservado, tono, guardado: on ? completo : null, firma, log, dormir: false };
 }

@@ -36,6 +36,8 @@ const puesto = revisarAjuste({
   symbol: 'MNQ', riesgoUsd: 630, maxQty: 20, ahora,
 });
 assert.equal(puesto.guardado.stop, 26800);
+assert.equal(puesto.guardado.abierta, 26800);
+assert.equal(puesto.guardado.barra, b300);
 assert.equal(puesto.guardado.tp, 26820);
 assert.equal(puesto.guardado.qty, 20);
 assert.equal(puesto.guardado.lado, 'long');
@@ -52,12 +54,42 @@ assert.equal(corto.guardado.tp, 26800);
 assert.equal(corto.guardado.qty, 8);
 
 const guardado = puesto.guardado;
-const seFue = revisarAjuste({ marcado: true, guardado, lectura: lectura([vela(b310, 26812, false)]), symbol: 'MNQ', riesgoUsd: 630, maxQty: 20, ahora });
-assert.equal(seFue.conservado, true);
-assert.equal(seFue.habilitada, true, 'marcada, se puede apagar');
+const seFue = revisarAjuste({
+  marcado: true, guardado,
+  lectura: lectura([vela(b310, 26812, false)], { precio: { bid: 26819.75, ask: 26820, last: 26820 } }),
+  symbol: 'MNQ', riesgoUsd: 630, maxQty: 20, ahora,
+});
+assert.equal(seFue.dormir, false, 'la vela del círculo sigue entre las 4');
+assert.equal(seFue.conservado, false, 'no se congela: el TP y los contratos siguen el precio');
+assert.equal(seFue.habilitada, true);
+assert.equal(seFue.marcado, true);
+assert.equal(seFue.guardado.barra, b300);
+assert.equal(seFue.guardado.abierta, 26800);
 assert.equal(seFue.guardado.stop, 26800);
-assert.equal(seFue.guardado.qty, 20);
-assert.match(seFue.log, /se conserva/);
+assert.equal(seFue.guardado.tp, 26840);
+assert.equal(seFue.guardado.qty, 15);
+assert.match(seFue.texto, /Stop 26800 · TP 26840 · 15 contratos/);
+
+const bSigue = b300 + 3 * 300;
+const sigue = revisarAjuste({
+  marcado: true, guardado,
+  lectura: lectura([vela(bSigue, 26830, false)], { precio: { bid: 26819.75, ask: 26820, last: 26820 } }),
+  symbol: 'MNQ', riesgoUsd: 630, maxQty: 20, ahora: barraEnMs(bSigue) + 50 * 1000,
+});
+assert.equal(sigue.dormir, false, 'a 3 velas todavía cuenta');
+assert.equal(sigue.guardado.stop, 26800);
+assert.equal(sigue.guardado.tp, 26840);
+
+const bSale = b300 + 4 * 300;
+const dormido = revisarAjuste({
+  marcado: true, guardado,
+  lectura: lectura([vela(bSale, 26830, false)]),
+  symbol: 'MNQ', riesgoUsd: 630, maxQty: 20, ahora: barraEnMs(bSale) + 50 * 1000,
+});
+assert.equal(dormido.dormir, true, 'al salir de las 4 velas el tirador se duerme');
+assert.equal(dormido.marcado, false);
+assert.equal(dormido.guardado, null);
+assert.equal(dormido.habilitada, false);
 
 const otra = revisarAjuste({
   marcado: true, guardado,
@@ -143,11 +175,22 @@ assert.equal(pagina.velas[1].abierta, 26808);
 assert.equal(pagina.precio.ask, 26810);
 
 const html = fs.readFileSync(new URL('./Granja-de-Cuentas-v2.html', import.meta.url), 'utf8');
-assert.match(html, /ajp-shimmer">Desliza</);assert.match(html, /width:168px/);assert.match(html, /align-items:center/);
+assert.match(html, /Ajustar a último Profito/);assert.match(html, /width:196px/);assert.match(html, /align-items:center/);
 assert.match(html, /class="ajp-face ajp-awake"/);
 assert.match(html, /class="ajp-face ajp-sleep"/);
-assert.match(html, /data:image\/png;base64,/);
-assert.match(html, /ajp\.off \.ajp-sleep\{display:block;filter:grayscale\(1\)/);
+assert.ok(html.includes(fs.readFileSync(new URL('../assets/profito-dormido.png', import.meta.url)).toString('base64')), 'el dormido del tirador es el PNG aprobado');
+assert.match(html, /ajp\.off \.ajp-sleep\{display:block;filter:brightness\(1\.18\) drop-shadow\(0 0 3px rgba\(255,255,255,\.35\)\)/);
+assert.match(html, /animation:ajpBreath 3\.93s ease-in-out infinite/);
+assert.match(html, /ajp\.off \.ajp-track\{opacity:1\}/);
+assert.match(html, /padding:0 8px 0 34px/);
+assert.match(html, /left:calc\(50% - 88px\)/);
+assert.equal(html.includes('ajp.off .ajp-shimmer{animation:none'), false, 'el brillo del texto sigue apagado');
+assert.match(html, /ajp\.on \.ajp-shimmer\{opacity:1;justify-content:center/);
+assert.match(html, /animation:ajpGlow 2\.2s ease-in-out infinite/);
+assert.match(html, /class=szl>Cuenta/);
+assert.match(html, /class=szl>Estrategia/);
+assert.match(html, /ajp\.marcado\?"Activo":"Ajustar a último Profito"/);
+assert.match(html, /window\.__tlSonDesbloqueo=function\(\)/);
 assert.match(html, /ajpDemoCirculo/);
 assert.match(html, /data-ajp-demo/);
 assert.equal(html.includes('ajp-ojo'), false, 'el tirador ya no se dibuja a mano');
@@ -163,7 +206,17 @@ assert.match(html, /avisoPanel/);
 assert.equal(html.includes('data-ajp-box'), false, 'ya no es una casilla');
 const arma = html.indexOf('function ajpArmar');
 const pinta = html.indexOf('function ajpPintar');
-assert.equal(html.slice(arma, pinta).includes('go('), false, 'deslizar no abre la orden');
+const cuerpoArma = html.slice(arma, pinta);
+assert.equal(cuerpoArma.includes('go('), false, 'deslizar no abre la orden');
+const soltar = cuerpoArma.slice(cuerpoArma.indexOf('const soltar'), cuerpoArma.indexOf('knob.addEventListener'));
+const iFinal = soltar.indexOf('if(alFinal)');
+assert.ok(iFinal > 0);
+assert.equal(soltar.slice(0, iFinal).includes('__tlSonDesbloqueo'), false, 'soltar antes no suena el desbloqueo');
+assert.match(soltar.slice(iFinal, soltar.indexOf('if(ajp.marcado)', iFinal)), /__tlSonDesbloqueo/);
+assert.equal(soltar.includes('playPerdida'), false, 'apagarlo a mano no suena la pérdida');
+const cuerpoPinta = html.slice(pinta, html.indexOf('function ajpLeer'));
+assert.match(cuerpoPinta, /r\.dormir/);
+assert.match(cuerpoPinta, /playPerdida\(\)/);
 assert.equal(puesto.tono, 'alcista');
 
 console.log('ajustar-profito ok');

@@ -120,7 +120,7 @@ export function manejar(q, r, deps) {
         const lectura = algo.lecturaProfito ? algo.lecturaProfito() : null;
         const calc = revisarAjuste({ marcado: !!j.marcado, guardado: j.guardado || null, lectura, symbol: j.symbol || 'MNQ', riesgoUsd: j.riesgoUsd, maxQty: j.maxQty, ahora: Date.now() });
         if (algo.anotarAjuste) algo.anotarAjuste(calc.log, calc.firma);
-        out = { habilitada: !!calc.habilitada, marcado: !!j.marcado, texto: calc.texto || '', guardado: calc.guardado || null, conservado: !!calc.conservado };
+        out = { habilitada: !!calc.habilitada, marcado: calc.dormir ? false : !!j.marcado, texto: calc.texto || '', guardado: calc.dormir ? null : (calc.guardado || null), conservado: !!calc.conservado, dormir: !!calc.dormir };
       } catch (e) { out.err = String(e && e.message || e); }
       r.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
       r.end(JSON.stringify(out));
