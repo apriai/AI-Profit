@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.38] — 2026-11-20
+### Cambiado
+- **El tirador de la pista es el dibujo real del Profito despierto** (`assets/profito-icon-1024.png`, la misma cara que `assets/favicon-512.png`). Apagado, esa imagen se ve en gris y siguen las z de la granja. No hay un dibujo aparte del Profito dormido.
+### Notas
+- El HTML abierto como archivo sigue dejando probar el deslizador. Dentro de la app, sin círculo, sigue bloqueado.
+
 ## [0.10.37] — 2026-11-20
 ### Cambiado
 - **El Profito despierto de la pista es la esfera verde lima de la granja:** brillo arriba a la derecha, borde más oscuro y dos ojos en píldora vertical, juntos y un poco arriba del centro. Los ojos dormidos, en «u», usan el mismo lugar.
