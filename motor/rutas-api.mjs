@@ -3,6 +3,7 @@
 // {"ok":false,"err":["ruta desconocida"]} y el ojo de los algoritmos no hace nada.
 import fs from 'node:fs';
 import path from 'node:path';
+import { revisarAjuste } from './ajustar-profito.mjs';
 
 export function manejar(q, r, deps) {
   if (deps.propiasH(q, r)) return;
@@ -109,6 +110,22 @@ export function manejar(q, r, deps) {
       });
       return;
     }
+  }
+  if (q.url === '/api/ajustar-profito' && q.method === 'POST') {
+    let b = ''; q.on('data', c => b += c); q.on('end', async () => {
+      let j = {}; try { j = JSON.parse(b || '{}'); } catch {}
+      let out = { habilitada: false, marcado: !!j.marcado, texto: '', guardado: null };
+      try {
+        const algo = deps.algoTv();
+        const lectura = algo.lecturaProfito ? algo.lecturaProfito() : null;
+        const calc = revisarAjuste({ marcado: !!j.marcado, guardado: j.guardado || null, lectura, symbol: j.symbol || 'MNQ', riesgoUsd: j.riesgoUsd, maxQty: j.maxQty, ahora: Date.now() });
+        if (algo.anotarAjuste) algo.anotarAjuste(calc.log, calc.firma);
+        out = { habilitada: !!calc.habilitada, marcado: !!j.marcado, texto: calc.texto || '', guardado: calc.guardado || null, conservado: !!calc.conservado };
+      } catch (e) { out.err = String(e && e.message || e); }
+      r.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      r.end(JSON.stringify(out));
+    });
+    return;
   }
   if (q.method === 'POST' || q.url === '/bot') {
     let b = ''; q.on('data', c => b += c); q.on('end', async () => {

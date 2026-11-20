@@ -356,7 +356,7 @@ const guardarHist = () => { for (const d of new Set([diaFarm(), diaFarm(Date.now
 setInterval(guardarHist, 3 * 60 * 1000);
 setTimeout(guardarHist, 15000);
 
-let algoTv = { estado: () => ({ conectado: false, algos: [], texto: '', senal: { seq: 0, barra: null, lado: null } }), intentar: async () => algoTv.estado(), sincronizar: async () => algoTv.estado(), fijar: async () => ({ ok: false, ...algoTv.estado() }), oirSenal: async () => algoTv.estado() };
+let algoTv = { estado: () => ({ conectado: false, algos: [], texto: '', senal: { seq: 0, barra: null, lado: null } }), intentar: async () => algoTv.estado(), sincronizar: async () => algoTv.estado(), fijar: async () => ({ ok: false, ...algoTv.estado() }), oirSenal: async () => algoTv.estado(), lecturaProfito: () => null, anotarAjuste: () => {} };
 try {
   algoTv = crearAlgoTv({
     dir: DIR,

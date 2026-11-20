@@ -82,6 +82,18 @@ function bracketSano(side, b, live) {
 // Bracket pegado a la misma orden. Si el precio candidato (el cierre de la vela) dejaría el SL o el TP
 // del lado malo o a menos de 1 tick del precio vivo, se recalcula desde el vivo. Si ni así queda fuera
 // del mercado, no se envía.
+// Stop en un precio absoluto (la apertura de la vela) y TP a la misma distancia, del otro lado.
+export function bracketDesdeStop(side, live, stop) {
+  const px = roundTick(Number(live)), sl = roundTick(Number(stop));
+  if ((side !== 'long' && side !== 'short') || !Number.isFinite(px) || px <= 0 || !Number.isFinite(sl) || sl <= 0) return null;
+  if (side === 'long' && !(sl <= px - TICK)) return null;
+  if (side === 'short' && !(sl >= px + TICK)) return null;
+  const dist = Math.abs(px - sl);
+  const tp = roundTick(side === 'long' ? px + dist : px - dist);
+  const b = { stopLoss: sl, takeProfit: tp, precio: px, recalculado: false };
+  if (!bracketSano(side, b, px)) return null;
+  return b;
+}
 export function bracketSeguro(side, live, slPts, tpPts, candidato) {
   const px = Number(live), slP = Number(slPts), tpP = Number(tpPts);
   if ((side !== 'long' && side !== 'short') || !Number.isFinite(px) || px <= 0 || !(slP > 0) || !(tpP > 0)) return null;
@@ -404,7 +416,8 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
     async position(symbol) { const p = await evaluate(js.position(symbol)); if (p && p.error) throw new Error(p.error); if (p && p.transient) return p; last.pos = p; return p; },
     async stop() { return last.pos ? last.pos.stop : null; },
     async lastPrice() { try { const r = await evaluate(js.lastPrice); return r && typeof r.price === 'number' ? r.price : null; } catch { return null; } },
-    async openBracket({ side, symbol, qty, slPts, tpPts, tradeSymbol, fillWaitMs, adoptMs, marcar } = {}) {
+    async cotizacion() { const r = await evaluate(js.cotizacion); if (!r || r.error) throw new Error((r && r.error) || 'sin cotización'); return r; },
+    async openBracket({ side, symbol, qty, slPts, tpPts, stopAbs, tradeSymbol, fillWaitMs, adoptMs, marcar } = {}) {
       const marcas = { cotizacion: null, snapshot: null, placeOrder: null, posicion: null, fuente: null, precio: null, edadMs: null, recalculado: null, execError: null };
       const fin = v => { if (typeof marcar === 'function') marcar(marcas); return v; };
       if (!tradeSymbol) return fin('error: sin símbolo del bróker');
@@ -416,8 +429,8 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
       const live = det ? det.precio : null;
       if (det) { marcas.fuente = det.fuente; marcas.precio = det.precio; marcas.edadMs = det.edadMs; }
       if (live == null) return fin('error: no hay precio vivo (bid/ask) para el SL y el TP: no se envía la orden');
-      const br = bracketSeguro(side, live, slPts, tpPts, q.bar);
-      if (!br) return fin('error: el SL o el TP quedarían dentro del precio vivo: no se envía la orden');
+      const br = stopAbs != null ? bracketDesdeStop(side, live, stopAbs) : bracketSeguro(side, live, slPts, tpPts, q.bar);
+      if (!br) return fin(stopAbs != null ? { avisoPanel: true, texto: 'El stop queda del lado incorrecto' } : 'error: el SL o el TP quedarían dentro del precio vivo: no se envía la orden');
       marcas.recalculado = !!br.recalculado;
       const s = side === 'long' ? 1 : -1;
       const o = { symbol: tradeSymbol, side: s, type: 2, qty, stopLoss: br.stopLoss, takeProfit: br.takeProfit };
@@ -638,7 +651,13 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
           if ((S.pasos || []).length && dPre.action !== 'modify') orden.push('paso');
           if (dPre.action === 'modify' || dPre.action === 'skip') { if (dPre.action === 'modify') orden.push('paso'); await actuar(dPre, pos, sl, tRead, tSeen); if (S.lockPrice != null) sl = S.lockPrice; }
           orden.push('ajuste');
-          S.ajusteHecho = true; const sd2 = c.side === 'long' ? 1 : -1, slCalc = roundTick(pos.entry - sd2 * S.slPts), tpN = roundTick(pos.entry + sd2 * S.tpPts);
+          S.ajusteHecho = true; const sd2 = c.side === 'long' ? 1 : -1;
+          let slCalc, tpN;
+          if (S.stopProfito != null) {
+            const aj = bracketDesdeStop(c.side, pos.entry, S.stopProfito);
+            if (!aj) { log('Ajustar a último Profito: el fill quedó del lado del stop, no se mueve'); slCalc = typeof sl0 === 'number' ? sl0 : roundTick(S.stopProfito); tpN = S.tpRef; }
+            else { slCalc = aj.stopLoss; tpN = aj.takeProfit; }
+          } else { slCalc = roundTick(pos.entry - sd2 * S.slPts); tpN = roundTick(pos.entry + sd2 * S.tpPts); }
           const protegido = S.lockPrice != null ? S.lockPrice : (S.lockPending ? S.lockTarget : null);
           const slN = protegido != null && (c.side === 'long' ? protegido > slCalc : protegido < slCalc) ? protegido : slCalc;
           const slA = slN === protegido ? protegido : sl0, tpA = S.tpRef;
@@ -752,7 +771,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
         return r || { ok: false, err: 'No se pudo iniciar' };
       } catch (e) { acctGuard.testActive = false; if (S.state === 'running') S.state = 'error'; return { ok: false, err: String(e.message || e) }; }
     },
-    async _start({ side = 'long', symbol = DEFAULT.symbol, qty, accountId, accountName, strategyId, tClick } = {}) {
+    async _start({ side = 'long', symbol = DEFAULT.symbol, qty, accountId, accountName, strategyId, tClick, stopProfito } = {}) {
       const tServer = Date.now();
       const tiempos = { clickServidor: tClick != null && Number.isFinite(+tClick) ? tServer - +tClick : null };
       const strat = getStrategy(strategyId == null || strategyId === '' ? DEFAULT_STRATEGY : strategyId); if (!strat) return { ok: false, err: `Estrategia desconocida: ${strategyId}` };
@@ -779,8 +798,21 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
       if (accountId && prep.accountId && String(prep.accountId) !== String(accountId)) return { ok: false, err: 'La cuenta activa no es la elegida: no se opera' };
       const hint = accountHintFor(name);
       { const maxQ = maxQtyFor(symbol, hint); if (qty > maxQ) return { ok: false, err: `Cantidad inválida: ${symbol} entre 1 y ${maxQ}` }; }
-      const P = paramsForAccount(strat.params, hint), c = { side, symbol, qty, P, strategy: { id: strat.id, name: strat.name }, steps: stepsFor(symbol, qty, P) }, slPts = ptsFor(P.SL_USD, symbol, qty), tpPts = ptsFor(P.TP_USD, symbol, qty);
-      S = { ...S, pnlBroker: null, summary: null, reason: null, lockTarget: null, lockPending: false, openAt: null, closeAt: null, lockAt: null, tpPrice: null, latency: null, state: 'running', strategy: { id: strat.id, name: strat.name }, P, steps: stepsFor(symbol, qty, P), step: 0, pasos: [], mode: chk.paper ? 'paper' : chk.real ? 'real' : 'simulacion', realLabel: chk.realLabel || null, alerta: null, emptyN: 0, emptySince: null, kidsWarned: false, fuentesStats: null, account: chk.account, side, symbol, qty, entry: null, price: null, pnl: null, sl: null, slVisto: null, tpVisto: null, tp: tpPts, locked: false, lockPrice: null, error: null, startedAt: new Date().toISOString(), log: [] };
+      const P = paramsForAccount(strat.params, hint);
+      let slPts = ptsFor(P.SL_USD, symbol, qty), tpPts = ptsFor(P.TP_USD, symbol, qty), stopAbs = null;
+      if (stopProfito != null && stopProfito !== '') {
+        const stopN = Number(stopProfito);
+        if (!Number.isFinite(stopN) || stopN <= 0) return { ok: false, avisoPanel: true, err: 'El stop no es un precio' };
+        let qv = null;
+        try { qv = await (await D()).cotizacion(); } catch (e) { return { ok: false, avisoPanel: true, err: 'No hay precio vivo para el ajuste' }; }
+        const det0 = detallePrecio(side, qv, Date.now());
+        const br0 = bracketDesdeStop(side, det0 && det0.precio, stopN);
+        if (!br0) { log('Ajustar a último Profito: no se envía, el stop queda del lado incorrecto'); return { ok: false, avisoPanel: true, err: 'El stop queda del lado incorrecto' }; }
+        stopAbs = br0.stopLoss; slPts = Math.abs(br0.precio - br0.stopLoss); tpPts = Math.abs(br0.takeProfit - br0.precio);
+        log(`Ajustar a último Profito: stop ${br0.stopLoss} · TP ${br0.takeProfit} · ${qty} ${symbol}`);
+      }
+      const c = { side, symbol, qty, P, strategy: { id: strat.id, name: strat.name }, steps: stepsFor(symbol, qty, P) };
+      S = { ...S, pnlBroker: null, summary: null, reason: null, lockTarget: null, lockPending: false, openAt: null, closeAt: null, lockAt: null, tpPrice: null, latency: null, state: 'running', strategy: { id: strat.id, name: strat.name }, P, steps: stepsFor(symbol, qty, P), step: 0, pasos: [], mode: chk.paper ? 'paper' : chk.real ? 'real' : 'simulacion', realLabel: chk.realLabel || null, alerta: null, emptyN: 0, emptySince: null, kidsWarned: false, fuentesStats: null, account: chk.account, side, symbol, qty, entry: null, price: null, pnl: null, sl: null, slVisto: null, tpVisto: null, tp: tpPts, stopProfito: stopAbs, locked: false, lockPrice: null, error: null, startedAt: new Date().toISOString(), log: [] };
       stopReq = false;
       log(`Inicio [${strat.name}] ${side === 'long' ? 'COMPRA' : 'VENTA'} ${qty} ${symbol} · SL -$${P.SL_USD} (${slPts} pts) · TP +$${P.TP_USD} (${tpPts} pts) · ${P.STEPS ? (!c.steps.length ? 'stop fijo (sin movimientos)' : 'escalones ' + c.steps.map(x => `+$${x.triggerUsd}→+$${x.lockUsd} (${x.lockPts} pts)`).join(' · ')) : `colchón +$${lockUsdFor(symbol, qty, P)} (${lockPtsFor(symbol, qty, P)} pts, ≈ +$${P.NET_USD} netos), disparo +$${triggerUsdFor(symbol, qty, P)} (${triggerPtsFor(symbol, qty, P)} pts)`} · cuenta ${chk.account.name || '?'}${strat.params.SCALE_BY_SIZE ? ' · plan ' + accountPlanSize(hint) : ''} -> ${chk.msg}`);
       if (prep.switchedMs != null) log(`Cuenta cambiada a ${name} por API (${(prep.switchedMs / 1000).toFixed(2)} s, verificada)`);
@@ -788,13 +820,18 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
       if (!exec) { log('BLOQUEADO: solo Paper/Demo o cuenta real permitida. No se envía ninguna orden.'); S.state = 'blocked'; return { ok: false, blocked: true, err: chk.msg, status: S }; }
       const drv = await D(); S.accountId = prep.accountId || null;
       const marcas = {};
-      const op = await drv.openBracket({ ...c, slPts, tpPts, tradeSymbol: prep.tradeSymbol, fillWaitMs: opts.fillWaitMs, adoptMs: opts.adoptMs, marcar: m => Object.assign(marcas, m) });
+      const op = await drv.openBracket({ ...c, slPts, tpPts, stopAbs, tradeSymbol: prep.tradeSymbol, fillWaitMs: opts.fillWaitMs, adoptMs: opts.adoptMs, marcar: m => Object.assign(marcas, m) });
       tiempos.cotizacion = marcas.cotizacion ?? null; tiempos.snapshot = marcas.snapshot ?? null; tiempos.placeOrder = marcas.placeOrder ?? null; tiempos.posicion = marcas.posicion ?? null;
       tiempos.total = Date.now() - (tClick != null && Number.isFinite(+tClick) ? +tClick : tServer);
       if (marcas.fuente) log(lineaPrecio(marcas));
       if (marcas.execError) log('No pude leer las ejecuciones: ' + marcas.execError);
       const especial = op && typeof op === 'object';
       const texto = especial ? String(op.texto || '') : String(op);
+      if (especial && op.avisoPanel) {
+        S.state = 'idle'; S.error = null; S.reason = null;
+        log('Ajustar a último Profito: no se envía, el stop queda del lado incorrecto');
+        return { ok: false, avisoPanel: true, err: texto || 'El stop queda del lado incorrecto' };
+      }
       log('open ->', texto);
       log(lineaTiempos(tiempos));
       if (especial && op.cerrado) {

@@ -591,20 +591,38 @@ function indices(mi){
   if(ba<0&&lineas.length>1) ba=lineas[1];
   return {al:al, ba:ba};
 }
-function ultimo(src){
-  var data=null, bars=null, last=null;
-  try{ data=src.data&&src.data(); }catch(e){}
-  try{ bars=data&&typeof data.bars==='function'?data.bars():null; }catch(e2){}
-  if(!bars){ try{ bars=src._data&&typeof src._data.bars==='function'?src._data.bars():src._data; }catch(e3){} }
-  try{ if(bars&&typeof bars.last==='function') last=bars.last(); }catch(e4){}
-  if(!last&&bars&&bars._items&&bars._items.length) last=bars._items[bars._items.length-1];
-  if(!last) return null;
-  var value=last.value!=null?last.value:last;
+function infoDe(item){
+  if(!item) return null;
+  var value=item.value!=null?item.value:item;
   var time=null;
-  try{ if(last.index!=null) time=last.index; }catch(e5){}
+  try{ if(item.index!=null) time=item.index; }catch(e){}
   if(value&&finito(value[0])&&value[0]>1e8) time=value[0];
   else if(time==null&&value&&finito(value[0])) time=value[0];
   return {time:time, value:value};
+}
+function ultimo(src){
+  var filasSrc=filas(src, 1);
+  return filasSrc.length?infoDe(filasSrc[filasSrc.length-1]):null;
+}
+function filas(src, n){
+  var data=null, bars=null, items=[];
+  try{ data=src&&src.data&&src.data(); }catch(e){}
+  try{ bars=data&&typeof data.bars==='function'?data.bars():null; }catch(e2){}
+  if(!bars&&src){ try{ bars=src.bars&&typeof src.bars==='function'?src.bars():(src._data&&typeof src._data.bars==='function'?src._data.bars():src._data); }catch(e3){} }
+  try{
+    if(bars&&bars._items&&bars._items.length){
+      var a=bars._items, i0=Math.max(0, a.length-n);
+      for(var i=i0;i<a.length;i++) if(a[i]) items.push(a[i]);
+    } else if(bars&&typeof bars.last==='function'){
+      var last=bars.last(); if(last) items.push(last);
+    }
+  }catch(e4){}
+  return items;
+}
+function abiertaDe(value){
+  if(!value||!finito(value[1])) return null;
+  if(finito(value[0])&&value[0]>1e8&&value[1]>1e8) return null;
+  return value[1];
 }
 function plotEn(info, idx){
   if(!info||idx<0||!info.value) return false;
@@ -642,8 +660,32 @@ try{
   var mi=null; try{ mi=elegido.src&&elegido.src.metaInfo&&elegido.src.metaInfo(); }catch(e6){}
   var ix=indices(mi||{});
   var info=elegido.src?ultimo(elegido.src):null;
-  if(!info||info.time==null) return {ok:true, enGrafico:lista.length, visible:true, barra:null, alcista:false, bajista:false, resolucion:res, simbolo:sim};
-  return {ok:true, enGrafico:lista.length, visible:true, barra:info.time, alcista:plotEn(info, ix.al), bajista:plotEn(info, ix.ba), resolucion:res, simbolo:sim};
+  if(!info||info.time==null) return {ok:true, enGrafico:lista.length, visible:true, barra:null, alcista:false, bajista:false, resolucion:res, simbolo:sim, velas:[]};
+  var velas=[], abiertas={};
+  try{
+    var ms=window.TradingViewApi._activeChartWidgetWV.value()._chartWidget.model().mainSeries();
+    var fils=filas(ms, 12);
+    for(var bi=0;bi<fils.length;bi++){
+      var ib=infoDe(fils[bi]);
+      if(!ib||ib.time==null) continue;
+      var ap=abiertaDe(ib.value);
+      if(ap!=null) abiertas[String(ib.time)]=ap;
+    }
+  }catch(eM){}
+  var filsS=elegido.src?filas(elegido.src, 12):[];
+  for(var si=0;si<filsS.length;si++){
+    var is=infoDe(filsS[si]);
+    if(!is||is.time==null) continue;
+    velas.push({barra:is.time, abierta:abiertas[String(is.time)]!=null?abiertas[String(is.time)]:null, alcista:plotEn(is, ix.al), bajista:plotEn(is, ix.ba)});
+  }
+  var precio=null;
+  try{
+    var ms2=window.TradingViewApi._activeChartWidgetWV.value()._chartWidget.model().mainSeries();
+    var qq=(ms2.quotes&&ms2.quotes())||{};
+    function num(v){var x=typeof v==='number'?v:+v; return typeof x==='number'&&isFinite(x)&&x>0?x:null}
+    precio={bid:num(qq.bid), ask:num(qq.ask), last:num(qq.last!=null?qq.last:qq.trade)};
+  }catch(eQ){}
+  return {ok:true, enGrafico:lista.length, visible:true, barra:info.time, alcista:plotEn(info, ix.al), bajista:plotEn(info, ix.ba), resolucion:res, simbolo:sim, velas:velas, precio:precio};
 }catch(e){ return {ok:false}; }
 })()`;
 }
@@ -692,6 +734,8 @@ export function crearAlgoTv({
   const estadoSenal = { barra: null, alcista: false, bajista: false };
   let senal = { seq: 0, barra: null, lado: null };
   let senalEnCurso = false;
+  let lecturaProfito = null;
+  let firmaAjuste = '';
   function estado() {
     const algos = vista();
     return { conectado: memoria.conectado === true, fase: faseActual(), algos, texto: textoLista(algos), senal: { seq: senal.seq, barra: senal.barra, lado: senal.lado } };
@@ -701,6 +745,7 @@ export function crearAlgoTv({
     senalEnCurso = true;
     try {
       const r = await evaluar(exprSenal({ nombre: ALGO_NOMBRE }));
+      if (r && r.ok) lecturaProfito = { velas: Array.isArray(r.velas) ? r.velas : [], resolucion: r.resolucion || '', simbolo: r.simbolo || '', precio: r.precio || null, leido: Date.now() };
       const d = decidirToque(estadoSenal, r || {});
       if (d.rebaseline) log(`Señal Profito Algoritmo: marco reanudado (${d.resolucion || '?'} ${d.simbolo || '?'}, barra ${d.barra})`);
       if (d.pasada) log(`Señal Profito Algoritmo: vela pasada ignorada (${d.resolucion || '?'} ${d.simbolo || '?'}, barra ${d.barra})`);
@@ -866,5 +911,10 @@ export function crearAlgoTv({
       return estado();
     }
   }
-  return { intentar, sincronizar, fijar, estado, oirSenal, archivo, manifiesto };
+  function anotarAjuste(linea, firma) {
+    if (!linea || !firma || firma === firmaAjuste) return;
+    firmaAjuste = firma;
+    log(linea);
+  }
+  return { intentar, sincronizar, fijar, estado, oirSenal, lecturaProfito: () => lecturaProfito, anotarAjuste, archivo, manifiesto };
 }

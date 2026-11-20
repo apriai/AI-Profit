@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.33] — 2026-11-20
+### Añadido
+- **«Ajustar a último Profito» en el panel de operar.** Se prende deslizando el círculo de Profito hasta el final de la pista (el mismo verde o rojo del indicador). Si no se suelta al final, el círculo vuelve con un rebote. Tocarlo o devolverlo lo apaga. Solo se puede deslizar si hay un círculo del algoritmo en la vela abierta o en las 3 velas cerradas de justo antes. Si no hay, la pista queda atenuada, el círculo gris y el cursor no lo permite. Al activarla, el stop queda en la apertura de la vela del círculo más reciente, el objetivo a la misma distancia del otro lado, y los contratos salen del riesgo en dólares de la estrategia, sin pasar el tope de la cuenta (25K o 50K). Si el círculo se va, se quedan esos números mientras siga activada. Si aparece otro, se recalculan. No abre la orden: BUY o SELL siguen mandando, con el stop y el objetivo en la misma orden. Si el stop quedaría del lado incorrecto del precio vivo, no se envía y el panel lo dice.
+### Notas
+- No cambia el sonido del algoritmo ni cómo se mueve el stop después de entrar.
+
 ## [0.10.32] — 2026-11-19
 ### Cambiado
 - **La explicación bajo Estrategia ya no se repite.** Solo queda el texto corto. Si el stop se mueve una vez (Fast Breakeven) se añade «Se mueve una sola vez.» Si es un colchón o tiene escalones, «Solo sube, nunca baja.» Si el stop no se mueve, el texto corto queda igual. Los dólares siguen saliendo de la cuenta, 25K o 50K.
