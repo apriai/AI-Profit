@@ -5159,7 +5159,7 @@ function tlRosePos(){const can=ci.userData&&ci.userData.can,rose=can&&can.userDa
 function tlPourStart(plant){if(!plant||!plant.g)return;if(!tlFlowerPanelOpen(plant.id)||!stSitFree(Wu.state)||tlAtSeat(ci)||!tlAtWaterPoint(plant,Wu.state&&Wu.state.goal)||!tlFacingPlant(plant,.8))return;tlPour.lx=null;tlPour.lz=null;const can=tlCan();can.visible=!0;tlPour.on=!0;tlPour.plant=plant;tlPour.id=plant.id;if(!tlPour.geo){tlPour.geo=new gl(.028,6,6);tlPour.mat=new yn({color:0x7fdcff,transparent:!0,opacity:.92})}if(!tlPour.drops.length){for(let i=0;i<24;i++){const d=new ht(tlPour.geo,tlPour.mat);d.visible=!1;d.userData.k=-1;Xt.add(d);tlPour.drops.push(d)}}if(!tlPour.raf)tlPour.raf=requestAnimationFrame(tlPourTick)}
 function tlPourTick(){tlPour.raf=0;const plant=tlPour.plant;if(!plant||plant.removed||!tlFlowerPanelOpen(tlPour.id)){tlStopWater();return}const stChk=Wu.state,movedP=tlPour.lx!=null?Math.hypot(ci.position.x-tlPour.lx,ci.position.z-tlPour.lz):0;tlPour.lx=ci.position.x;tlPour.lz=ci.position.z;const walkAway=stChk&&stChk.mode==="walk"&&((stChk.route&&stChk.route.length)||(stChk.target&&Math.hypot(ci.position.x-stChk.target.x,ci.position.z-stChk.target.z)>.35));const unsettled=!stSitFree(stChk)||tlAtSeat(ci)||!tlAtWaterPoint(plant,stChk&&stChk.goal)||movedP>.022||walkAway||!tlFacingPlant(plant,.9);if(unsettled){const can=ci.userData&&ci.userData.can;if(can)can.visible=!1;if(tlPour.drops)tlPour.drops.forEach(d=>{d.visible=!1;d.userData.k=-1});tlPour.on=!1;if(tlAtSeat(ci)||!tlFlowerPanelOpen(tlPour.id))return;if(!tlAtWaterPoint(plant,stChk&&stChk.goal)){try{tlGoWater(plant)}catch(e){}return}tlPour.raf=requestAnimationFrame(tlPourTick);return}tlPour.on=!0;const st=Wu.state;if(st.mode!=="walk"){st.mode="inspect";st.timer=1.4;st.look=plant.g.position}const can=ci.userData.can;if(can){can.visible=!0;can.rotation.z=-.4+.1*Math.sin(performance.now()/160)}const from=tlRosePos(),to=plant.g.position.clone();to.y+=(plant.d&&plant.d.kind==="tree"?1.1:.45);const now=performance.now()/1000;let spawned=0;for(const d of tlPour.drops){if(d.userData.k<0||now-d.userData.t0>d.userData.life){if(spawned<3){d.userData.k=1;d.userData.t0=now;d.userData.life=.4+.28*Math.random();d.userData.s=from.clone();d.userData.e=to.clone().add(new P((Math.random()-.5)*.4,Math.random()*.3,(Math.random()-.5)*.4));d.visible=!0;spawned++}else{d.visible=!1;d.userData.k=-1;continue}}const u=Math.min(1,(now-d.userData.t0)/d.userData.life);d.position.lerpVectors(d.userData.s,d.userData.e,u);d.position.y+=Math.sin(u*Math.PI)*.4;d.scale.setScalar(.65+Math.sin(u*Math.PI)*.7)}tlPour.raf=requestAnimationFrame(tlPourTick)}
 function tlGoWater(plant){try{if(!plant||!plant.g||window.__tlWinTick)return;if(!tlFlowerPanelOpen(plant.id)){tlStopWater();return}if(tlGoWater.iv){clearInterval(tlGoWater.iv);tlGoWater.iv=0}if(tlPour.on&&tlPour.plant===plant&&stSitFree(Wu.state)&&!tlAtSeat(ci)&&tlNearPlant(plant,1.4)){tlPourStart(plant);return}tlPour.on=!1;if(tlPour.raf){cancelAnimationFrame(tlPour.raf);tlPour.raf=0}if(tlPour.drops)tlPour.drops.forEach(d=>{d.visible=!1;d.userData.k=-1});tlPour.plant=null;tlPour.id=null;tlCan().visible=!1;const st=Wu.state,n=ci;let tg=tlWaterStand(plant,n.position,0);if(!tg)return;st.look=plant.g.position.clone();st.after="inspect";st.route=[];st.sit=0;st.goal=tg.clone();st._water=1;if(st.mode==="sit"||st.sit>.2||tlAtSeat(n)){try{tlLeaveSeat(n,tg)}catch(ex){}st.sit=0}st.mode="walk";st.target.copy(tg);const applyWay=W=>{if(W&&W.length){st.route=W.slice(1).concat([tg.clone()]);st.target.set(W[0].x,0,W[0].z)}};applyWay(typeof tlWay==="function"?tlWay(n.position.x,n.position.z,tg.x,tg.z):null);try{if(typeof tlParkPet==="function")tlParkPet(tg)}catch(ex){}applyWay(typeof tlWay==="function"?tlWay(n.position.x,n.position.z,tg.x,tg.z):null);let ticks=0,stuck=0,lastX=n.position.x,lastZ=n.position.z,alt=0,stillN=0,stillX=n.position.x,stillZ=n.position.z;const my=plant.id;const tryPour=()=>{if(!tlFlowerPanelOpen(my)||tlAtSeat(ci))return!1;if(!tlAtWaterPoint(plant,tg))return!1;st.look=plant.g.position.clone();st.route=[];st.mode="inspect";st.timer=1.4;st.after="inspect";if(st.sit!=null&&st.sit>.45)st.sit=0;try{const fx=ci.position.x,fz=ci.position.z;st.heading=Math.atan2(-(plant.g.position.z-fz),plant.g.position.x-fx)}catch(e){}const mv=Math.hypot(ci.position.x-stillX,ci.position.z-stillZ);if(stillN<1||mv>.1)return!1;if(!tlFacingPlant(plant,.7))return!1;tlPourStart(plant);return!!tlPour.on};const hopAlong=()=>{try{const px=ci.position.x,pz=ci.position.z;if(px>3.55&&px<7.7&&pz<-.55&&pz>-3.4){for(const q of[[3.05,-.35],[2.85,.4],[3.15,1.1],[2.6,-.2]]){if(typeof tlFoot==="function"&&!tlFoot(q[0],q[1]))continue;ci.position.x=q[0];ci.position.z=q[1];break}}const W=typeof tlWay==="function"?tlWay(ci.position.x,ci.position.z,tg.x,tg.z):null;if(W&&W.length){let hop=W[0];for(const h of W){if(Math.hypot(h.x-ci.position.x,h.z-ci.position.z)>.7){hop=h;break}}const dx=hop.x-ci.position.x,dz=hop.z-ci.position.z,d=Math.hypot(dx,dz)||1,step=Math.min(1.55,d),nx=ci.position.x+dx/d*step,nz=ci.position.z+dz/d*step;if(typeof tlFoot!=="function"||tlFoot(nx,nz)){ci.position.x=nx;ci.position.z=nz}st.route=W.slice(1).concat([tg.clone?tg.clone():new P(tg.x,0,tg.z)]);st.target.set(hop.x,0,hop.z);return!0}const foot=typeof tlFoot==="function"?tlFoot:Yo;for(const f of[1.1,1.8,2.6,3.4]){for(let i=0;i<16;i++){const a=i*Math.PI/8,x=ci.position.x+Math.cos(a)*f,z=ci.position.z+Math.sin(a)*f;if(!foot(x,z))continue;const W2=typeof tlWay==="function"?tlWay(x,z,tg.x,tg.z):null;if(W2!==null){ci.position.x=x;ci.position.z=z;if(W2.length){st.route=W2.slice(1).concat([tg.clone?tg.clone():new P(tg.x,0,tg.z)]);st.target.set(W2[0].x,0,W2[0].z)}else st.target.copy(tg);return!0}}}return!1}catch(ex){return!1}};tlGoWater.iv=setInterval(()=>{ticks++;try{if(typeof tlParkPet==="function")tlParkPet(tg)}catch(ex){}const smv=Math.hypot(ci.position.x-stillX,ci.position.z-stillZ);if(smv<.1)stillN++;else{stillN=0;stillX=ci.position.x;stillZ=ci.position.z}if(ticks>240||!tlFlowerPanelOpen(my)){clearInterval(tlGoWater.iv);tlGoWater.iv=0;if(!tlFlowerPanelOpen(my))tlStopWater();return}if(tryPour()){return}if(tlAtWaterPoint(plant,tg)){stuck=0;return}const px=ci.position.x,pz=ci.position.z;if(Math.hypot(px-lastX,pz-lastZ)<.14)stuck++;else{stuck=0;lastX=px;lastZ=pz}if(stuck>=4){if(tryPour()){return}stuck=0;alt++;try{if(typeof Ri!=="undefined"&&Ri&&typeof tlYield==="function")tlYield(Hu.state)}catch(ex){}try{tlNudgeSide(ci,st.heading||0,.45)||tlNudgeSide(ci,(st.heading||0)+.9,.5)}catch(ex){}try{if(typeof tlEscape==="function")tlEscape(ci,plant)}catch(ex){}try{if(typeof tlSlide==="function")tlSlide(ci,st)}catch(ex){}const nxt=tlWaterStand(plant,ci.position,alt);if(nxt){tg=nxt;st.goal=tg.clone()}if(tlAtSeat(ci)||st.mode==="sit"){try{tlLeaveSeat(ci,tg)}catch(ex){}st.sit=0}st._water=1;st.mode="walk";st.after="inspect";try{tlReplanWalk(st,ci)}catch(ex){st.target.copy(tg)}hopAlong();lastX=ci.position.x;lastZ=ci.position.z}else if(st.mode!=="walk"&&st.mode!=="inspect"&&st.mode!=="stand"){st.sit=0;st._water=1;st.mode="walk";st.after="inspect";st.goal=tg.clone();try{tlReplanWalk(st,ci)}catch(ex){st.target.copy(tg)}}else if(tlAtSeat(ci)){st.sit=0;st._water=1;st.mode="walk";st.after="inspect";st.goal=tg.clone();try{tlLeaveSeat(ci,tg);tlReplanWalk(st,ci)}catch(ex){st.target.copy(tg)}}},200)}catch(err){console.warn("tlGoWater",err)}}
-function Rl(n){const e=At[n];if(!e||e.removed)return;__selLbl(e);const t=e.g.position.clone().add(new P(0,e.h*.55,0)),i=fn.pos.clone().sub(fn.target).normalize();Ou(t.clone().addScaledVector(i,23).add(new P(-3,0,0)),t.clone().add(new P(2.2,.8,0))),jr(e.id,!0),tlGoWater(e)}const $x=(n,e,t="")=>`<div class="row"><span>${n}</span><b class="${t}">${e}</b></div>`;function jr(n,e){var c;const t=bn().accounts.find(l=>l.id===n);if(!t){Ms===n&&ms();return}if(t.memorial&&window.__memCard){window.__memCard(t);return}const i=Ln(t);Ms=n;const s=i.kind==="tree"?[["Saldo",Ut(i.bal)],["P&L hoy",yi(t.pnlToday||0),(t.pnlToday||0)>=0?"pos":"neg"],["Drawdown",i.locked?`Fijo en ${Ut(i.floor)}`:`Trailing · piso ${Ut(i.floor)}`],["Margen sobre DD",Ut(i.ddLeft)],["Total pagado",Ut(i.payTotal)]]:i.kind==="wither"?[["Estado","Drawdown roto"],["P&L final",yi(i.pnl),"neg"],["DD restante","$0"]]:[["Saldo",Ut(i.bal)],["P&L total (desde "+Math.round(t.start??25e3).toLocaleString("en-US")+")",yi(i.pnl),i.pnl>=0?"pos":"neg"],["P&L hoy",yi(t.pnlToday||0),(t.pnlToday||0)>=0?"pos":"neg"],["Meta",`$${(i.target||1250).toLocaleString("en-US")} · ${Math.round(i.progress*100)}%`],["DD restante",Ut(i.ddLeft),i.atRisk?"neg":""],["DD tipo","Trailing EOD $"+(i.dd||1000).toLocaleString("en-US")]],r=i.kind==="tree"?`<div class="sec">💰 Pagos <span>${i.payouts.length}</span></div>
+function Rl(n){const e=At[n];if(!e||e.removed)return;__selLbl(e);const t=e.g.position.clone().add(new P(0,e.h*.55,0)),i=fn.pos.clone().sub(fn.target).normalize();Ou(t.clone().addScaledVector(i,23).add(new P(-3,0,0)),t.clone().add(new P(2.2,.8,0))),jr(e.id,!0),tlGoWater(e)}const $x=(n,e,t="")=>`<div class="row"><span>${n}</span><b class="${t}">${e}</b></div>`;function jr(n,e){var c;const t=bn().accounts.find(l=>l.id===n);if(!t){Ms===n&&ms();return}if(t.memorial&&window.__memCard){window.__memCard(t);return}const i=Ln(t);Ms=n;window.__tlRepintarFlor=function(){if(Ms===n)jr(n)};const s=i.kind==="tree"?[["Saldo",Ut(i.bal)],["P&L sesión",yi(window.__tlSesion?window.__tlSesion.pnlFila(t):(t.pnlToday||0)),(window.__tlSesion?window.__tlSesion.pnlFila(t):(t.pnlToday||0))>=0?"pos":"neg"],["Drawdown",i.locked?`Fijo en ${Ut(i.floor)}`:`Trailing · piso ${Ut(i.floor)}`],["Margen sobre DD",Ut(i.ddLeft)],["Total pagado",Ut(i.payTotal)]]:i.kind==="wither"?[["Estado","Drawdown roto"],["P&L final",yi(i.pnl),"neg"],["DD restante","$0"]]:[["Saldo",Ut(i.bal)],["P&L total (desde "+Math.round(t.start??25e3).toLocaleString("en-US")+")",yi(i.pnl),i.pnl>=0?"pos":"neg"],["P&L sesión",yi(window.__tlSesion?window.__tlSesion.pnlFila(t):(t.pnlToday||0)),(window.__tlSesion?window.__tlSesion.pnlFila(t):(t.pnlToday||0))>=0?"pos":"neg"],["Meta",`$${(i.target||1250).toLocaleString("en-US")} · ${Math.round(i.progress*100)}%`],["DD restante",Ut(i.ddLeft),i.atRisk?"neg":""],["DD tipo","Trailing EOD $"+(i.dd||1000).toLocaleString("en-US")]],r=i.kind==="tree"?`<div class="sec">💰 Pagos <span>${i.payouts.length}</span></div>
     ${i.payouts.length?i.payouts.map((l,d)=>`<div class="pay"><span>${Wo(l.date)}</span><b class="gold">${Ut(l.amount)}</b><button class="x" data-delpay="${d}" title="Quitar">×</button></div>`).join(""):'<div class="note">Todavía no hay pagos.</div>'}
     <form class="payform"><input name="amount" type="number" min="1" step="1" placeholder="Monto $" required><input name="date" type="date" value="${_t()}" required><button class="pbtn" type="submit">＋</button></form>`:"";Zt.innerHTML=`<button class="close">×</button><h2>${ps((t.plantName&&String(t.plantName).trim())||t.name)}</h2><div class="st">${ps(String(t.name||"").length>10?String(t.name).slice(0,4)+"…"+String(t.name).slice(-3):t.name)} · LucidFlex ${((t.planSaldo==="50K"||[t.balance,t.bal,t.peak,t.inicio,t.start,t.planStart].some(n=>+n>=37500))||(![t.balance,t.bal,t.peak,t.inicio,t.start,t.planStart].some(n=>+n>0)&&(t.plan==="50K"||t.dd===2e3||i.dd===2e3))?"50K":"25K")} · ${i.estado}${t.example?" · cifras de ejemplo":""}${t.date?" · desde "+Wo(t.date):""}</div><label class="pname">Nombre de planta<input data-pname maxlength="40" placeholder="Ej. Hero 1" value="${ps(t.plantName||"")}"></label>
     <button class="tbtn" data-trade><span class="tbtn-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16.5l5-5 3.5 3.5L20 7"/><path d="M14 7h6v6"/></svg></span><span>TRADE</span></button>
@@ -6054,7 +6054,82 @@ document.getElementById("metricaBtn").onclick=e=>{e.__tlSon=1;var abrio=mv.class
 junto();addEventListener("resize",junto);addEventListener("load",junto);
 })();</script>
 
-<script>/* Prop Farm: trades del día (bróker/historial) para la barra superior. El neto de la sesión manda sobre el daily guardado. */(function(){async function p(){try{const [t,a]=await Promise.all([fetch("/api/colchon/trades",{cache:"no-store"}).then(r=>r.json()),fetch("/accounts.json",{cache:"no-store"}).then(r=>r.json())]);const d=t.dia,R=t.resumen||{},dn=a&&a.daily&&a.daily[d];const live=Array.isArray(a&&a.live)?a.live.length:null;const _tr=Array.isArray(t.trades)?t.trades:[];const neto=typeof t.saldoDia==="number"?t.saldoDia:(typeof R.pnl==="number"?R.pnl:(typeof dn==="number"?dn:null));window.__tlPnl={neto,bruto:typeof t.bruto==="number"?t.bruto:(t.total??0),n:typeof R.n==="number"?R.n:(t.n??_tr.length),ganados:typeof R.ganados==="number"?R.ganados:_tr.filter(x=>x&&x.pnl>0).length,perdidos:typeof R.perdidos==="number"?R.perdidos:_tr.filter(x=>x&&typeof x.pnl==="number"&&x.pnl<0).length,racha:R.racha||0,rachaTipo:R.rachaTipo||null,mejor:R.mejor||0,peor:R.peor||0,cuentas:live,dia:d};window.__zu&&window.__zu()}catch(e){}}setTimeout(p,1500);setInterval(p,30000)})();</script>
+<script id="tl-sesion-pnl">/* P&L de la sesión de UNA cuenta: de las 16:00 ET a las 16:00 ET del día siguiente. Solo el neto ya descontado. No incluye la posición abierta. */
+(function (root) {
+  function partesNY(ms) {
+    const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).formatToParts(new Date(ms)).map(x => [x.type, x.value]));
+    return { y: +p.year, m: +p.month, d: +p.day, h: +p.hour % 24, min: +p.minute, s: +p.second };
+  }
+  function instanteNY(y, m, d, h, min) {
+    let t = Date.UTC(y, m - 1, d, h + 5, min);
+    for (let i = 0; i < 4; i++) {
+      const p = partesNY(t);
+      const delta = Date.UTC(y, m - 1, d, h, min) - Date.UTC(p.y, p.m - 1, p.d, p.h, p.min);
+      if (delta === 0) return t;
+      t += delta;
+    }
+    return t;
+  }
+  function inicioSesion(ahora) {
+    const t = ahora == null ? Date.now() : +ahora;
+    const p = partesNY(t);
+    let y = p.y, m = p.m, d = p.d;
+    if (p.h < 16) {
+      const prev = new Date(Date.UTC(y, m - 1, d));
+      prev.setUTCDate(prev.getUTCDate() - 1);
+      y = prev.getUTCFullYear(); m = prev.getUTCMonth() + 1; d = prev.getUTCDate();
+    }
+    return instanteNY(y, m, d, 16, 0);
+  }
+  function finSesion(ahora) {
+    const p = partesNY(inicioSesion(ahora));
+    const next = new Date(Date.UTC(p.y, p.m - 1, p.d));
+    next.setUTCDate(next.getUTCDate() + 1);
+    return instanteNY(next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate(), 16, 0);
+  }
+  function mismaCuenta(a, b) {
+    const x = String(a || ""), y = String(b || "");
+    if (!x || !y) return false;
+    if (x === y) return true;
+    const mask = s => s.replace(/\b([A-Za-z][A-Za-z0-9]{3})[A-Za-z0-9]{4,}([A-Za-z0-9]{3})\b/g, "$1…$2");
+    return mask(x) === y || mask(y) === x || mask(x) === mask(y);
+  }
+  function netoSesion(trades, cuenta, ahora) {
+    const a = inicioSesion(ahora), b = finSesion(ahora);
+    let neto = 0, n = 0;
+    for (const tr of trades || []) {
+      if (cuenta && !mismaCuenta(tr && (tr.cuenta || tr.account || tr.name), cuenta)) continue;
+      const ms = Date.parse(tr && tr.at);
+      if (!Number.isFinite(ms) || ms < a || ms >= b) continue;
+      if (typeof tr.pnl !== "number" || !Number.isFinite(tr.pnl)) continue;
+      neto += tr.pnl; n++;
+    }
+    return { neto: Math.round(neto * 100) / 100, n, inicio: a, fin: b };
+  }
+  function dayDe(id) {
+    const map = root.__tlDayPnl || {};
+    if (map[id]) return map[id];
+    for (const k of Object.keys(map)) if (mismaCuenta(k, id)) return map[k];
+    return null;
+  }
+  function pnlFila(cuenta) {
+    const id = String((cuenta && (cuenta.name || cuenta.id)) || "");
+    const trades = root.__tlPnlTrades;
+    if (Array.isArray(trades) && id) {
+      const ses = netoSesion(trades, id, Date.now());
+      if (ses.n > 0) return ses.neto;
+    }
+    const dia = root.__tlPnl && root.__tlPnl.dia;
+    const broker = id ? dayDe(id) : null;
+    if (broker && typeof broker.dayPnl === "number" && Number.isFinite(broker.dayPnl) && (!dia || !broker.tradingDay || broker.tradingDay === dia)) return broker.dayPnl;
+    const local = cuenta && Number(cuenta.pnlToday);
+    if (Number.isFinite(local) && (!dia || !cuenta.pnlDate || cuenta.pnlDate === dia)) return local;
+    return 0;
+  }
+  root.__tlSesion = { partesNY, inicioSesion, finSesion, mismaCuenta, netoSesion, pnlFila };
+})(window);
+</script>
+<script>/* Prop Farm: trades del día (bróker/historial) para la barra superior. El neto de la sesión manda sobre el daily guardado. */(function(){async function p(){try{const [t,a]=await Promise.all([fetch("/api/colchon/trades",{cache:"no-store"}).then(r=>r.json()),fetch("/accounts.json",{cache:"no-store"}).then(r=>r.json())]);const d=t.dia,R=t.resumen||{},dn=a&&a.daily&&a.daily[d];const live=Array.isArray(a&&a.live)?a.live.length:null;const _tr=Array.isArray(t.trades)?t.trades:[];const neto=typeof t.saldoDia==="number"?t.saldoDia:(typeof R.pnl==="number"?R.pnl:(typeof dn==="number"?dn:null));window.__tlPnl={neto,bruto:typeof t.bruto==="number"?t.bruto:(t.total??0),n:typeof R.n==="number"?R.n:(t.n??_tr.length),ganados:typeof R.ganados==="number"?R.ganados:_tr.filter(x=>x&&x.pnl>0).length,perdidos:typeof R.perdidos==="number"?R.perdidos:_tr.filter(x=>x&&typeof x.pnl==="number"&&x.pnl<0).length,racha:R.racha||0,rachaTipo:R.rachaTipo||null,mejor:R.mejor||0,peor:R.peor||0,cuentas:live,dia:d};window.__tlPnlTrades=_tr;window.__tlDayPnl={};try{const acc=a&&a.accounts||{};for(const k of Object.keys(acc)){const v=acc[k];if(v&&typeof v.dayPnl==="number")window.__tlDayPnl[k]={dayPnl:v.dayPnl,tradingDay:v.tradingDay||""}}}catch(err){}if(window.__tlRepintarFlor)window.__tlRepintarFlor();window.__zu&&window.__zu()}catch(e){}}setTimeout(p,1500);setInterval(p,30000)})();</script>
 <script>/* Cerezo estático con manzanas, y barras de meta de las plantas. Sin certificados. */
 (function(){
 const LIME="#cdea1d";
@@ -6261,7 +6336,7 @@ function hook(){const G=window.__granja&&window.__granja.pet;if(!G||!G.renderer|
  if(cfg.kind!=="perro"||cfg.body!==A.perro.b||cfg.accent!==A.perro.a){try{applyPet(G,cfg)}catch(err){console.warn("mascota",err)}}
  (function lab(){const p=window.__pet.screen();if(p&&cfg.name){tag.textContent=cfg.name;tag.style.left=p.x+"px";tag.style.top=(p.y-8)+"px";tag.style.display="block"}else tag.style.display="none";requestAnimationFrame(lab)})()}
 setTimeout(hook,600);})();</script>
-<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.45</div>
+<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.46</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/api/version",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
 <script>/* 0.7.0: Profito duerme al abrir (granja en pausa), riega con laptop durante un trade, y etiquetas de cuentas con saldo y etapa. Solo visual: no toca el motor de trading. */
 (function(){
