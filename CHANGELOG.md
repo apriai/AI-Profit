@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.45] — 2026-11-20
+### Arreglado
+- **El panel sale de la operación abierta cuando el servidor ya la cerró**, también si se cerró a mano en TradingView o si hay otra ventana de la granja. El aviso de «ya visto» solo evita repetir la celebración. Si una lectura falla, el panel sigue preguntando.
+### Notas
+- No cambia el envío de órdenes.
+
 ## [0.10.44] — 2026-11-20
 ### Cambiado
 - Al terminar una operación, el globo del agente dice «Operación terminada».
