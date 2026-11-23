@@ -63,16 +63,42 @@ const ahora = Date.parse('2026-11-13T21:01:00Z');
 const realNow = Date.now;
 Date.now = () => ahora;
 try {
-  assert.equal(pnlFila({ name: cuenta, pnlToday: 0, pnlDate: '2026-11-14' }), -10, 'los trades de la cuenta ganan al cero guardado');
+  assert.equal(pnlFila({ name: cuenta, pnlToday: 0, pnlDate: '2026-11-14' }), -10, 'sin saldo, se suman los trades');
   assert.equal(pnlFila({ name: 'LFF02500000000001', pnlToday: 0, pnlDate: '2026-11-14' }), 0, 'otra cuenta no hereda esos trades');
-  sandbox.window.__tlPnlTrades = [];
-  sandbox.window.__tlDayPnl = { [cuenta]: { dayPnl: -101, tradingDay: '2026-11-14' } };
-  sandbox.window.__tlPnl = { dia: '2026-11-14' };
-  assert.equal(pnlFila({ name: cuenta, pnlToday: 0, pnlDate: '2026-11-14' }), -101, 'sin trades de esa cuenta, vale el P&L del día del bróker');
-  sandbox.window.__tlDayPnl = { [cuenta]: { dayPnl: -101, tradingDay: '2026-11-13' } };
-  assert.equal(pnlFila({ name: cuenta, pnlToday: 0, pnlDate: '2026-11-14' }), 0, 'un día de trading viejo no se muestra');
+  sandbox.window.__tlSesionSaldo = { [cuenta]: { balance: 24173, sessionStartBalance: 24802.5, sessionPnl: -629.5 } };
+  assert.equal(pnlFila({ name: cuenta, bal: 24173, pnlToday: 0 }), -629.5, 'el saldo del bróker gana a los trades aproximados');
+  sandbox.window.__tlSesionSaldo = {};
+  assert.equal(pnlFila({ name: cuenta, bal: 24173, pnlToday: -469.5 }), 0, 'con saldo y sin foto no se usa la suma de trades');
 } finally {
   Date.now = realNow;
+}
+
+const { guardarSesion, diaSesion } = sandbox.window.__tlSesion;
+assert.equal(diaSesion(Date.parse('2026-11-13T20:59:00Z')), '2026-11-13');
+assert.equal(diaSesion(Date.parse('2026-11-13T21:01:00Z')), '2026-11-14');
+assert.equal(diaSesion(Date.parse('2026-03-08T20:01:00Z')), '2026-03-09', '8 mar 16:01 EDT');
+assert.equal(diaSesion(Date.parse('2026-11-01T21:01:00Z')), '2026-11-02', '1 nov 16:01 EST');
+sandbox.window.__tlSesionSaldo = {};
+const ahoraSaldo = Date.now;
+Date.now = () => Date.parse('2026-11-23T18:00:00Z');
+try {
+  guardarSesion(
+    { accounts: [{ name: cuenta, balance: 24173 }] },
+    { accounts: { [cuenta]: { startOfDay: 24802.5, balance: 24802.5, tradingDay: '2026-11-23' } } },
+  );
+  assert.equal(pnlFila({ name: cuenta, bal: 24173 }), -629.5, 'sin sessionPnl del API, saldo menos el inicio guardado');
+  guardarSesion(
+    { accounts: [{ name: cuenta, balance: 24100 }] },
+    { accounts: { [cuenta]: { startOfDay: 24100, tradingDay: '2026-11-23' } } },
+  );
+  assert.equal(pnlFila({ name: cuenta, bal: 24100 }), -702.5, 'el inicio no se reemplaza cuando el saldo se mueve');
+  guardarSesion(
+    { accounts: [{ name: cuenta, balance: 24100, sessionStartBalance: 25000, sessionPnl: -900 }] },
+    { accounts: { [cuenta]: { startOfDay: 24802.5, tradingDay: '2026-11-23' } } },
+  );
+  assert.equal(pnlFila({ name: cuenta, bal: 24100 }), -900, 'el sessionPnl del API manda');
+} finally {
+  Date.now = ahoraSaldo;
 }
 
 assert.equal(html.split('["P&L sesión"').length - 1, 2, 'la flor y el árbol dicen P&L sesión');

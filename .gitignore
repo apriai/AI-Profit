@@ -4,6 +4,8 @@
 # datos/LEEME.md si se versiona; no ignores toda la carpeta datos/.
 accounts.json
 sod.json
+sesion-saldo.json
+sesion-saldo.json.tmp
 days.json
 logros.json
 metas.json

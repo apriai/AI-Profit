@@ -5428,6 +5428,7 @@ async function sync() {
     const archivo = await fetch('/accounts.json', { cache: 'no-store' }).then(r => r.json()).catch(() => ({}));
     const broker = await fetch('/api/colchon/accounts', { cache: 'no-store' }).then(r => r.json()).catch(() => ({ ok: false, accounts: [] }));
     aplicarFlores(s, { accountsJson: archivo, colchon: broker });
+    if (window.__tlGuardarSesion) window.__tlGuardarSesion(broker, archivo);
   } catch (e) { console.warn('TradingLink', e); }
 }
 setTimeout(sync, 500);
@@ -6087,6 +6088,12 @@ junto();addEventListener("resize",junto);addEventListener("load",junto);
     next.setUTCDate(next.getUTCDate() + 1);
     return instanteNY(next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate(), 16, 0);
   }
+  function diaSesion(ahora) {
+    const p = partesNY(ahora == null ? Date.now() : +ahora);
+    const d = new Date(Date.UTC(p.y, p.m - 1, p.d));
+    if (p.h >= 16) d.setUTCDate(d.getUTCDate() + 1);
+    return d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0") + "-" + String(d.getUTCDate()).padStart(2, "0");
+  }
   function mismaCuenta(a, b) {
     const x = String(a || ""), y = String(b || "");
     if (!x || !y) return false;
@@ -6106,27 +6113,62 @@ junto();addEventListener("resize",junto);addEventListener("load",junto);
     }
     return { neto: Math.round(neto * 100) / 100, n, inicio: a, fin: b };
   }
-  function dayDe(id) {
-    const map = root.__tlDayPnl || {};
+  function saldoDe(id) {
+    const map = root.__tlSesionSaldo || {};
     if (map[id]) return map[id];
     for (const k of Object.keys(map)) if (mismaCuenta(k, id)) return map[k];
     return null;
   }
   function pnlFila(cuenta) {
     const id = String((cuenta && (cuenta.name || cuenta.id)) || "");
+    const s = id ? saldoDe(id) : null;
+    if (s && typeof s.sessionPnl === "number" && Number.isFinite(s.sessionPnl)) return s.sessionPnl;
+    const bal = s && typeof s.balance === "number" ? s.balance : Number(cuenta && cuenta.bal);
+    if (Number.isFinite(bal)) {
+      const inicio = s && typeof s.sessionStartBalance === "number" ? s.sessionStartBalance : null;
+      if (typeof inicio === "number") return Math.round((bal - inicio) * 100) / 100;
+      return 0;
+    }
     const trades = root.__tlPnlTrades;
     if (Array.isArray(trades) && id) {
       const ses = netoSesion(trades, id, Date.now());
       if (ses.n > 0) return ses.neto;
     }
-    const dia = root.__tlPnl && root.__tlPnl.dia;
-    const broker = id ? dayDe(id) : null;
-    if (broker && typeof broker.dayPnl === "number" && Number.isFinite(broker.dayPnl) && (!dia || !broker.tradingDay || broker.tradingDay === dia)) return broker.dayPnl;
-    const local = cuenta && Number(cuenta.pnlToday);
-    if (Number.isFinite(local) && (!dia || !cuenta.pnlDate || cuenta.pnlDate === dia)) return local;
     return 0;
   }
-  root.__tlSesion = { partesNY, inicioSesion, finSesion, mismaCuenta, netoSesion, pnlFila };
+  function guardarSesion(broker, archivo) {
+    const map = root.__tlSesionSaldo || (root.__tlSesionSaldo = {});
+    const dia = diaSesion();
+    const lista = broker && Array.isArray(broker.accounts) ? broker.accounts : [];
+    for (const a of lista) {
+      const id = String((a && (a.name || a.id)) || "");
+      if (!id) continue;
+      const row = map[id] || {};
+      if (typeof a.balance === "number") row.balance = a.balance;
+      if (typeof a.sessionStartBalance === "number") row.sessionStartBalance = a.sessionStartBalance;
+      if (typeof a.sessionPnl === "number") row.sessionPnl = a.sessionPnl;
+      else if (typeof row.balance === "number" && typeof row.sessionStartBalance === "number") row.sessionPnl = Math.round((row.balance - row.sessionStartBalance) * 100) / 100;
+      map[id] = row;
+    }
+    const acc = (archivo && archivo.accounts) || {};
+    for (const id of Object.keys(acc)) {
+      const a = acc[id];
+      if (!a || typeof a.startOfDay !== "number") continue;
+      if (a.tradingDay && a.tradingDay !== dia) continue;
+      const row = map[id] || {};
+      if (typeof row.sessionPnl === "number") continue;
+      const bal = typeof row.balance === "number" ? row.balance : a.balance;
+      if (typeof bal !== "number") continue;
+      row.balance = bal;
+      row.sessionStartBalance = a.startOfDay;
+      row.sessionPnl = Math.round((bal - a.startOfDay) * 100) / 100;
+      map[id] = row;
+    }
+    root.__tlSesionSaldo = map;
+    if (root.__tlRepintarFlor) root.__tlRepintarFlor();
+  }
+  root.__tlSesion = { partesNY, inicioSesion, finSesion, diaSesion, mismaCuenta, netoSesion, pnlFila, guardarSesion };
+  root.__tlGuardarSesion = guardarSesion;
 })(window);
 </script>
 <script>/* Prop Farm: trades del día (bróker/historial) para la barra superior. El neto de la sesión manda sobre el daily guardado. */(function(){async function p(){try{const [t,a]=await Promise.all([fetch("/api/colchon/trades",{cache:"no-store"}).then(r=>r.json()),fetch("/accounts.json",{cache:"no-store"}).then(r=>r.json())]);const d=t.dia,R=t.resumen||{},dn=a&&a.daily&&a.daily[d];const live=Array.isArray(a&&a.live)?a.live.length:null;const _tr=Array.isArray(t.trades)?t.trades:[];const neto=typeof t.saldoDia==="number"?t.saldoDia:(typeof R.pnl==="number"?R.pnl:(typeof dn==="number"?dn:null));window.__tlPnl={neto,bruto:typeof t.bruto==="number"?t.bruto:(t.total??0),n:typeof R.n==="number"?R.n:(t.n??_tr.length),ganados:typeof R.ganados==="number"?R.ganados:_tr.filter(x=>x&&x.pnl>0).length,perdidos:typeof R.perdidos==="number"?R.perdidos:_tr.filter(x=>x&&typeof x.pnl==="number"&&x.pnl<0).length,racha:R.racha||0,rachaTipo:R.rachaTipo||null,mejor:R.mejor||0,peor:R.peor||0,cuentas:live,dia:d};window.__tlPnlTrades=_tr;window.__tlDayPnl={};try{const acc=a&&a.accounts||{};for(const k of Object.keys(acc)){const v=acc[k];if(v&&typeof v.dayPnl==="number")window.__tlDayPnl[k]={dayPnl:v.dayPnl,tradingDay:v.tradingDay||""}}}catch(err){}if(window.__tlRepintarFlor)window.__tlRepintarFlor();window.__zu&&window.__zu()}catch(e){}}setTimeout(p,1500);setInterval(p,30000)})();</script>
@@ -6336,7 +6378,7 @@ function hook(){const G=window.__granja&&window.__granja.pet;if(!G||!G.renderer|
  if(cfg.kind!=="perro"||cfg.body!==A.perro.b||cfg.accent!==A.perro.a){try{applyPet(G,cfg)}catch(err){console.warn("mascota",err)}}
  (function lab(){const p=window.__pet.screen();if(p&&cfg.name){tag.textContent=cfg.name;tag.style.left=p.x+"px";tag.style.top=(p.y-8)+"px";tag.style.display="block"}else tag.style.display="none";requestAnimationFrame(lab)})()}
 setTimeout(hook,600);})();</script>
-<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.46</div>
+<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.47</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/api/version",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
 <script>/* 0.7.0: Profito duerme al abrir (granja en pausa), riega con laptop durante un trade, y etiquetas de cuentas con saldo y etapa. Solo visual: no toca el motor de trading. */
 (function(){

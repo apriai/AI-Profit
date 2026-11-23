@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { revisarAjuste } from './ajustar-profito.mjs';
+import { aplicarEnRespuesta } from './sesion-saldo.mjs';
 
 export function manejar(q, r, deps) {
   if (deps.propiasH(q, r)) return;
@@ -81,7 +82,10 @@ export function manejar(q, r, deps) {
         else if (q.url.startsWith('/api/colchon/status')) out = { ...deps.colchon.status(), cfg: deps.colchonCFG };
         else if (q.url.startsWith('/api/colchon/summary')) out = deps.colchon.summary() || { ok: false, err: 'Todavía no hay resumen' };
         else if (q.url.startsWith('/api/colchon/strategies')) out = deps.colchon.strategies();
-        else if (q.url.startsWith('/api/colchon/accounts')) out = await deps.colchon.accounts();
+        else if (q.url.startsWith('/api/colchon/accounts')) {
+          out = await deps.colchon.accounts();
+          try { out = aplicarEnRespuesta(out, { dir: deps.DIR, state: deps.state }); } catch {}
+        }
         else if (q.url.startsWith('/api/colchon/check')) out = await deps.colchon.check();
         else if (q.url.startsWith('/api/colchon/start') && q.method === 'POST') out = await deps.colchon.start(j);
         else if (q.url.startsWith('/api/colchon/stop') && q.method === 'POST') out = await deps.colchon.stop(j);
