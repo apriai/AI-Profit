@@ -1,0 +1,197 @@
+//@version=6
+// Misma señal que motor/pine/ai-profit-camp-algo.pine (mismos nombres y valores).
+// La tabla cuenta aciertos y fallos. No muestra dólares ni puntos.
+//
+// Entrada «Apertura de la vela de señal» (por defecto):
+// se simula comprar o vender al precio de apertura de la vela que se colorea.
+// La señal solo se conoce al cierre de esa vela, así que esta entrada mira hacia atrás.
+// El stop y el objetivo se revisan con el máximo y el mínimo de esa vela y de las siguientes.
+// Si en una misma vela el precio toca el stop y el objetivo, cuenta como fallo.
+//
+// Entrada «Cierre de la vela de señal»:
+// se entra al cierre, cuando la señal ya es real. El stop se revisa desde la vela siguiente.
+//
+// No se opera la señal de las velas que empiezan entre las 09:30 y las 09:39,
+// hora de Nueva York. La primera vela válida de la apertura es la de las 09:40.
+//
+// EMA 200, apagada de inicio: si se enciende, solo compra cuando el cierre
+// queda por encima de la media del mismo tiempo, y solo vende cuando queda por debajo.
+strategy("Profito Algoritmo Backtest", "PA Backtest", overlay = true, pyramiding = 0, default_qty_type = strategy.fixed, default_qty_value = 1, process_orders_on_close = true, calc_on_every_tick = false)
+
+minBody = input.float(70.0, "Cuerpo Min %", group = "Señal") / 100
+maxCloseW = input.float(12.0, "Mecha Max Cierre %", group = "Señal") / 100
+maxOppW = input.float(25.0, "Mecha Max Contra %", group = "Señal") / 100
+bodyMult = input.float(1.5, "Multiplicador Cuerpo", group = "Señal")
+fullWick = input.bool(true, "Envolver mecha previa", group = "Señal")
+atrMult = input.float(1.2, "Minimo vs ATR", group = "Señal")
+
+entrada = input.string("Apertura de la vela de señal", "Entrada", options = ["Apertura de la vela de señal", "Cierre de la vela de señal"], group = "Operación", tooltip = "Apertura: precio de apertura de la vela coloreada. Esa vela ya tiene que haber cerrado para conocer la señal. Si el stop y el objetivo caen en la misma vela, es fallo. Cierre: se entra al cierre, sin usar el futuro.")
+rr = input.float(1.0, "Objetivo (múltiplo del riesgo)", minval = 0.1, step = 0.1, group = "Operación")
+bufferTicks = input.int(0, "Margen del stop (ticks)", minval = 0, group = "Operación")
+usarEma = input.bool(false, "EMA 200", group = "Filtro", tooltip = "Solo compras si el cierre de la vela de señal está por encima de la EMA 200 de este mismo tiempo. Solo ventas si está por debajo.")
+
+usarExc = input.bool(true, "Ignorar el inicio de la apertura de Nueva York", group = "Horario")
+excSes = input.session("0930-0940", "Ventana sin operaciones", group = "Horario")
+tz = "America/New_York"
+
+rng = high - low
+body = math.abs(close - open)
+bull = close > open
+bear = close < open
+upW = high - math.max(open, close)
+loW = math.min(open, close) - low
+clW = bull ? upW : loW
+opW = bull ? loW : upW
+bPct = rng > 0 ? body / rng : 0
+cPct = rng > 0 ? clW / rng : 0
+oPct = rng > 0 ? opW / rng : 0
+pBody = math.abs(close[1] - open[1])
+atr = ta.atr(14)
+okAnat = bPct >= minBody and cPct <= maxCloseW and oPct <= maxOppW
+okSize = rng >= atr * atrMult and body >= pBody * bodyMult
+bCond = fullWick ? (close > high[1] and open <= close[1]) : (close > open[1] and open <= close[1])
+sCond = fullWick ? (close < low[1] and open >= close[1]) : (close < open[1] and open >= close[1])
+isBull = bull and close[1] < open[1] and bCond and okAnat and okSize
+isBear = bear and close[1] > open[1] and sCond and okAnat and okSize
+ema200 = ta.ema(close, 200)
+pasaEma = not usarEma or (isBull and close > ema200) or (isBear and close < ema200)
+
+enExc = usarExc and not na(time(timeframe.period, excSes, tz))
+puede = not enExc and barstate.isconfirmed
+porApertura = entrada == "Apertura de la vela de señal"
+
+plot(isBull ? low - 2 * syminfo.mintick : na, "Alcista", color = #00E676, style = plot.style_circles, linewidth = 6)
+plot(isBear ? high + 2 * syminfo.mintick : na, "Bajista", color = #FF5252, style = plot.style_circles, linewidth = 6)
+barcolor(isBull ? #00E676 : isBear ? #FF5252 : na)
+plot(usarEma ? ema200 : na, "EMA 200", color = #C8E810, linewidth = 2)
+
+sesionDe() =>
+    int m = hour(time, tz) * 60 + minute(time, tz)
+    int id = 6
+    if m >= 18 * 60 or m < 3 * 60
+        id := 0
+    else if m < 9 * 60 + 30
+        id := 1
+    else if m < 9 * 60 + 40
+        id := 2
+    else if m < 11 * 60 + 30
+        id := 3
+    else if m < 14 * 60
+        id := 4
+    else if m < 16 * 60
+        id := 5
+    id
+
+ses = sesionDe()
+hh = hour(time, tz)
+
+var bool en = false
+var float sl = na
+var float tp = na
+var int sesT = 0
+var int hhT = 0
+var int lado = 0
+var int barEnt = na
+var int[] acS = array.new_int(7, 0)
+var int[] faS = array.new_int(7, 0)
+var int[] acH = array.new_int(24, 0)
+var int[] faH = array.new_int(24, 0)
+var int[] acD = array.new_int(2, 0)
+var int[] faD = array.new_int(2, 0)
+
+anotar(bool gano) =>
+    if gano
+        array.set(acS, sesT, array.get(acS, sesT) + 1)
+        array.set(acH, hhT, array.get(acH, hhT) + 1)
+        array.set(acD, lado, array.get(acD, lado) + 1)
+    else
+        array.set(faS, sesT, array.get(faS, sesT) + 1)
+        array.set(faH, hhT, array.get(faH, hhT) + 1)
+        array.set(faD, lado, array.get(faD, lado) + 1)
+
+resultado() =>
+    bool esLargo = lado == 0
+    bool hitS = esLargo ? low <= sl : high >= sl
+    bool hitT = esLargo ? high >= tp : low <= tp
+    int r = 0
+    if hitS or hitT
+        r := hitT and not hitS ? 1 : -1
+    r
+
+if en and (bar_index != barEnt or porApertura)
+    int r = resultado()
+    if r != 0
+        anotar(r == 1)
+        en := false
+
+if not en and puede and pasaEma and (isBull or isBear)
+    bool largo = isBull
+    float buf = bufferTicks * syminfo.mintick
+    float entradaPx = porApertura ? open : close
+    float stopPx = largo ? low - buf : high + buf
+    float riesgo = largo ? entradaPx - stopPx : stopPx - entradaPx
+    if riesgo > 0
+        en := true
+        barEnt := bar_index
+        sl := stopPx
+        tp := largo ? entradaPx + rr * riesgo : entradaPx - rr * riesgo
+        sesT := ses
+        hhT := hh
+        lado := largo ? 0 : 1
+        if porApertura
+            int r = resultado()
+            if r != 0
+                anotar(r == 1)
+                en := false
+
+f_pct(int a, int f) =>
+    a + f == 0 ? "—" : str.tostring(a * 100.0 / (a + f), "0.0") + "%"
+
+f_suma(int[] xs) =>
+    int s = 0
+    for i = 0 to array.size(xs) - 1
+        s += array.get(xs, i)
+    s
+
+var table tab = table.new(position.top_right, 4, 12, bgcolor = color.new(#1a1230, 8), border_width = 1, frame_color = color.new(color.white, 70), border_color = color.new(color.white, 80))
+var table tabH = table.new(position.bottom_left, 4, 25, bgcolor = color.new(#1a1230, 8), border_width = 1, frame_color = color.new(color.white, 70), border_color = color.new(color.white, 80))
+
+if barstate.islast
+    int ac = f_suma(acS)
+    int fa = f_suma(faS)
+    string modo = porApertura ? "Apertura de la vela" : "Cierre de la vela"
+    table.cell(tab, 0, 0, "Profito · " + modo, text_color = color.white, text_size = size.small, bgcolor = #1a1230)
+    table.cell(tab, 1, 0, "Aciertos", text_color = color.white, text_size = size.small, bgcolor = #1a1230)
+    table.cell(tab, 2, 0, "Fallos", text_color = color.white, text_size = size.small, bgcolor = #1a1230)
+    table.cell(tab, 3, 0, "% acierto", text_color = color.white, text_size = size.small, bgcolor = #1a1230)
+    table.cell(tab, 0, 1, "Todo", text_color = color.white, text_size = size.small)
+    table.cell(tab, 1, 1, str.tostring(ac), text_color = #b6f5c2, text_size = size.small)
+    table.cell(tab, 2, 1, str.tostring(fa), text_color = #ffc1b8, text_size = size.small)
+    table.cell(tab, 3, 1, f_pct(ac, fa), text_color = color.white, text_size = size.small)
+    table.cell(tab, 0, 2, "Largos", text_color = color.white, text_size = size.small)
+    table.cell(tab, 1, 2, str.tostring(array.get(acD, 0)), text_color = #b6f5c2, text_size = size.small)
+    table.cell(tab, 2, 2, str.tostring(array.get(faD, 0)), text_color = #ffc1b8, text_size = size.small)
+    table.cell(tab, 3, 2, f_pct(array.get(acD, 0), array.get(faD, 0)), text_color = color.white, text_size = size.small)
+    table.cell(tab, 0, 3, "Cortos", text_color = color.white, text_size = size.small)
+    table.cell(tab, 1, 3, str.tostring(array.get(acD, 1)), text_color = #b6f5c2, text_size = size.small)
+    table.cell(tab, 2, 3, str.tostring(array.get(faD, 1)), text_color = #ffc1b8, text_size = size.small)
+    table.cell(tab, 3, 3, f_pct(array.get(acD, 1), array.get(faD, 1)), text_color = color.white, text_size = size.small)
+    sesNom = array.from("Asia 18:00-03:00", "Londres 03:00-09:30", "09:30-09:40 no se opera", "Apertura NY 09:40-11:30", "Mediodía 11:30-14:00", "Tarde 14:00-16:00", "Hueco 16:00-18:00")
+    for i = 0 to 6
+        int a = array.get(acS, i)
+        int f = array.get(faS, i)
+        table.cell(tab, 0, 4 + i, array.get(sesNom, i), text_color = color.white, text_size = size.tiny)
+        table.cell(tab, 1, 4 + i, str.tostring(a), text_color = #b6f5c2, text_size = size.tiny)
+        table.cell(tab, 2, 4 + i, str.tostring(f), text_color = #ffc1b8, text_size = size.tiny)
+        table.cell(tab, 3, 4 + i, f_pct(a, f), text_color = color.white, text_size = size.tiny)
+    table.cell(tabH, 0, 0, "Hora ET", text_color = color.white, text_size = size.tiny, bgcolor = #1a1230)
+    table.cell(tabH, 1, 0, "Aciertos", text_color = color.white, text_size = size.tiny, bgcolor = #1a1230)
+    table.cell(tabH, 2, 0, "Fallos", text_color = color.white, text_size = size.tiny, bgcolor = #1a1230)
+    table.cell(tabH, 3, 0, "%", text_color = color.white, text_size = size.tiny, bgcolor = #1a1230)
+    for i = 0 to 23
+        int a = array.get(acH, i)
+        int f = array.get(faH, i)
+        table.cell(tabH, 0, 1 + i, (i < 10 ? "0" : "") + str.tostring(i) + ":00", text_color = color.white, text_size = size.tiny)
+        table.cell(tabH, 1, 1 + i, str.tostring(a), text_color = #b6f5c2, text_size = size.tiny)
+        table.cell(tabH, 2, 1 + i, str.tostring(f), text_color = #ffc1b8, text_size = size.tiny)
+        table.cell(tabH, 3, 1 + i, f_pct(a, f), text_color = color.white, text_size = size.tiny)
