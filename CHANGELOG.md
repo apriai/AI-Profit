@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.48] — 2026-11-24
+### Arreglado
+- **El DD restante usa el pico de cierre del servidor**, no un saldo intradía. Si la flor tenía un pico más alto, lo baja al pico de las 16:00 ET. En una 25K, el piso sigue siendo ese pico menos $1,000.
+### Notas
+- El pico llega en `/api/colchon/accounts` como `eodPeak`, leído de `sod.json`. No cambia el envío de órdenes.
+
 ## [0.10.47] — 2026-11-23
 ### Cambiado
 - **El P&L de sesión de la flor es el saldo del bróker menos el saldo al empezar la sesión** (16:00 ET). Ya no suma trades aproximados. Si no hay foto de esta sesión, usa el primer saldo visto. Solo si no hay saldo se suman los trades.

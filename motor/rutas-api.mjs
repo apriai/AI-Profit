@@ -4,7 +4,31 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { revisarAjuste } from './ajustar-profito.mjs';
-import { aplicarEnRespuesta } from './sesion-saldo.mjs';
+import { aplicarEnRespuesta, mismaCuenta } from './sesion-saldo.mjs';
+
+function leerSod(dir) {
+  try { return JSON.parse(fs.readFileSync(path.join(dir, 'sod.json'), 'utf8')); } catch { return null; }
+}
+
+// Pico de cierre (EOD) guardado por el servidor. Un saldo intradía no cuenta.
+export function conPicoEod(respuesta, sod) {
+  if (!respuesta || !Array.isArray(respuesta.accounts)) return respuesta;
+  const cuentas = (sod && sod.accounts) || {};
+  const accounts = respuesta.accounts.map(a => {
+    const id = String((a && (a.name || a.id)) || '');
+    if (!id) return a;
+    let pico = cuentas[id] && cuentas[id].peak;
+    if (typeof pico !== 'number' || !Number.isFinite(pico)) {
+      pico = null;
+      for (const [k, s] of Object.entries(cuentas)) {
+        if (s && mismaCuenta(k, id) && typeof s.peak === 'number' && Number.isFinite(s.peak)) { pico = s.peak; break; }
+      }
+    }
+    if (typeof pico !== 'number' || !Number.isFinite(pico)) return a;
+    return { ...a, eodPeak: pico };
+  });
+  return { ...respuesta, accounts };
+}
 
 export function manejar(q, r, deps) {
   if (deps.propiasH(q, r)) return;
@@ -85,6 +109,7 @@ export function manejar(q, r, deps) {
         else if (q.url.startsWith('/api/colchon/accounts')) {
           out = await deps.colchon.accounts();
           try { out = aplicarEnRespuesta(out, { dir: deps.DIR, state: deps.state }); } catch {}
+          try { out = conPicoEod(out, leerSod(deps.DIR)); } catch {}
         }
         else if (q.url.startsWith('/api/colchon/check')) out = await deps.colchon.check();
         else if (q.url.startsWith('/api/colchon/start') && q.method === 'POST') out = await deps.colchon.start(j);

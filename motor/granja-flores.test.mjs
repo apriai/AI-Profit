@@ -70,6 +70,27 @@ aplicarFlores(conSaldo, {
 });
 assert.equal(conSaldo.cuentas.length, 1);
 assert.equal(conSaldo.cuentas[0].bal, 25110);
+assert.equal(conSaldo.cuentas[0].peak, 25000, 'un saldo intradía no sube el pico');
+
+const dd = tienda();
+dd.cuentas.push({ id: 26, name: 'LFE0-PRUEBA-026', type: 'eval', memorial: false, start: 25000, bal: 24173, peak: 25070 });
+aplicarFlores(dd, {
+  accountsJson: { accounts: {}, live: ['LFE0-PRUEBA-026'] },
+  colchon: { ok: true, accounts: [{ name: 'LFE0-PRUEBA-026', type: 'eval', balance: 24173, eodPeak: 25000 }] },
+});
+const flor = dd.cuentas.find(a => a.name === 'LFE0-PRUEBA-026');
+assert.equal(flor.peak, 25000, 'el pico de cierre reemplaza al intradía, aunque sea menor');
+const piso = Math.max(flor.peak, flor.start) - 1000;
+assert.equal(Math.max(0, flor.bal - piso), 173);
+assert.equal(Math.max(0, 24173 - (Math.max(25070, 25000) - 1000)), 103);
+
+const quieto = tienda();
+quieto.cuentas.push({ id: 8, name: 'EVAL-PICO', type: 'eval', memorial: false, start: 25000, bal: 25000, peak: 25000 });
+aplicarFlores(quieto, {
+  accountsJson: { accounts: {}, live: ['EVAL-PICO'] },
+  colchon: { ok: true, accounts: [{ name: 'EVAL-PICO', type: 'eval', balance: 25070, peak: 25070 }] },
+});
+assert.equal(quieto.cuentas.find(a => a.name === 'EVAL-PICO').peak, 25000, 'sin pico de cierre, el saldo del día no lo sube');
 
 const quemada = tienda();
 quemada.cuentas.push({ id: 3, name: 'FONDEADA-OTRA', type: 'funded', memorial: false, bal: 50000 });

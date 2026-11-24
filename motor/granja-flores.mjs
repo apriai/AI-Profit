@@ -79,7 +79,7 @@ export function planFlores({ accountsJson = {}, colchon = null } = {}) {
       type: tipoDe(a),
       start,
       bal,
-      peak: a.peak != null ? Number(a.peak) : Math.max(start, bal),
+      eodPeak: typeof a.eodPeak === 'number' && Number.isFinite(a.eodPeak) ? a.eodPeak : null,
       dd: a.dd,
       dailyLoss: a.dailyLoss,
       profitTarget: a.profitTarget,
@@ -112,7 +112,7 @@ export function aplicarFlores(store, datos) {
     if (ex) {
       if (ex.type !== a.type) store.upsertAccount({ id: ex.id, type: a.type, bal: a.bal });
       else if (a.tieneSaldo && store.setDaily) store.setDaily(ex.id, { bal: a.bal, pnlToday: a.dayPnl ?? 0 });
-      if (a.peak != null && a.peak > (ex.peak ?? 0)) store.upsertAccount({ id: ex.id, peak: a.peak });
+      if (Number.isFinite(a.eodPeak)) store.upsertAccount({ id: ex.id, peak: a.eodPeak });
       store.upsertAccount({
         id: ex.id, start: a.start, dd: a.dd, dailyLoss: a.dailyLoss, profitTarget: a.profitTarget,
         scale: a.scale, plan: a.plan, lockTriggerOver: a.lockTriggerOver, lockFloorOver: a.lockFloorOver, atRisk: a.atRisk,
@@ -120,7 +120,7 @@ export function aplicarFlores(store, datos) {
       if (a.burned && store.markBurned && !ex.burnedAt) store.markBurned(ex.id);
     } else {
       const n = store.upsertAccount({
-        name: a.name, type: a.type, start: a.start, bal: a.bal, peak: a.peak,
+        name: a.name, type: a.type, start: a.start, bal: a.bal, peak: Number.isFinite(a.eodPeak) ? a.eodPeak : a.start,
         dd: a.dd, dailyLoss: a.dailyLoss, profitTarget: a.profitTarget, scale: a.scale, plan: a.plan,
         lockTriggerOver: a.lockTriggerOver, lockFloorOver: a.lockFloorOver, atRisk: a.atRisk,
       });
