@@ -46,6 +46,17 @@ assert.equal(tocado.ok, false);
 assert.ok(money(tocado.realRisk) <= 401);
 assert.ok(tocado.errors.some(e => /ya estaría tocado/.test(e)));
 
+const pasa = compute({ ...base, side: 'long', addPrice: 20960, live: 20960, ddlLeft: 100, ddLeft: 200 });
+assert.equal(pasa.ok, true, pasa.errors && pasa.errors.join(' | '));
+assert.ok(pasa.realRisk > 100);
+assert.ok(pasa.warnings.includes('Este SL se pasa de tu daily loss'));
+assert.ok(pasa.warnings.includes('Este SL se pasa de tu drawdown'));
+assert.equal(pasa.errors.some(e => /daily loss|drawdown/.test(e)), false);
+const granja = fs.readFileSync(new URL('./Granja-de-Cuentas-v2.html', import.meta.url), 'utf8');
+assert.match(granja, /Este SL se pasa de tu daily loss/);
+assert.match(granja, /Este SL se pasa de tu drawdown/);
+assert.match(granja, /addWarn/);
+
 function broker({ fallaBracket = false } = {}) {
   const st = { qty: 5, entry: 21000, price: 20960, stop: 20950, tp: 21160 };
   const llamadas = [];

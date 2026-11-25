@@ -73,6 +73,8 @@ Protección, en este orden (`js.agregarMercado` y `js.alinearBracket`):
 
 No se cambia la cantidad de una hija que ya existe: Tradovate lo rechaza, y un stop más grande que la posición puede voltearla. Si el precio del bracket viejo no queda, el panel dice «Revisa SL/TP en Tradovate» y no se cierra la posición. No hay un limpiador que cancele órdenes huérfanas.
 
+Si el SL nuevo se pasa del daily loss o del drawdown que queda, el cajón avisa en amarillo («Este SL se pasa de tu daily loss» / «Este SL se pasa de tu drawdown») y Confirmar sigue disponible. Esos dos ya no bloquean. Siguen bloqueando el tope de contratos, un stop ya tocado, una distancia inválida y un redondeo que no cabe.
+
 El bucle del colchón usa la cantidad y el promedio nuevos: el disparo en dólares se recalcula. Si el colchón ya se había movido, no vuelve a bajar el stop. Cuando mueve el stop (`js.modify` / `tvStopOrders`) o el objetivo (`js.modifyTp`), cambia el precio de **todos** los de la posición, no solo el primero. La guarda de flat sigue: con varios brackets activos no da la operación por cerrada y no cancela esas órdenes.
 
 ## 5. Estrategias (`strategies.mjs`)

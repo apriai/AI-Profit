@@ -212,10 +212,10 @@ export function compute(i) {
   }
 
   if (realRisk != null && realRisk > ddlLeft + 1e-9) {
-    errors.push(`El riesgo real ($${money(realRisk)}) supera el daily loss que te queda ($${money(ddlLeft)}).`);
+    warnings.push('Este SL se pasa de tu daily loss');
   }
   if (realRisk != null && realRisk > ddLeft + 1e-9) {
-    errors.push(`El riesgo real ($${money(realRisk)}) supera el drawdown de cierre que te queda ($${money(ddLeft)}).`);
+    warnings.push('Este SL se pasa de tu drawdown');
   }
   if (leave.risk > ddlLeft + 1e-9) {
     warnings.push(`Si dejas el SL donde está, el riesgo sería $${money(leave.risk)} y se pasa del daily loss que te queda ($${money(ddlLeft)}).`);

@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.54] — 2026-11-25
+### Cambiado
+- **Agregar/Promediar ya no bloquea por daily loss ni por drawdown.** Si el SL nuevo se pasa de lo que queda, el cajón muestra un aviso amarillo («Este SL se pasa de tu daily loss» o «Este SL se pasa de tu drawdown») y Confirmar sigue. La persona decide. Siguen bloqueando el tope de contratos, un stop ya tocado, una distancia inválida y el redondeo.
+### Notas
+- No cambia el envío de la orden ni la barra de la mascota.
+
 ## [0.10.53] — 2026-11-25
 ### Cambiado
 - **El resumen del cierre sale al momento.** La guarda de flat pide 2 lecturas vacías, unos 450 ms, y sigue exigiendo que no queden SL ni TP activos. El panel muestra enseguida el P&L aproximado, con «(aprox.)». Si en unos 3 s llega el P&L de las ejecuciones, se actualizan el resumen, la granja y `colchon-resumen.json` en el mismo cierre. Si no llega, se queda el aproximado. El sonido y la celebración suenan una sola vez.

@@ -6402,6 +6402,8 @@ setTimeout(hook,600);})();</script>
 #prLive .badges i.bad{color:#ffd0d8;border-color:rgba(255,77,109,.4)}
 #prLive .addErr{display:none;margin-top:8px;padding:7px 9px;border-radius:10px;background:rgba(255,77,109,.12);border:1px solid rgba(255,77,109,.35);color:#ffd0d8;font-size:11px}
 #prLive .addErr.show{display:block}
+#prLive .addWarn{display:none;margin-top:8px;padding:7px 9px;border-radius:10px;background:rgba(255,216,107,.1);border:1px solid rgba(255,216,107,.32);color:#ffe7a3;font-size:11px}
+#prLive .addWarn.show{display:block}
 #prLive .addActs{display:flex;gap:7px;margin-top:10px}
 #prLive .addActs button{flex:1;border-radius:11px;padding:9px 8px;font:700 12px Inter,system-ui;cursor:pointer}
 #prLive .addActs .cancel{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#fff}
@@ -6451,9 +6453,11 @@ setTimeout(hook,600);})();</script>
     }
     var riesgo = !r ? "—" : (r.slKind === "lock" ? ("protege " + money(r.realLock)) : money(r.realRisk));
     var prev = r ? '<div class=prev><div class=row><span>Agrega</span><b>' + addQty + " " + sym + " @ " + px(s.price) + " · mercado</b></div><div class=row><span>Promedio nuevo</span><b class=gold>" + px(r.avgExact) + "</b></div><div class=row><span>SL nuevo</span><b class=red>" + px(r.sl) + "</b></div><div class=row><span>Riesgo</span><b>" + riesgo + "</b></div><div class=row><span>TP nuevo</span><b class=lime>" + px(r.tp) + "</b></div><div class=row><span>Objetivo</span><b class=lime>" + money(r.realTarget) + "</b></div></div>" : '<div class=prev>Esperando entrada, SL y TP…</div>';
-    var badges = r ? '<div class=badges>' + (r.against ? '<i class=warn>En contra</i>' : (r.favor ? '<i class=ok>A favor</i>' : '<i>Mismo precio</i>')) + '<i class="' + (r.Q > r.maxQty ? "bad" : "ok") + '">' + r.Q + " / " + r.maxQty + " " + sym + "</i>" + '<i class="' + ((r.realRisk || 0) > lim.ddlLeft ? "bad" : "ok") + '">DDL ' + money(lim.ddlLeft) + "</i>" + '<i class="' + ((r.realRisk || 0) > lim.ddLeft ? "bad" : "ok") + '">DD ' + money(lim.ddLeft) + "</i></div>" : "";
+    var badges = r ? '<div class=badges>' + (r.against ? '<i class=warn>En contra</i>' : (r.favor ? '<i class=ok>A favor</i>' : '<i>Mismo precio</i>')) + '<i class="' + (r.Q > r.maxQty ? "bad" : "ok") + '">' + r.Q + " / " + r.maxQty + " " + sym + "</i>" + '<i class="' + ((r.realRisk || 0) > lim.ddlLeft ? "warn" : "ok") + '">DDL ' + money(lim.ddlLeft) + "</i>" + '<i class="' + ((r.realRisk || 0) > lim.ddLeft ? "warn" : "ok") + '">DD ' + money(lim.ddLeft) + "</i></div>" : "";
+    var aviso = r && r.warnings ? r.warnings.filter(function (w) { return w === "Este SL se pasa de tu daily loss" || w === "Este SL se pasa de tu drawdown"; }) : [];
+    var warn = aviso.length ? '<div class="addWarn show">' + aviso.join("<br>") + "</div>" : "";
     var err = r && r.errors && r.errors[0] ? '<div class="addErr show">' + r.errors[0] + "</div>" : '<div class="addErr" data-adderr></div>';
-    card.innerHTML = '<div class=blk><p class=lb>Agregar contratos ' + sym + '</p><div class=addQty>' + opts.map(function (n) { return '<button type=button data-q="' + n + '" class="' + (n === addQty ? "on" : "") + '">+' + n + "</button>"; }).join("") + "</div></div><div class=blk><p class=lb>Vista previa · mercado</p>" + prev + badges + err + '</div><div class=addActs><button type=button class=cancel data-addx>Cancelar</button><button type=button class=go data-addgo ' + (r && r.ok ? "" : "disabled") + ">Confirmar</button></div>";
+    card.innerHTML = '<div class=blk><p class=lb>Agregar contratos ' + sym + '</p><div class=addQty>' + opts.map(function (n) { return '<button type=button data-q="' + n + '" class="' + (n === addQty ? "on" : "") + '">+' + n + "</button>"; }).join("") + "</div></div><div class=blk><p class=lb>Vista previa · mercado</p>" + prev + badges + warn + err + '</div><div class=addActs><button type=button class=cancel data-addx>Cancelar</button><button type=button class=go data-addgo ' + (r && r.ok ? "" : "disabled") + ">Confirmar</button></div>";
     card.querySelectorAll("[data-q]").forEach(function (b) { b.onclick = function (ev) { ev.preventDefault(); addQty = +b.getAttribute("data-q"); window.__tlAgregarMontar(live, s); }; });
     card.querySelector("[data-addx]").onclick = function (ev) { ev.preventDefault(); window.__tlAddOpen = false; window.__tlAgregarMontar(live, s); };
     var go = card.querySelector("[data-addgo]");
@@ -6469,7 +6473,7 @@ setTimeout(hook,600);})();</script>
   };
 })();
 </script>
-<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.53</div>
+<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.54</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/api/version",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
 <script>/* 0.7.0: Profito duerme al abrir (granja en pausa), riega con laptop durante un trade, y etiquetas de cuentas con saldo y etapa. Solo visual: no toca el motor de trading. */
 (function(){
