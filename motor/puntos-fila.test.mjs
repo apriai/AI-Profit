@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { anotarPuntos, puntosDe } from './pnl-sesion.mjs';
 
 // Día vivo: roundTrips ya trae el promedio y los puntos.
@@ -16,6 +17,15 @@ const guardado = {
   fuente: 'broker', cuenta: 'LFE0…026',
 };
 assert.equal(puntosDe(guardado), 12.5);
+// Agregar guardado: el primer fill y el último no son el promedio. Manda el P&L bruto.
+const agregadoViejo = {
+  direccion: 'VENTA', tamano: '6 MNQ', entrada: 25206, salida: 25236, pnlBruto: -120, pnl: -126,
+};
+assert.equal(puntosDe(agregadoViejo), -10);
+assert.equal(puntosDe({
+  direccion: 'VENTA', tamano: '6 MNQ', entradaProm: 25220, salidaProm: 25236,
+  entrada: 25206, salida: 25236, pnlBruto: -120,
+}), -16);
 
 // Cierre de la granja (colchon-eventos fin_trade): hay P&L y tamaño, no precios.
 const granja = {
@@ -46,5 +56,16 @@ const filas = anotarPuntos([guardado, granja, { direccion: 'COMPRA' }]);
 assert.equal(filas[0].puntos, 12.5);
 assert.equal(filas[1].puntos, -10);
 assert.equal(filas[2].puntos, undefined);
+
+const html = fs.readFileSync(new URL('./Granja-de-Cuentas-v2.html', import.meta.url), 'utf8');
+const puntosFila = new Function(html.slice(html.indexOf('function puntosFila'), html.indexOf('function firmaLista')) + '\nreturn puntosFila;')();
+assert.equal(puntosFila(agregadoViejo), -10);
+assert.equal(puntosFila({ direccion: 'COMPRA', tamano: '1 MNQ', entrada: 100, salida: 110 }), 10);
+assert.match(html, /s\.pnl<0/);
+const rutas = fs.readFileSync(new URL('./rutas-api.mjs', import.meta.url), 'utf8');
+const link = fs.readFileSync(new URL('./tradinglink.mjs', import.meta.url), 'utf8');
+assert.match(rutas, /fillsDesdeMs: null/);
+assert.match(link, /const fillsDesdeMs = null/);
+assert.match(link, /inicioDiaFarm\(desde\)/);
 
 console.log('puntos-fila ok');

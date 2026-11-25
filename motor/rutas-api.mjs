@@ -107,7 +107,7 @@ export function manejar(q, r, deps) {
           const corte = horas > 0 ? Date.now() - horas * 3600000 : null;
           const inicio = deps.inicioDiaFarm ? deps.inicioDiaFarm(dia) : null;
           const desdeMs = corte == null ? inicio : (inicio == null ? corte : Math.min(inicio, corte));
-          out = await deps.tradesDe(dia, { desdeMs, fillsDesdeMs: d ? null : corte });
+          out = await deps.tradesDe(dia, { desdeMs, fillsDesdeMs: null });
         } else if (q.url.startsWith('/api/colchon/conexion')) out = await deps.conexion();
         else if (q.url.startsWith('/api/colchon/status')) out = { ...deps.colchon.status(), cfg: deps.colchonCFG };
         else if (q.url.startsWith('/api/colchon/summary')) out = deps.colchon.summary() || { ok: false, err: 'Todavía no hay resumen' };

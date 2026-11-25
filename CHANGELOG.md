@@ -10,6 +10,17 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.63] — 2026-11-25
+### Corregido
+- Un trade nuevo ya no hereda el promedio ni el tamaño de un Agregar anterior. El resumen usa la entrada y los contratos de ese trade.
+- Las últimas 24 h siguen acotando la lectura del registro de eventos. Las ejecuciones del bróker no se recortan, para no emparejar mal la ida y la vuelta ni guardar mal el día.
+- El SL y el TP recalculados de Agregar solo se usan si el cálculo salió bien. Si no, se quedan los de la cotización.
+- Si el stop ya protegía, Agregar deja anotado ese precio como stop protegido.
+- El aviso de que la pérdida abierta usa parte del riesgo solo sale cuando el P&L está en rojo.
+- Los puntos, si no hay promedio de entrada y de salida, salen del P&L bruto antes que del primer y del último fill.
+### Notas
+- No cambia la mascota.
+
 ## [0.10.62] — 2026-11-25
 ### Corregido
 - **La columna Puntos ya no sale en blanco.** Si el bróker trae el promedio de entrada y de salida, se usan esos. Si no, los precios guardados del trade (también en `historial/<día>.json` y en el cierre de la granja). Si tampoco están, los puntos salen del P&L bruto dividido por los contratos y el valor del punto (MNQ $2, NQ $20, MES $5, ES $50). «—» solo queda cuando no hay ninguno de esos datos.

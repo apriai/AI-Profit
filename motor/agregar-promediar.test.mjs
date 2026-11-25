@@ -453,4 +453,113 @@ function pagina() {
   assert.equal(pg.canceles(), 0);
 }
 
+{
+  const tocado = compute({ ...base, side: 'long', addPrice: 20920, live: 20920 });
+  assert.equal(tocado.ok, false);
+  assert.ok(Number.isFinite(tocado.sl) && tocado.sl > 0);
+  const bT = broker();
+  const orig = bT.agregarMercado.bind(bT);
+  bT.agregarMercado = async req => {
+    const antes = bT.st.price;
+    bT.st.price = 20920;
+    const r = await orig(req);
+    bT.st.price = antes;
+    return { ...r, price: 20920 };
+  };
+  const kT = createColchon(() => ({
+    kind: 'api',
+    account: async () => ({ name: 'Practice Demo', broker: 'Tradovate Practice' }),
+    accountId: async () => 'p4',
+    preparar: async () => ({ accountId: 'p4', name: 'Practice Demo', brokerId: 'paper', tradeSymbol: 'MNQH6' }),
+    cotizacion: async () => ({ bid: 20959.75, ask: 20960, last: 20960, leido: Date.now() }),
+    position: async () => bT.position(),
+    stop: async () => bT.st.stop,
+    working: async () => [],
+    openBracket: async () => 'ok market',
+    agregarMercado: req => bT.agregarMercado(req),
+    alinearBracket: req => bT.alinearBracket(req),
+    flatten: () => bT.flatten(),
+    ticker: null,
+  }), { pollMs: 40, logFile: path.join(os.tmpdir(), 'tl-agregar-tocado.log'), ignoreClock: true, noTicks: true });
+  const ab = await kT.start({ side: 'long', symbol: 'MNQ', qty: 5, accountId: 'p4', accountName: 'Practice Demo' });
+  assert.equal(ab.ok, true, ab.err);
+  const add = await kT.add({ addQty: 5 });
+  assert.equal(add.ok, true, add.err);
+  assert.ok(Math.abs(bT.llamadas[1].sl - uno.sl) < 1e-6, 'un recálculo inválido no reemplaza el SL');
+  assert.ok(Math.abs(bT.llamadas[1].tp - uno.tp) < 1e-6);
+  const logT = fs.readFileSync(path.join(os.tmpdir(), 'tl-agregar-tocado.log'), 'utf8');
+  assert.match(logT, /ya estaría tocado/);
+  await kT.stop({ flatten: false });
+}
+
+{
+  let fase = 'suma';
+  let viva = true;
+  const pausa = () => new Promise(r => setTimeout(r, 40));
+  const k2 = createColchon(() => ({
+    kind: 'api',
+    account: async () => ({ name: 'Practice Demo', broker: 'Tradovate Practice' }),
+    accountId: async () => 'p5',
+    preparar: async () => ({ accountId: 'p5', name: 'Practice Demo', brokerId: 'paper', tradeSymbol: 'MNQH6' }),
+    cotizacion: async () => fase === 'suma'
+      ? { bid: 20959.75, ask: 20960, last: 20960, leido: Date.now() }
+      : { bid: 21999.75, ask: 22000, last: 22000, leido: Date.now() },
+    position: async () => {
+      if (!viva) return null;
+      if (fase === 'suma') return { side: 'long', qty: 5, entry: 21000, price: 20970, stop: 20950, raw: { takeProfit: 21160 } };
+      return { side: 'long', qty: 1, entry: 22000, price: 22004, stop: 21940, raw: { takeProfit: 22120 } };
+    },
+    stop: async () => fase === 'suma' ? 20950 : 21940,
+    working: async () => [],
+    openBracket: async () => 'ok market',
+    agregarMercado: async req => {
+      const avg = (5 * 21000 + req.addQty * 20956.25) / (5 + req.addQty);
+      return { ok: true, qty: 5 + req.addQty, avg, price: 20970, viejos: ['S0', 'T0'] };
+    },
+    alinearBracket: async () => ({ ok: true, qty: 10, stops: 2, tps: 2 }),
+    flatten: async () => 'ok',
+    ticker: null,
+  }), { pollMs: 30, logFile: path.join(os.tmpdir(), 'tl-agregar-segundo.log'), ignoreClock: true, noTicks: true, flatConfirm: { reads: 1, ms: 0 } });
+  const primero = await k2.start({ side: 'long', symbol: 'MNQ', qty: 5, accountId: 'p5', accountName: 'Practice Demo' });
+  assert.equal(primero.ok, true, primero.err);
+  await pausa();
+  const add = await k2.add({ addQty: 5 });
+  assert.equal(add.ok, true, add.err);
+  assert.equal(k2.status().qtyProm, 10);
+  viva = false;
+  await k2.stop({ flatten: false });
+  fase = 'solo';
+  viva = true;
+  const segundo = await k2.start({ side: 'long', symbol: 'MNQ', qty: 1, accountId: 'p5', accountName: 'Practice Demo' });
+  assert.equal(segundo.ok, true, segundo.err);
+  assert.equal(k2.status().promedio, null);
+  assert.equal(k2.status().qtyProm, null);
+  const espera = Date.now() + 1500;
+  while (Date.now() < espera && k2.status().entry !== 22000) await pausa();
+  assert.equal(k2.status().entry, 22000);
+  assert.equal(k2.status().qty, 1);
+  viva = false;
+  const tope = Date.now() + 2000;
+  let sm = null;
+  const inicio = k2.status().startedAt;
+  while (Date.now() < tope) {
+    sm = k2.summary();
+    if (sm && sm.inicio === inicio) break;
+    await pausa();
+  }
+  assert.ok(sm, 'resumen del segundo trade');
+  assert.equal(sm.tamano, '1 MNQ');
+  assert.equal(sm.entrada, 22000);
+  assert.notEqual(sm.pnlFinalUSD, Math.round(((20970 - ((5 * 21000 + 5 * 20956.25) / 10)) * 2 * 10 - 10) * 100) / 100);
+  await k2.stop({ flatten: false });
+}
+
+{
+  const col = fs.readFileSync(new URL('./colchon.mjs', import.meta.url), 'utf8');
+  assert.match(col, /promedio: null, qtyProm: null/);
+  assert.match(col, /while \(S\.enPaso/);
+  assert.match(col, /real\.ok && Number\.isFinite\(real\.sl\)/);
+  assert.match(col, /S\.lockTarget = slU; S\.lockPrice = slU; S\.lockPending = false/);
+}
+
 console.log('agregar-promediar ok');

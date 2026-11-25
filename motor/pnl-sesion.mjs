@@ -61,13 +61,18 @@ function esCorto(t) {
 export function puntosDe(t) {
   if (!t || typeof t !== 'object') return null;
   if (typeof t.puntos === 'number' && Number.isFinite(t.puntos)) return r2(t.puntos);
-  const entrada = precioF(t.entradaProm ?? t.entradaPromedio ?? t.avgEntry ?? t.entrada ?? t.entry);
-  const salida = precioF(t.salidaProm ?? t.salidaPromedio ?? t.avgExit ?? t.salida ?? t.exit ?? t.precioSalida);
-  if (entrada != null && salida != null) return r2(esCorto(t) ? entrada - salida : salida - entrada);
-  const bruto = numF(t.pnlBruto) != null ? numF(t.pnlBruto) : (t.neto === false ? numF(t.pnl) : (numF(t.pnl) != null && numF(t.comision) != null ? r2(numF(t.pnl) + numF(t.comision)) : numF(t.pnl)));
+  const promE = precioF(t.entradaProm ?? t.entradaPromedio ?? t.avgEntry);
+  const promS = precioF(t.salidaProm ?? t.salidaPromedio ?? t.avgExit);
+  if (promE != null && promS != null) return r2(esCorto(t) ? promE - promS : promS - promE);
   const { n, pv } = instrumentoDe(t);
-  if (bruto == null || !(n > 0) || !(pv > 0)) return null;
-  return r2(bruto / (n * pv));
+  const bruto = numF(t.pnlBruto);
+  if (bruto != null && n > 0 && pv > 0) return r2(bruto / (n * pv));
+  const entrada = precioF(t.entrada ?? t.entry);
+  const salida = precioF(t.salida ?? t.exit ?? t.precioSalida);
+  if (entrada != null && salida != null) return r2(esCorto(t) ? entrada - salida : salida - entrada);
+  const g = t.neto === false ? numF(t.pnl) : (numF(t.pnl) != null && numF(t.comision) != null ? r2(numF(t.pnl) + numF(t.comision)) : numF(t.pnl));
+  if (g == null || !(n > 0) || !(pv > 0)) return null;
+  return r2(g / (n * pv));
 }
 
 export function anotarPuntos(trades) {

@@ -696,6 +696,8 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
     try {
       for (let i = 0; !stopReq; i++) {
         if (S.agregando) { await sleep(wait); continue; }
+        S.enPaso = true;
+        try {
         if (paper && S.accountId && driver.accountId) { const cur = await driver.accountId(); if (cur && cur !== S.accountId) { S.error = `La cuenta activa cambió (${cur}) en mitad de la prueba: se deja de vigilar SIN cerrar nada. Revisa la cuenta ${S.account && S.account.name} en TradingView.`; log('ERROR', S.error); break; } }
         const tRead = Date.now(); let pos = await driver.position(c.symbol); const sl0 = await driver.stop(); const tSeen = Date.now();
         if (pos && pos.transient) { ev('anomalia', { kind: 'lectura_fallida_transitoria', error: pos.transient }); await sleep(wait); continue; }
@@ -764,6 +766,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
           S.closeAt = Date.now(); log('Sin posición: fin del loop (' + S.reason + ')'); break; }
         if ((d.action === 'skip' || d.action === 'modify') && (d.action !== 'modify' || slLista)) await actuar(d, pos, sl, tRead, tSeen);
         await sleep(esperarBrackets ? 150 : wait);
+        } finally { S.enPaso = false; }
       }
     } catch (e) { S.error = String(e.message || e); log('ERROR', S.error); ev('error', { error: S.error }); }
     if (driver.ticker && !opts.noTicks) { try { await driver.ticker.stop(); } catch {} }
@@ -927,7 +930,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
       }
       const c = { side, symbol, qty, P, strategy: { id: strat.id, name: strat.name }, steps: stepsFor(symbol, qty, P) };
       trade = c;
-      S = { ...S, pnlBroker: null, summary: null, reason: null, lockTarget: null, lockPending: false, openAt: null, closeAt: null, lockAt: null, tpPrice: null, latency: null, state: 'running', strategy: { id: strat.id, name: strat.name }, P, steps: stepsFor(symbol, qty, P), step: 0, pasos: [], mode: chk.paper ? 'paper' : chk.real ? 'real' : 'simulacion', realLabel: chk.realLabel || null, alerta: null, emptyN: 0, emptySince: null, kidsWarned: false, fuentesStats: null, account: chk.account, side, symbol, qty, entry: null, price: null, pnl: null, sl: null, slVisto: null, tpVisto: null, tp: tpPts, stopProfito: stopAbs, locked: false, lockPrice: null, error: null, startedAt: new Date().toISOString(), log: [] };
+      S = { ...S, pnlBroker: null, summary: null, reason: null, lockTarget: null, lockPending: false, openAt: null, closeAt: null, lockAt: null, tpPrice: null, latency: null, state: 'running', strategy: { id: strat.id, name: strat.name }, P, steps: stepsFor(symbol, qty, P), step: 0, pasos: [], mode: chk.paper ? 'paper' : chk.real ? 'real' : 'simulacion', realLabel: chk.realLabel || null, alerta: null, emptyN: 0, emptySince: null, kidsWarned: false, fuentesStats: null, account: chk.account, side, symbol, qty, entry: null, price: null, pnl: null, sl: null, slVisto: null, tpVisto: null, tp: tpPts, stopProfito: stopAbs, locked: false, lockPrice: null, promedio: null, qtyProm: null, error: null, startedAt: new Date().toISOString(), log: [] };
       stopReq = false;
       log(`Inicio [${strat.name}] ${side === 'long' ? 'COMPRA' : 'VENTA'} ${qty} ${symbol} · SL -$${P.SL_USD} (${slPts} pts) · TP +$${P.TP_USD} (${tpPts} pts) · ${P.STEPS ? (!c.steps.length ? 'stop fijo (sin movimientos)' : 'escalones ' + c.steps.map(x => `+$${x.triggerUsd}→+$${x.lockUsd} (${x.lockPts} pts)`).join(' · ')) : `colchón +$${lockUsdFor(symbol, qty, P)} (${lockPtsFor(symbol, qty, P)} pts, ≈ +$${P.NET_USD} netos), disparo +$${triggerUsdFor(symbol, qty, P)} (${triggerPtsFor(symbol, qty, P)} pts)`} · cuenta ${chk.account.name || '?'}${strat.params.SCALE_BY_SIZE ? ' · plan ' + accountPlanSize(hint) : ''} -> ${chk.msg}`);
       if (prep.switchedMs != null) log(`Cuenta cambiada a ${name} por API (${(prep.switchedMs / 1000).toFixed(2)} s, verificada)`);
@@ -972,6 +975,10 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
       if (S.state !== 'running' || !trade) return { ok: false, err: 'No hay una operación abierta' };
       const q = Number(addQty);
       if (!Number.isInteger(q) || q < 1) return { ok: false, err: 'Cantidad inválida' };
+      S.agregando = true;
+      try {
+      const topePaso = Date.now() + 8000;
+      while (S.enPaso && Date.now() < topePaso) await sleep(25);
       const drv = await D();
       let pos; try { pos = await drv.position(trade.symbol); } catch (e) { return { ok: false, err: String(e.message || e) }; }
       if (!pos || !pos.qty || pos.entry == null) return { ok: false, err: 'No veo la posición' };
@@ -1001,7 +1008,6 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
         comm: trade.symbol === 'NQ' ? 3.5 : 1, ddlLeft, ddLeft,
       });
       if (!previo.ok) return { ok: false, err: (previo.errors && previo.errors[0]) || 'No se puede agregar', errors: previo.errors };
-      S.agregando = true;
       const aviso = 'Revisa SL/TP en Tradovate';
       const slN = previo.sl, tpN = previo.tp;
       const aplicarTam = (qty, avg, alineado, slU, tpU) => {
@@ -1013,7 +1019,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
         if (!alineado) S.alerta = aviso;
         else {
           S.sinProteccion = false; S.alerta = null;
-          if (previo.slKind === 'lock' || S.locked) { if (trade.st) trade.st.step = trade.steps.length; S.step = trade.steps.length; S.locked = true; }
+          if (previo.slKind === 'lock' || S.locked) { if (trade.st) trade.st.step = trade.steps.length; S.step = trade.steps.length; S.locked = true; S.lockTarget = slU; S.lockPrice = slU; S.lockPending = false; }
           else { if (trade.st) trade.st.step = 0; S.step = 0; S.locked = false; }
         }
       };
@@ -1032,8 +1038,8 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
             addQty: q2 > 0 ? q2 : q, addPrice: addPx, live: livePx, riskMode: 'keep', tpMode: 'keep',
             comm: trade.symbol === 'NQ' ? 3.5 : 1, ddlLeft, ddLeft,
           });
-          if (real && Number.isFinite(real.sl) && real.sl > 0 && Number.isFinite(real.tp) && real.tp > 0) { slFin = real.sl; tpFin = real.tp; }
-          log(`AGREGAR recálculo · antes SL ${slN} TP ${tpN} · después SL ${slFin} TP ${tpFin} · promedio ${avg} · qty ${qty}${real && real.ok === false ? ' · ' + ((real.errors && real.errors[0]) || 'aviso') : ''}`);
+          if (real && real.ok && Number.isFinite(real.sl) && real.sl > 0 && Number.isFinite(real.tp) && real.tp > 0) { slFin = real.sl; tpFin = real.tp; }
+          log(`AGREGAR recálculo · antes SL ${slN} TP ${tpN} · después SL ${slFin} TP ${tpFin} · promedio ${avg} · qty ${qty}${!(real && real.ok) && real && real.errors && real.errors[0] ? ' · ' + real.errors[0] : ''}`);
         } else {
           log(`AGREGAR recálculo · sin fill real, se quedan SL ${slN} TP ${tpN}`);
         }
@@ -1053,6 +1059,7 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
         return { ok: true, qty, avg, sl: slFin, tp: tpFin, status: S };
       } catch (e) { return { ok: false, err: String(e.message || e) }; }
       finally { S.agregando = false; }
+      } finally { S.agregando = false; }
     },
     async stop({ flatten = false } = {}) { stopReq = true; if (flatten && (S.mode === 'paper' || S.mode === 'real')) log('flatten ->', await (await D()).flatten(S.symbol)); await loopP; return { ok: true, status: S }; },
     status: () => S,

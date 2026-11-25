@@ -314,7 +314,7 @@ async function metricasDe(url) {
   const dias = diasEnRango(desde, hasta, hoy, conocidos);
   const abierto = rango === 'todo' && !(horas > 0) && !q.get('desde') && !q.get('hasta');
   const desdeMs = abierto ? null : inicioDiaFarm(desde);
-  const fillsDesdeMs = horas > 0 ? Date.now() - horas * 3600000 : null;
+  const fillsDesdeMs = null;
   const porDia = [];
   for (const dia of dias) porDia.push(await tradesDe(dia, { desdeMs, fillsDesdeMs }));
   return agregarMetricas(porDia, { desde, hasta });
