@@ -54,7 +54,7 @@ El arranque de un clic es el acceso **AI Profit**. En Windows lo crea `instalar-
 | GET | `/api/colchon/check` | Cuenta activa y si se puede operar: paper, real permitida o bloqueada. |
 | POST | `/api/colchon/start` | `{side:'long'\|'short', symbol:'MNQ'\|'NQ', qty, strategyId, accountId?, confirmReal?}`. |
 | POST | `/api/colchon/stop` | `{flatten?:bool}`: deja de vigilar y, opcionalmente, cierra. |
-| POST | `/api/colchon/add` | `{addQty}` con una operación abierta, solo en cuenta de práctica. Suma contratos a mercado y deja un solo SL y un solo TP. |
+| POST | `/api/colchon/add` | `{addQty}` con una operación abierta, en la cuenta que ya está operando. Suma contratos a mercado y deja un solo SL y un solo TP. |
 | GET | `/api/colchon/reporte?dia=AAAA-MM-DD` | Informe en Markdown (también se guarda en `reportes\<día>.md`). |
 | GET/POST | `/api/colchon/lectura` | Consulta o cambia la pausa de la lectura en segundo plano (`{pause:bool}`). |
 | GET/POST | `/bot` | Interruptor del bot de órdenes manuales. Devuelve `simulated` = DRY_RUN. |

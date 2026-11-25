@@ -891,9 +891,6 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
       if (S.state !== 'running' || !trade) return { ok: false, err: 'No hay una operación abierta' };
       const q = Number(addQty);
       if (!Number.isInteger(q) || q < 1) return { ok: false, err: 'Cantidad inválida' };
-      const cuenta = `${(S.account && S.account.name) || ''} ${(S.account && S.account.broker) || ''}`;
-      const practica = S.mode === 'paper' || /paper|demo|practice|simul/i.test(cuenta);
-      if (!practica) return { ok: false, err: 'Agregar/Promediar está en prueba: solo en una cuenta de práctica.' };
       const drv = await D();
       let pos; try { pos = await drv.position(trade.symbol); } catch (e) { return { ok: false, err: String(e.message || e) }; }
       if (!pos || !pos.qty || pos.entry == null) return { ok: false, err: 'No veo la posición' };

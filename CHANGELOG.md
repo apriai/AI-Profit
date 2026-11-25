@@ -12,7 +12,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 
 ## [0.10.50] — 2026-11-25
 ### Añadido
-- **Agregar/Promediar** en el panel del trade abierto. Suma contratos a mercado a la posición que ya está abierta y deja un solo SL y un solo TP para toda la posición. El riesgo en dólares se conserva (o la ganancia neta, si el colchón ya se movió) y el objetivo neto no baja. Primero se prueba en una cuenta de práctica.
+- **Agregar/Promediar** en el panel del trade abierto. Suma contratos a mercado a la posición que ya está abierta y deja un solo SL y un solo TP para toda la posición. El riesgo en dólares se conserva (o la ganancia neta, si el colchón ya se movió) y el objetivo neto no baja. Sigue bloqueando el tope de contratos, el daily loss y el drawdown. El cajón pide Confirmar antes de enviar.
 ### Notas
 - No cambia cómo abren las estrategias que ya estaban. La mascota del panel no cambia.
 

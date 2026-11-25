@@ -91,4 +91,26 @@ assert.equal(r.qty, 10);
 assert.equal(k.status().qty, 10);
 await k.stop({ flatten: false });
 
+const real = broker();
+const kReal = createColchon(() => ({
+  kind: 'api',
+  account: async () => ({ name: 'LFE0TEST000026', broker: 'Tradovate' }),
+  accountId: async () => 'r1',
+  preparar: async () => ({ accountId: 'r1', name: 'LFE0TEST000026', brokerId: 'tradovate', tradeSymbol: 'MNQH6' }),
+  cotizacion: async () => ({ bid: 20959.75, ask: 20960, last: 20960, leido: Date.now() }),
+  position: async () => real.position(),
+  stop: async () => real.st.stop,
+  working: async () => [],
+  openBracket: async () => 'ok market',
+  agregar: req => real.agregar(req),
+  ticker: null,
+}));
+const abiertoReal = await kReal.start({ side: 'long', symbol: 'MNQ', qty: 5, accountId: 'r1', accountName: 'LFE0TEST000026' });
+assert.equal(abiertoReal.ok, true, abiertoReal.err);
+assert.equal(kReal.status().mode, 'real');
+const enReal = await kReal.add({ addQty: 1 });
+assert.equal(enReal.ok, true, enReal.err);
+assert.equal(real.llamadas.length, 1);
+await kReal.stop({ flatten: false });
+
 console.log('agregar-promediar ok');
