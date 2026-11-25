@@ -6,6 +6,7 @@ import { negocio } from './negocio.mjs';
 import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, conPnlExacto, diaFarm, fueraDeSesion, cdpEvaluator, PAGE, acctGuard, js, frenaEscaneo, PANEL_PAUSA_MS } from './colchon.mjs';
 import { attachReporte } from './tv-reporte.mjs';
 import { fijarResumenTv, resumenTvActivo } from './resumen-tv.mjs';
+import { attachGex, fijarGexTv, gexTvActivo } from './gex.mjs';
 import { crearPaqueteLogs } from './descargar-logs.mjs';
 import { createVistaPrevia } from './tv-vista-previa.mjs';
 import { estrategiasPropias } from './estrategias-propias.mjs';
@@ -327,6 +328,10 @@ try {
   colchonHooks.onCierre = (s) => { if (!resumenTvActivo(DIR)) return; try { reporte.alCerrar(s); } catch (e) { console.log('reporte:', e && e.message); } };
   console.log('reporte: Reporte de trades en TradingView listo');
 } catch (e) { console.log('reporte: no arrancó; el motor sigue.', e && e.message); }
+try {
+  attachGex({ dir: DIR, tradeAbierto: () => colchon.status().state === 'running', activo: () => gexTvActivo(DIR) });
+  console.log('gex: muros listos');
+} catch (e) { console.log('gex: no arrancó; el motor sigue.', e && e.message); }
 // Vista previa del panel: solo dibuja. No abre, no modifica y no cierra órdenes, y no repone reportes.
 const vistaPrevia = createVistaPrevia({
   cotizar: async () => { const E = await cdpEvaluator(9222); try { return await E.evaluate(js.lastPrice); } finally { try { E.close(); } catch {} } },
@@ -351,6 +356,7 @@ http.createServer((q, r) => manejar(q, r, {
   metricasDe, tradesDe, conexion, orders,
   algoTv: () => algoTv, textoVersion, ROOT, HTML,
   resumenTv: { leer: () => ({ ok: true, on: resumenTvActivo(DIR) }), fijar: (on) => fijarResumenTv(DIR, on) },
+  gexTv: { leer: () => ({ ok: true, on: gexTvActivo(DIR) }), fijar: (on) => fijarGexTv(DIR, on) },
   descargarLogs: (j) => crearPaqueteLogs({
     dir: DIR,
     root: ROOT,
@@ -359,7 +365,7 @@ http.createServer((q, r) => manejar(q, r, {
     conexion,
     colchon: (() => { const s = colchon.status(); return { state: s.state, strategy: s.strategy || null, symbol: s.symbol || null, side: s.side || null, mode: s.mode || null }; })(),
     resumenTradingView: resumenTvActivo(DIR),
-    toggles: j && j.toggles,
+    toggles: Object.assign({}, j && j.toggles, { murosGex: gexTvActivo(DIR) }),
   }),
 })).listen(PORT, '127.0.0.1', () => console.log(`Granja: http://localhost:${PORT}`));
 let lastFull = 0, lastFunded = 0, lastBusy = Date.now(); const FULL_MS = EVERY_MS, QUIET_MS = 5 * 60 * 1000;

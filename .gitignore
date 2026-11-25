@@ -30,6 +30,8 @@ algo-tv.json
 algo-tv.json.tmp-*
 resumen-tv.json
 resumen-tv.json.tmp-*
+gex-tv.json
+gex-tv.json.tmp-*
 tv-reporte.json.tmp-*
 estrategias-propias.json.tmp-*
 backups-negocio/
