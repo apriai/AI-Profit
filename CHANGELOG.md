@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.66] — 2026-11-25
+### Añadido
+- **Resumen de trades en TradingView.** Al pasar de No a Sí se dibujan los cierres de hoy, el día de calendario de Nueva York (de las 00:00 a las 24:00), con todas las ejecuciones del bróker. Al pasar de Sí a No se quitan esos dibujos y no se tocan los del usuario. Si TradingView no está conectado, no se marcan como dibujados. No barre al arrancar.
+### Notas
+- No cambia las órdenes ni la mascota.
+
 ## [0.10.65] — 2026-11-25
 ### Eliminado
 - **Evaluación con rascacielos** ya no está en el selector. El id `evaluacion` cae en Evaluación, igual que una selección guardada que ya no existe. Un trade que ya estaba abierto sigue con las reglas que tenía al empezar.

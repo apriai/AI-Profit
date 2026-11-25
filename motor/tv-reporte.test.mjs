@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { PAGE } from './colchon.mjs';
+import { PAGE, diaFarm } from './colchon.mjs';
 import {
   MODULO, TITULO, GRUPO, ESTILO, ESPERAS_MS, ARCHIVO,
-  rootOf, cierresDeFills, planDibujo, pasosDibujo, expresionDibujo, expresionDibujo as expr,
+  rootOf, cierresDeFills, planDibujo, pasosDibujo, expresionDibujo, expresionDibujo as expr, expresionQuitar,
   reducirPosiciones, eventoDesdeGranja, createReporte, textoDuracion, textoPnl, colorPnl, horaET,
   READ_EXEC_JS, READ_CHARTS_JS, JS_ESCUCHA, chartBloquea, esTransitorio,
+  diaCalendarioNY, cierresDelDia, idsAQuitar, cruzarFinTrade, leerFinTrades,
 } from './tv-reporte.mjs';
 
 const PROHIBIDO = /placeOrder|modifyOrder|editPositionBrackets|closePosition|cancelOrder|createEditOrderContext|setCurrentAccount|removeAllShapes|setSymbol/;
@@ -43,6 +44,7 @@ function banco(dir, opt = {}) {
   const reads = [];
   const charts = [];
   const draws = [];
+  const quits = [];
   const state = {
     ex: opt.ex || [],
     charts: opt.charts || [{ index: 0, symbol: 'CME_MINI:MNQ1!', active: true }],
@@ -54,6 +56,9 @@ function banco(dir, opt = {}) {
     sleep: ms => { sleeps.push(ms); return Promise.resolve(); },
     readExec: async () => {
       reads.push(1);
+      if (opt.orden) opt.orden.push('leer');
+      if (state.readGate) await state.readGate;
+      if (opt.orden) opt.orden.push('leido');
       if (state.failRead) { state.failRead--; throw new Error('ECONNREFUSED'); }
       if (state.noApi) return { error: 'no-api' };
       const ex = typeof state.ex === 'function' ? state.ex(reads.length) : state.ex;
@@ -66,16 +71,25 @@ function banco(dir, opt = {}) {
     },
     draw: async (plan, chart) => {
       draws.push({ plan, chart });
+      if (opt.orden) opt.orden.push('dibujar');
       if (state.drawThrow) { state.drawThrow--; throw new Error('cdp cortado'); }
       if (state.drawRes) return state.drawRes;
       const n = pasosDibujo(plan).filter(p => p.op === 'shape' || p.op === 'multipoint').length;
       return { ok: true, ids: Array.from({ length: n }, (_, i) => `id${draws.length}-${i}`), save: { method: 'TradingViewApi.saveChartToServer', called: true, layoutId: 'L1' } };
     },
+    quitar: async (pedido) => {
+      quits.push(pedido);
+      if (opt.orden) opt.orden.push('quitar');
+      if (state.quitarThrow) { state.quitarThrow--; throw new Error('sin tv'); }
+      if (state.quitarRes) return typeof state.quitarRes === 'function' ? state.quitarRes(pedido) : state.quitarRes;
+      return { ok: true, removed: (pedido.ids || []).slice(), via: pedido.ids && pedido.ids.length ? 'ids' : null, save: { method: 'TradingViewApi.saveChartToServer', called: true, layoutId: 'L1' } };
+    },
+    leerEventos: opt.leerEventos || (() => []),
     raizOcupada: opt.raizOcupada,
     activo: opt.activo,
     log() {},
   });
-  return { rep, sleeps, reads, charts, draws, state };
+  return { rep, sleeps, reads, charts, draws, quits, state };
 }
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'tv-reporte-'));
 
@@ -405,6 +419,9 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'tv-reporte-'));
   const tl = fs.readFileSync(new URL('./tradinglink.mjs', import.meta.url), 'utf8');
   ok(tl.includes("attachReporte") && tl.includes('colchonHooks.onCierre'));
   ok(!/setInterval\([^)]*reporte/.test(tl));
+  ok(tl.includes('alPrender') && tl.includes('alApagar') && tl.includes('antes !== out.on'));
+  ok(tl.indexOf('alPrender') > tl.indexOf('attachReporte') + 400, 'el barrido no corre al arrancar');
+  ok(!tl.slice(tl.indexOf('attachReporte'), tl.indexOf('attachReporte') + 500).includes('alPrender'));
   const page = PAGE + '\n' + READ_EXEC_JS(PAGE) + '\n' + READ_CHARTS_JS + '\n' + JS_ESCUCHA(PAGE);
   ok(!PROHIBIDO.test(page), 'las lecturas no envían órdenes');
   eq(expr && MODULO, 'tv-reporte');
@@ -414,6 +431,143 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'tv-reporte-'));
   ok(execJs.includes('_activeChartWidgetWV'), 'el fallback de símbolo coincide con brokerExecs');
   ok(execJs.includes("return {error:'no-api'}"));
 
+}
+
+// --- día calendario de Nueva York, medianoche y horario de verano ---
+{
+  const mediodia = Date.parse('2026-11-25T17:00:00.000Z');
+  eq(diaCalendarioNY(mediodia), '2026-11-25');
+  const antes = Date.parse('2026-11-25T04:59:59.000Z');
+  const justo = Date.parse('2026-11-25T05:00:00.000Z');
+  const tarde = Date.parse('2026-11-26T04:59:59.000Z');
+  const despues = Date.parse('2026-11-26T05:00:00.000Z');
+  eq(diaCalendarioNY(antes), '2026-11-24');
+  eq(diaCalendarioNY(justo), '2026-11-25');
+  eq(diaCalendarioNY(tarde), '2026-11-25');
+  eq(diaCalendarioNY(despues), '2026-11-26');
+  const cincoYMedia = Date.parse('2026-11-25T22:30:00.000Z');
+  eq(diaCalendarioNY(cincoYMedia), '2026-11-25');
+  eq(diaFarm(cincoYMedia), '2026-11-26', 'las 17:30 son de hoy en el calendario y de mañana en la sesión');
+  const nocheAnterior = Date.parse('2026-11-25T00:00:00.000Z');
+  eq(diaCalendarioNY(nocheAnterior), '2026-11-24');
+  eq(diaFarm(nocheAnterior), '2026-11-25', 'las 19:00 de ayer entran en la sesión de hoy, no en el día civil');
+  eq(diaCalendarioNY(Date.parse('2026-03-08T04:59:59.000Z')), '2026-03-07');
+  eq(diaCalendarioNY(Date.parse('2026-03-08T05:00:00.000Z')), '2026-03-08');
+  eq(diaCalendarioNY(Date.parse('2026-03-08T06:59:59.000Z')), '2026-03-08');
+  eq(diaCalendarioNY(Date.parse('2026-03-08T07:00:00.000Z')), '2026-03-08');
+  eq(diaCalendarioNY(Date.parse('2026-03-09T03:59:59.000Z')), '2026-03-08');
+  eq(diaCalendarioNY(Date.parse('2026-03-09T04:00:00.000Z')), '2026-03-09');
+  eq(diaCalendarioNY(Date.parse('2026-11-01T03:59:59.000Z')), '2026-10-31');
+  eq(diaCalendarioNY(Date.parse('2026-11-01T04:00:00.000Z')), '2026-11-01');
+  eq(diaCalendarioNY(Date.parse('2026-11-01T05:30:00.000Z')), '2026-11-01');
+  eq(diaCalendarioNY(Date.parse('2026-11-01T06:30:00.000Z')), '2026-11-01');
+  eq(diaCalendarioNY(Date.parse('2026-11-02T04:59:59.000Z')), '2026-11-01');
+  eq(diaCalendarioNY(Date.parse('2026-11-02T05:00:00.000Z')), '2026-11-02');
+  const marcas = [
+    { exitMs: antes, symbol: 'a' }, { exitMs: justo, symbol: 'b' }, { exitMs: tarde, symbol: 'c' },
+    { exitMs: despues, symbol: 'd' }, { exitMs: cincoYMedia, symbol: 'e' }, { exitMs: nocheAnterior, symbol: 'f' },
+  ];
+  eq(cierresDelDia(marcas, mediodia).map(t => t.symbol), ['b', 'c', 'e']);
+}
+
+// --- no se cortan los fills antes de emparejar; sí se filtra por la hora de salida ---
+{
+  const ahora = Date.parse('2026-11-25T17:00:00.000Z');
+  const entry = Date.parse('2026-11-25T04:30:00.000Z');
+  const exit = Date.parse('2026-11-25T05:10:00.000Z');
+  const ambos = [fill('e', 1, 1, 100, entry), fill('x', -1, 1, 101, exit)];
+  const soloSalida = ambos.filter(f => diaCalendarioNY(f.time) === '2026-11-25');
+  eq(cierresDeFills(soloSalida).length, 0, 'cortar los fills antes de emparejar pierde la entrada de ayer');
+  const delDia = cierresDelDia(cierresDeFills(ambos, { cuenta: CUENTA, accountId: '99' }), ahora);
+  eq(delDia.length, 1);
+  eq(delDia[0].entry, 100);
+  const ev = { type: 'fin_trade', side: 'long', symbol: 'MNQ', entrada: 100, cuenta: CUENTA, accountId: '99', tamano: '1 MNQ', direccion: 'COMPRA', abiertaEn: new Date(entry).toISOString(), cerradaEn: new Date(exit).toISOString(), slVisto: 90, tpVisto: 110 };
+  eq(cruzarFinTrade(delDia[0], [ev]).slVisto, 90);
+  eq(cruzarFinTrade(delDia[0], []), null);
+  const b = banco(tmp(), { ex: ambos, now: () => ahora, leerEventos: () => [ev] });
+  eq(b.reads.length, 0, 'crear el reporte no barre el día');
+  const r = await b.rep.alPrender();
+  eq(r.status, 'listo');
+  eq(r.dibujados, 1);
+  eq(b.draws[0].plan.position.stopLevel, 40);
+  eq(b.draws[0].plan.position.profitLevel, 40);
+  const idsDibujados = r.resultados[0].ids.map(String);
+  const otra = await b.rep.alPrender();
+  eq(otra.resultados[0].status, 'ya');
+  eq(b.draws.length, 1, 'un cierre ya dibujado no se repite');
+  const off = await b.rep.alApagar();
+  eq(off.status, 'quitado');
+  eq(off.n, 1);
+  eq(b.quits[0].grupo, GRUPO);
+  eq(b.quits[0].ids, idsDibujados);
+  eq(Object.values(b.rep.estado().handled)[0].status, 'quitado');
+  await b.rep.alPrender();
+  eq(b.draws.length, 2, 'al volver a Sí se dibuja otra vez');
+}
+
+// --- sin TradingView no se marca; el símbolo abierto se salta; la cola no se pisa ---
+{
+  const ahora = Date.parse('2026-11-25T17:00:00.000Z');
+  const entry = Date.parse('2026-11-25T15:00:00.000Z');
+  const exit = entry + 4000;
+  const ambos = [fill('e', 1, 1, 100, entry), fill('x', -1, 1, 101, exit)];
+  const caido = banco(tmp(), { ex: ambos, now: () => ahora });
+  caido.state.failRead = 1;
+  const malo = await caido.rep.alPrender();
+  eq(malo.razon, 'TradingView no disponible');
+  eq(Object.keys(caido.rep.estado().handled).length, 0, 'sin conexión no queda marcado como dibujado');
+  const nqE = entry + 60000, nqX = nqE + 5000;
+  const ex = ambos.concat([
+    fill('ne', -1, 1, 200, nqE, 'CME_MINI:NQZ2026'),
+    fill('nx', 1, 1, 190, nqX, 'CME_MINI:NQZ2026'),
+  ]);
+  const b = banco(tmp(), { ex, now: () => ahora, raizOcupada: () => 'MNQ', charts: [{ index: 0, symbol: 'CME_MINI:NQ1!', active: true }] });
+  const r = await b.rep.alPrender();
+  eq(b.draws.length, 1);
+  eq(b.draws[0].plan.root, 'NQ');
+  ok(r.resultados.some(x => x.status === 'ocupado' && x.root === 'MNQ'));
+  ok(Object.values(b.rep.estado().handled).every(h => h.root !== 'MNQ'));
+  b.state.quitarThrow = 1;
+  const noQuita = await b.rep.alApagar();
+  eq(noQuita.razon, 'TradingView no disponible');
+  eq(Object.values(b.rep.estado().handled)[0].status, 'dibujado', 'si no se pudo quitar, sigue marcado');
+  eq(idsAQuitar(['1', '2'], [{ id: '9', title: 'mi linea' }, { id: '3', title: 'reporte' }, { id: '4', grupo: 'reporte' }, { id: '1', title: 'otra' }]), ['1', '2', '3', '4']);
+  const jsQ = expresionQuitar(['a', 'b']);
+  ok(jsQ.includes('removeEntity') && jsQ.includes('getAllShapes') && jsQ.includes('shapesGroupController'));
+  ok(!jsQ.includes('removeAllShapes') && !PROHIBIDO.test(jsQ));
+  ok(jsQ.includes('if(!id)') && jsQ.includes('saveChartToServer'));
+  const dirEv = tmp();
+  fs.writeFileSync(path.join(dirEv, 'colchon-eventos.jsonl'), JSON.stringify({ type: 'fin_trade', entrada: 1 }) + '\n' + '{mal\n' + JSON.stringify({ type: 'otra' }) + '\n');
+  eq(leerFinTrades(dirEv).length, 1);
+  let cur = 0, max = 0;
+  const rep = createReporte({
+    dir: tmp(), now: () => ahora, sleep: () => Promise.resolve(), log() {},
+    readExec: async () => { cur++; max = Math.max(max, cur); await new Promise(r => setTimeout(r, 20)); cur--; return { cuenta: CUENTA, accountId: '99', ex: ambos }; },
+    readCharts: async () => [{ index: 0, symbol: 'CME_MINI:MNQ1!', active: true }],
+    draw: async () => ({ ok: true, ids: [`q${max}`], save: null }),
+    quitar: async () => ({ ok: true, removed: [], via: null }),
+  });
+  await Promise.all([rep.alPrender(), rep.alPrender()]);
+  eq(max, 1, 'dos barridos no leen fills a la vez');
+  const orden = [];
+  let soltar;
+  const gate = new Promise(r => { soltar = r; });
+  let on = true;
+  const cola = banco(tmp(), { ex: ambos, now: () => ahora, orden, activo: () => on });
+  cola.state.readGate = gate;
+  const pPrende = cola.rep.alPrender();
+  await new Promise(r => setImmediate(r));
+  const pApaga = cola.rep.alApagar();
+  await new Promise(r => setImmediate(r));
+  eq(orden.includes('quitar'), false, 'apagar espera a que termine el barrido en curso');
+  eq(orden[0], 'leer');
+  on = false;
+  soltar();
+  const corto = await pPrende;
+  await pApaga;
+  eq(corto.status, 'apagado');
+  eq(cola.draws.length, 0, 'si se apaga mientras lee, no dibuja');
+  eq(orden.includes('quitar'), true);
 }
 
 console.log(`tv-reporte: ${pass} comprobaciones`);

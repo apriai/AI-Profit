@@ -1,8 +1,10 @@
 // tv-reporte.mjs — Reporte de trades en TradingView.
 // Dibuja UNA vez el cierre que acaba de confirmarse (granja o, si el bróker avisa en vivo, manual).
-// No barre el historial ni vigila dibujos ya hechos. Si faltan fills o TradingView no responde,
-// el cierre queda pendiente y se reintenta al volver a avisar o al reconectar la escucha.
-// No repone un dibujo ya hecho. No coloca, modifica ni cancela órdenes. Si este módulo falla, el motor sigue.
+// Al pasar el interruptor de No a Sí, dibuja los cierres de hoy (día calendario de Nueva York,
+// 00:00 a 24:00, no la sesión 18:00–16:00) y después sigue con los cierres nuevos.
+// Al pasarlo de Sí a No, quita esos dibujos. No barre al arrancar.
+// Si faltan fills o TradingView no responde, el cierre en vivo queda pendiente y se reintenta.
+// No coloca, modifica ni cancela órdenes. Si este módulo falla, el motor sigue.
 //
 // Frase de mantenimiento: «reporte trades en TradingView» = este archivo.
 import fs from 'node:fs';
@@ -93,6 +95,39 @@ export function textoPnl(n) {
   return `${n >= 0 ? '+' : '-'}$${s}`;
 }
 export function colorPnl(n) { return n >= 0 ? '#26a69a' : '#ef5350'; }
+
+// Día civil en Nueva York: de las 00:00 a las 24:00. No es la sesión de trading (18:00–16:00).
+export function diaCalendarioNY(ms = Date.now()) {
+  const t = Number(ms);
+  if (!Number.isFinite(t)) return null;
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(t));
+}
+export function cierresDelDia(trips, ahora = Date.now()) {
+  const dia = diaCalendarioNY(ahora);
+  if (!dia) return [];
+  return (trips || []).filter(t => t && diaCalendarioNY(t.exitMs) === dia);
+}
+
+// Ids guardados, más las formas del grupo o título «reporte». Una forma del usuario no entra.
+export function idsAQuitar(idsGuardados, formas) {
+  const vistos = new Set();
+  const out = [];
+  const add = id => {
+    if (id == null || id === '') return;
+    const s = String(id);
+    if (vistos.has(s)) return;
+    vistos.add(s);
+    out.push(s);
+  };
+  for (const id of idsGuardados || []) add(id);
+  for (const sh of formas || []) {
+    if (!sh) continue;
+    const title = sh.title != null ? String(sh.title) : '';
+    const grupo = sh.grupo != null ? String(sh.grupo) : (sh.group != null ? String(sh.group) : '');
+    if (title === GRUPO || grupo === GRUPO) add(sh.id);
+  }
+  return out;
+}
 
 function precioMedio(parts) {
   if (!parts.length) return null;
@@ -211,6 +246,23 @@ export function elegirCierre(trips, ev, ahora) {
     if (d > VENTANA_CIERRE_MS) continue;
     if (typeof ev.entry === 'number' && Number.isFinite(ev.entry) && Math.abs(t.entry - ev.entry) > tick * 8) continue;
     if (d < bestD) { best = t; bestD = d; }
+  }
+  return best;
+}
+
+// El fin_trade de la granja trae el SL y el TP vistos. Se cruza con el cierre del bróker, igual que un aviso en vivo.
+export function cruzarFinTrade(trip, eventos) {
+  if (!trip) return null;
+  let best = null, bestD = Infinity;
+  for (const raw of eventos || []) {
+    if (!raw) continue;
+    const base = raw.type === 'fin_trade' ? { ...raw, cerrado: true, cerradaEn: raw.cerradaEn || raw.fin } : raw;
+    const ev = normalizar(base);
+    if (!ev) continue;
+    const marca = Number.isFinite(ev.closeAt) ? ev.closeAt : trip.exitMs;
+    if (!elegirCierre([trip], ev, marca)) continue;
+    const d = Math.abs((ev.closeAt || trip.exitMs) - trip.exitMs);
+    if (d < bestD) { best = ev; bestD = d; }
   }
   return best;
 }
@@ -401,6 +453,78 @@ export function expresionDibujo(plan, chartIndex) {
   })()`;
 }
 
+// Quita solo los dibujos del reporte: primero por id guardado y, si hace falta, por grupo o título «reporte».
+// No llama a removeAllShapes. Guarda el layout solo si ya tiene id.
+export function expresionQuitar(ids, grupo = GRUPO) {
+  const job = JSON.stringify({ ids: [...new Set((ids || []).map(id => String(id)))], grupo });
+  return `(async function(){
+    var JOB=${job};
+    function guardar(c){
+      var out={method:null,layoutId:null,called:false,note:'El dibujo queda en el gráfico. Permanece si TradingView guarda el layout (autoguardado o Guardar). No es para siempre: si se borra el dibujo o el layout, no se vuelve a crear.'};
+      var api=window.TradingViewApi||{}; var id=null;
+      try{ var col=api._chartWidgetCollection; var m=col&&col.metaInfo&&col.metaInfo(); if(m&&(m.id||m.uid)) id=String(m.id||m.uid); }catch(e){}
+      out.layoutId=id;
+      if(!id){ out.note='Sin id de layout: no se llama a saveChartToServer para no abrir un diálogo. El dibujo está en la sesión y solo sigue ahí si TradingView autoguarda o alguien guarda el layout.'; return out; }
+      try{ if(typeof api.saveChartToServer==='function'){ api.saveChartToServer(); out.method='TradingViewApi.saveChartToServer'; out.called=true; return out; } }catch(e){ out.note=String(e&&e.message||e); }
+      try{ var col2=api._chartWidgetCollection; if(col2&&typeof col2.saveChartToServer==='function'){ col2.saveChartToServer(); out.method='chartWidgetCollection.saveChartToServer'; out.called=true; return out; } }catch(e2){ out.note=String(e2&&e2.message||e2); }
+      out.note='El layout tiene id pero esta página no expone saveChartToServer. El dibujo queda en la sesión.';
+      return out;
+    }
+    function charts(){
+      var api=window.TradingViewApi; if(!api) return [];
+      var n=1; try{ n=typeof api.chartsCount==='function'?api.chartsCount():1; }catch(e){ n=1; }
+      var list=[];
+      for(var i=0;i<n;i++){ try{ var c=typeof api.chart==='function'?api.chart(i):null; if(c) list.push(c); }catch(e2){} }
+      if(!list.length){ try{ var a=api.activeChart(); if(a) list.push(a); }catch(e3){} }
+      return list;
+    }
+    var list=charts(); if(!list.length) return {ok:false,error:'no-api',removed:[],via:null};
+    var removed=[], via=null, save=null;
+    function add(id){ var s=String(id); if(removed.indexOf(s)<0) removed.push(s); }
+    for(var ci=0;ci<list.length;ci++){
+      var c=list[ci], quito=false;
+      for(var i=0;i<JOB.ids.length;i++){
+        try{ c.removeEntity(JOB.ids[i]); add(JOB.ids[i]); quito=true; if(!via) via='ids'; }catch(e){}
+      }
+      var formas=[];
+      try{
+        var all=typeof c.getAllShapes==='function'?(c.getAllShapes()||[]):[];
+        for(var a=0;a<(all||[]).length;a++){
+          var sh=all[a]; if(!sh||sh.id==null) continue;
+          var title='';
+          try{ var ent=c.getShapeById(sh.id); var pr=ent&&ent.getProperties&&ent.getProperties(); if(pr&&pr.title!=null) title=String(pr.title); }catch(e4){}
+          formas.push({id:String(sh.id), title:title, grupo:''});
+        }
+      }catch(e5){}
+      try{
+        var ctl=c.shapesGroupController&&c.shapesGroupController();
+        var gs=ctl&&typeof ctl.groups==='function'?(ctl.groups()||[]):[];
+        for(var g=0;g<gs.length;g++){
+          var gid=gs[g], name='';
+          try{ name=typeof ctl.getGroupName==='function'?String(ctl.getGroupName(gid)||''):''; }catch(e6){}
+          if(name!==JOB.grupo) continue;
+          var miembros=[];
+          try{
+            if(typeof ctl.shapesInGroup==='function') miembros=ctl.shapesInGroup(gid)||[];
+            else if(typeof ctl.getGroupShapeIds==='function') miembros=ctl.getGroupShapeIds(gid)||[];
+          }catch(e7){}
+          for(var m=0;m<miembros.length;m++){
+            var mid=miembros[m]&&miembros[m].id!=null?miembros[m].id:miembros[m];
+            if(mid!=null) formas.push({id:String(mid), title:'', grupo:name});
+          }
+        }
+      }catch(e8){}
+      for(var f=0;f<formas.length;f++){
+        var fm=formas[f]; if(!fm||fm.id==null) continue;
+        if(String(fm.title)!==JOB.grupo && String(fm.grupo)!==JOB.grupo) continue;
+        try{ c.removeEntity(fm.id); add(fm.id); quito=true; via='fallback'; }catch(e9){}
+      }
+      if(quito){ var sv=guardar(c); if(sv) save=sv; }
+    }
+    return {ok:true, removed:removed, via:via, save:save};
+  })()`;
+}
+
 export function reducirPosiciones(mem, msg) {
   const prev = mem && mem.open ? mem.open : {};
   if (!msg || msg.lecturaOk === false || msg.reconexion) {
@@ -491,15 +615,18 @@ export function createReporte(opts = {}) {
   let mem = { open: {} };
   let tail = Promise.resolve();
   let parado = false;
+  function encolar(fn) {
+    const run = tail.then(fn, fn);
+    tail = run.then(() => {}, () => {});
+    return run;
+  }
   const api = {
     archivo: file,
     estado: () => ({ handled: st.handled, nextN: st.nextN, bitacora: st.bitacora, pending: st.pending }),
     memoria: () => mem,
-    alCerrar(raw) {
-      const run = tail.then(() => uno(raw), () => uno(raw));
-      tail = run.then(() => {}, () => {});
-      return run;
-    },
+    alCerrar(raw) { return encolar(() => uno(raw)); },
+    alPrender() { return encolar(() => dibujarDia()); },
+    alApagar() { return encolar(() => quitarDibujos()); },
     onPosicion(msg) {
       try {
         const r = reducirPosiciones(mem, msg);
@@ -615,6 +742,85 @@ export function createReporte(opts = {}) {
     log('omitido', lastRazon, 'fills', lastFills, 'cuenta', maskCuenta(ev.cuenta), 'root', root);
     return { status: 'omitido', key, razon: lastRazon, ms: now() - t0, fills: lastFills };
   }
+  function yaDibujado(key) {
+    const prev = st.handled[key];
+    return !!(prev && (prev.status === 'dibujado' || prev.status === 'parcial'));
+  }
+  async function dibujarListo(trip, ev) {
+    const key = claveTrade(trip);
+    if (yaDibujado(key)) return { status: 'ya', key };
+    if (!opts.readCharts) return { status: 'omitido', razon: 'sin lector de chart' };
+    let charts = null;
+    try { charts = await opts.readCharts(); } catch { return { status: 'omitido', razon: 'TradingView no disponible' }; }
+    const bloqueo = chartBloquea(charts, trip.root);
+    if (!bloqueo.ok) return { status: 'omitido', razon: bloqueo.razon };
+    const niv = nivelesConocidos(ev);
+    const trade = { ...trip, cuenta: (ev && ev.cuenta) || trip.cuenta, accountId: (ev && ev.accountId) || trip.accountId, sl: niv.sl, tp: niv.tp, n: st.nextN };
+    const plan = planDibujo(trade);
+    if (!plan) return { status: 'omitido', razon: 'datos incompletos' };
+    if (PROHIBIDO.test(expresionDibujo(plan, bloqueo.chart.index))) return { status: 'omitido', razon: 'expresion rechazada' };
+    let res = null;
+    try {
+      if (!opts.draw) return { status: 'omitido', razon: 'sin dibujo' };
+      res = await opts.draw(plan, bloqueo.chart);
+    } catch {
+      return { status: 'omitido', razon: 'TradingView no disponible' };
+    }
+    if (res && res.ok && Array.isArray(res.ids) && res.ids.length) {
+      st.nextN += 1;
+      st.handled[key] = { status: 'dibujado', ids: res.ids.map(String), save: res.save || null, at: new Date(now()).toISOString(), n: trade.n, root: trip.root, cuenta: maskCuenta(trade.cuenta), dia: diaCalendarioNY(trip.exitMs) };
+      anotar({ status: 'dibujado', n: trade.n, root: trip.root, cuenta: maskCuenta(trade.cuenta), save: res.save && res.save.method || null, dia: true });
+      log('dibujado dia', 'n', trade.n, 'cuenta', maskCuenta(trade.cuenta), 'root', trip.root);
+      return { status: 'dibujado', key, ids: res.ids };
+    }
+    if (res && res.partial && Array.isArray(res.ids) && res.ids.length) {
+      st.handled[key] = { status: 'parcial', razon: res.error || 'dibujo incompleto', ids: res.ids.map(String), at: new Date(now()).toISOString(), n: trade.n };
+      anotar({ status: 'parcial', razon: st.handled[key].razon, cuenta: maskCuenta(trade.cuenta), root: trip.root });
+      return { status: 'parcial', key };
+    }
+    return { status: 'omitido', razon: (res && (res.reason || res.error)) || 'dibujo incompleto' };
+  }
+  async function dibujarDia() {
+    const t0 = now();
+    if (typeof opts.activo === 'function' && opts.activo() === false) return { status: 'apagado', dibujados: 0, ms: now() - t0 };
+    if (!opts.readExec) return { status: 'omitido', razon: 'sin lector de fills', dibujados: 0, ms: now() - t0 };
+    let pack = null;
+    try { pack = await opts.readExec(); } catch { return { status: 'omitido', razon: 'TradingView no disponible', dibujados: 0, ms: now() - t0 }; }
+    if (!pack || pack.error === 'no-api' || !Array.isArray(pack.ex)) return { status: 'omitido', razon: 'TradingView no disponible', dibujados: 0, ms: now() - t0 };
+    if (typeof opts.activo === 'function' && opts.activo() === false) return { status: 'apagado', dibujados: 0, ms: now() - t0 };
+    const trips = cierresDelDia(cierresDeFills(pack.ex, { cuenta: pack.cuenta || null, accountId: pack.accountId || null }), now()).slice().sort((a, b) => a.exitMs - b.exitMs);
+    let eventos = [];
+    try { eventos = typeof opts.leerEventos === 'function' ? (opts.leerEventos() || []) : []; } catch { eventos = []; }
+    let ocupado = null;
+    try { const raw = opts.raizOcupada ? opts.raizOcupada() : null; ocupado = raw ? (rootOf(raw) || String(raw)) : null; } catch { ocupado = null; }
+    const resultados = [];
+    let dibujados = 0;
+    for (const trip of trips) {
+      if (typeof opts.activo === 'function' && opts.activo() === false) { resultados.push({ status: 'apagado' }); break; }
+      if (ocupado && trip.root === ocupado) { resultados.push({ status: 'ocupado', root: trip.root }); continue; }
+      const ev = cruzarFinTrade(trip, eventos);
+      const r = await dibujarListo(trip, ev);
+      resultados.push(r);
+      if (r.status === 'dibujado') dibujados++;
+    }
+    log('dia', diaCalendarioNY(now()), 'cierres', trips.length, 'dibujados', dibujados);
+    return { status: 'listo', dia: diaCalendarioNY(now()), dibujados, vistos: trips.length, resultados, ms: now() - t0 };
+  }
+  async function quitarDibujos() {
+    const t0 = now();
+    const keys = Object.keys(st.handled).filter(k => st.handled[k] && st.handled[k].status === 'dibujado');
+    const ids = [];
+    for (const k of keys) for (const id of st.handled[k].ids || []) ids.push(String(id));
+    if (!opts.quitar) return { status: 'omitido', razon: 'sin quitar', ms: now() - t0 };
+    let res = null;
+    try { res = await opts.quitar({ ids, grupo: GRUPO, titulo: TITULO }); }
+    catch { return { status: 'omitido', razon: 'TradingView no disponible', ms: now() - t0 }; }
+    if (!res || res.ok === false || res.error === 'no-api') return { status: 'omitido', razon: 'TradingView no disponible', ms: now() - t0 };
+    for (const k of keys) st.handled[k] = { ...st.handled[k], status: 'quitado', ids: [], quitadoEn: new Date(now()).toISOString() };
+    anotar({ status: 'quitado', n: keys.length, via: res.via || null });
+    log('quitados', keys.length, 'via', res.via || 'ninguno');
+    return { status: 'quitado', n: keys.length, removed: res.removed || [], via: res.via || null, save: res.save || null, ms: now() - t0 };
+  }
   return api;
 }
 
@@ -688,6 +894,15 @@ async function cdpEval(port, expr) {
   finally { try { E.close(); } catch {} }
 }
 
+export function leerFinTrades(dir) {
+  if (!dir) return [];
+  try {
+    return fs.readFileSync(path.join(dir, 'colchon-eventos.jsonl'), 'utf8').split('\n').filter(Boolean).map(l => {
+      try { return JSON.parse(l); } catch { return null; }
+    }).filter(x => x && x.type === 'fin_trade');
+  } catch { return []; }
+}
+
 export function attachReporte(opts = {}) {
   const port = opts.port || 9222;
   let pageP = null;
@@ -699,6 +914,8 @@ export function attachReporte(opts = {}) {
     readExec: async () => cdpEval(port, READ_EXEC_JS(await page())),
     readCharts: async () => cdpEval(port, READ_CHARTS_JS),
     draw: async (plan, chart) => cdpEval(port, expresionDibujo(plan, chart && chart.index)),
+    quitar: async (pedido) => cdpEval(port, expresionQuitar(pedido && pedido.ids, (pedido && pedido.grupo) || GRUPO)),
+    leerEventos: opts.leerEventos || (() => leerFinTrades(opts.dir)),
     activo: opts.activo,
   });
   escuchar(rep, port, page).catch(e => (opts.log || console.log)('[reporte] escucha no arrancó', e && e.message));
@@ -751,5 +968,6 @@ export function expresionesLimpias() {
     root: 'MNQ', symbol: 'CME_MINI:MNQZ2026', side: 'long', qty: 1, entry: 100, exit: 101, entryMs: 0, exitMs: 1000, pnl: 2, n: 1, cuenta: 'TEST001', sl: 90, tp: 110,
   });
   if (PROHIBIDO.test(expresionDibujo(plan, 0))) mal.push('dibujo');
+  if (PROHIBIDO.test(expresionQuitar(['1'], GRUPO))) mal.push('quitar');
   return mal;
 }

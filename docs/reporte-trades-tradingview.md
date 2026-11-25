@@ -4,16 +4,23 @@ Módulo: `motor/tv-reporte.mjs`.
 Nombre: **Reporte de trades en TradingView**.  
 Si más adelante alguien dice «reporte trades en TradingView», se refiere a este módulo.
 
-Dibuja en el gráfico el resultado de un trade que **acaba de cerrarse**. No decide entradas, no mueve el stop, no cancela órdenes y no borra dibujos.
+Dibuja en el gráfico el resultado de un trade que **acaba de cerrarse**, y también los cierres de hoy cuando se enciende el interruptor. No decide entradas, no mueve el stop y no cancela órdenes. Al apagarlo quita solo los dibujos de este reporte.
 
 ## Cuándo dibuja
 
-Solo hay un disparo: el cierre confirmado, con el servidor y TradingView en marcha.
+El cierre confirmado se dibuja con el servidor y TradingView en marcha. El interruptor, además, pone o quita los de hoy.
 
 - **Granja.** Al terminar un trade que sí se llenó, `motor/colchon.mjs` llama a `colchonHooks.onCierre`. Eso ocurre al final de `summarize()`, después de guardar el cierre. El aviso va con `setImmediate`: el motor no espera al dibujo y, si el reporte falla, el cierre y las órdenes no se tocan.
 - **Manual.** Si el bróker avisa en vivo que una posición que estábamos viendo abierta pasó a cero, y hay fills de ese cierre, también se dibuja. Un aviso repetido del mismo cierre no dibuja otra vez.
 
-No hay barrido al arrancar, ni al pulsar F5, ni al reconectar, ni un temporizador que recorra el historial. La primera vez que se instala no se dibujan los trades viejos: no se leen para dibujarlos.
+No hay barrido al arrancar, ni al pulsar F5, ni al reconectar, ni un temporizador que recorra el historial. La primera vez que se instala no se dibujan los trades viejos.
+
+El interruptor «Resumen de trades en TradingView» (`POST /api/resumen-tv`) sí cambia el gráfico, en segundo plano y sin bloquear la página:
+
+- **De No a Sí.** Lee la lista completa de ejecuciones del bróker (`allExecutions`, y si viene vacía `executions`). No recorta esa lista por hora antes de emparejar: un cierre de hoy puede haber entrado ayer. Arma los cierres con `cierresDeFills` y se queda con los que **salieron** en el día calendario de Nueva York, de las 00:00 a las 24:00. No usa la sesión de las 18:00 a las 16:00. Si ese cierre ya está marcado como dibujado en `tv-reporte.json`, no lo repite. El SL y el TP salen del `fin_trade` de la granja, con la misma cruce que un cierre en vivo. El dibujo es el de siempre (`planDibujo`). Después, los cierres nuevos se siguen dibujando como hasta ahora. Si TradingView no está conectado, no se marcan como dibujados. Si hay un trade abierto, se salta su símbolo.
+- **De Sí a No.** Quita esos dibujos con `removeEntity` sobre los ids guardados. Si alguno no está, busca las formas del grupo o del título `reporte` con `getAllShapes`. No usa `removeAllShapes` y no toca un dibujo del usuario. Los marca como quitados para que, al volver a Sí, se dibujen otra vez. El layout se guarda solo si ya tiene id.
+
+Los dos sentidos van a una cola: un clic rápido no se pisa con el anterior ni con el dibujo de un cierre en vivo.
 
 Si en el momento del cierre TradingView no responde (también cuando la API del bróker no está: `no-api`), faltan los fills o el gráfico todavía no está listo, el cierre **no se archiva para siempre**. Queda pendiente y se vuelve a intentar en un aviso posterior o al reconectar la escucha. Dentro del mismo intento las esperas son 0 ms, 350 ms, 800 ms, 2 s y 5 s. El lector de fills, si `allExecutions` viene vacío, pide también el contrato real `CME_MINI:MNQZ2026` y `CME_MINI:NQZ2026`, igual que las ejecuciones del bróker, y anota cuántos fills vio y por qué se omitió.
 
@@ -38,7 +45,7 @@ El título de grupo **reporte** se pone solo si el gráfico expone `shapesGroupC
 
 ## Qué pasa después
 
-Cuando el dibujo queda creado, el motor lo deja quieto. No mira si sigue ahí, no lo recrea si alguien lo borra, no lo «cura» y no lo elimina. Borrar el dibujo en TradingView es definitivo para el motor: ese cierre ya está marcado y no se vuelve a dibujar.
+Cuando el dibujo queda creado, el motor no lo recrea solo si alguien lo borra en el gráfico: ese cierre sigue marcado. Sí lo quita, y deja de marcarlo, cuando el interruptor pasa a No. Al volver a Sí se dibujan otra vez los de hoy.
 
 La marca vive en `tv-reporte.json`, en la carpeta de datos de esta computadora (la raíz, si ahí están las cuentas, o `datos/` si la instalación es nueva). Ahí están los cierres ya atendidos (dibujados u omitidos). No es una cola. No se sube a GitHub.
 
@@ -60,8 +67,8 @@ Eso no promete que el dibujo esté para siempre. Permanece si TradingView guarda
 
 - No coloca, modifica ni cancela órdenes, ni cambia SL, TP o estrategia.
 - No dibuja intentos fallidos ni posiciones que siguen abiertas.
-- No copia el historial antiguo al gráfico.
-- No borra dibujos del usuario ni reportes de otros días.
+- No copia al gráfico los cierres de otro día calendario.
+- No borra dibujos del usuario. Solo quita los del grupo o título `reporte`, y solo al pasar el interruptor a No.
 
 ## Mantenimiento
 
@@ -69,4 +76,4 @@ El enganche está en `motor/tradinglink.mjs` (`attachReporte`) y el aviso de la 
 
 Para que un cambio de código entre, hay que reiniciar el servidor, y solo sin posición abierta ni órdenes pendientes. La página se recarga con F5; el F5 no dibuja reportes.
 
-No borres `tv-reporte.json` para «volver a dibujar» los cierres pasados: el módulo no recorre el historial. Lo que ya está marcado como dibujado no se repite. Lo que quedó pendiente por un fallo pasajero (sin fills, sin API, chart no listo) sí se reintenta al reconectar. Borrar el archivo solo olvida la marca anti-duplicado; no redibuja el pasado y no borra lo que ya esté en el gráfico.
+No borres `tv-reporte.json` para «volver a dibujar»: un cierre marcado como dibujado no se repite. Para quitar los dibujos y volver a poner los de hoy, pasa el interruptor a No y otra vez a Sí. Lo que quedó pendiente por un fallo pasajero (sin fills, sin API, chart no listo) sí se reintenta al reconectar. Borrar el archivo solo olvida la marca anti-duplicado; no redibuja el pasado por sí solo y no borra lo que ya esté en el gráfico.
