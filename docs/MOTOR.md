@@ -54,10 +54,30 @@ El arranque de un clic es el acceso **AI Profit**. En Windows lo crea `instalar-
 | GET | `/api/colchon/check` | Cuenta activa y si se puede operar: paper, real permitida o bloqueada. |
 | POST | `/api/colchon/start` | `{side:'long'\|'short', symbol:'MNQ'\|'NQ', qty, strategyId, accountId?, confirmReal?}`. |
 | POST | `/api/colchon/stop` | `{flatten?:bool}`: deja de vigilar y, opcionalmente, cierra. |
+| POST | `/api/colchon/add` | `{addQty}` con una operación abierta, en la cuenta que ya está operando. Suma contratos a mercado con su propio bracket y deja todos los SL y TP al mismo precio. |
 | GET | `/api/colchon/reporte?dia=AAAA-MM-DD` | Informe en Markdown (también se guarda en `reportes\<día>.md`). |
 | GET/POST | `/api/colchon/lectura` | Consulta o cambia la pausa de la lectura en segundo plano (`{pause:bool}`). |
 | GET/POST | `/bot` | Interruptor del bot de órdenes manuales. Devuelve `simulated` = DRY_RUN. |
 | POST | `/order`, `/confirm`, `/cancel` | Flujo de órdenes manuales con confirmación. **No pertenece al motor colchón.** |
+
+## 4.1 Agregar/Promediar
+
+Con el trade abierto, el panel manda `POST /api/colchon/add`. El promedio nuevo es el promedio ponderado. El SL conserva el riesgo en dólares (o la ganancia neta si el colchón ya se movió) y se redondea al tick hacia el precio, para que el riesgo real no pase del objetivo. El TP se aleja al tick para que el neto no baje de la meta.
+
+Protección, en este orden (`js.agregarMercado` y `js.alinearBracket`):
+
+1. La orden que agrega va a mercado **con** `stopLoss` y `takeProfit`, igual que la entrada. Los precios son los recalculados para toda la posición (promedio ponderado). Tradovate crea un OSO cuyas hijas OCO son del tamaño que se agrega. No se mandan `parentId` ni `parentType`: no son campos de la orden y se perderían.
+2. Se espera el fill y se leen la cantidad y el promedio reales.
+3. `modifyOrder` cambia **solo el precio** del stop y del límite que ya estaban, a esos mismos SL y TP. No cambia la cantidad. No cancela. No coloca órdenes de salida sueltas. No hay un momento sin stop.
+4. Durante unos 3 s, `ver()` acepta varios SL y varios TP si las cantidades de los stops suman la posición, las de los límites también, y todos están a ese SL y a ese TP. Ninguno puede ser más grande que la posición. Si no cuadra, se reintenta el paso 3 una vez.
+
+No se cambia la cantidad de una hija que ya existe: Tradovate lo rechaza, y un stop más grande que la posición puede voltearla. Si el precio del bracket viejo no queda, el panel dice «Revisa SL/TP en Tradovate» y no se cierra la posición. No hay un limpiador que cancele órdenes huérfanas.
+
+El ojo de Profito Algoritmo tiene «Resumen de trades en TradingView» (`GET`/`POST /api/resumen-tv`, archivo `resumen-tv.json`). Empieza prendido. Apagado, `tv-reporte` no dibuja el cierre. El P&L, el resumen y los registros no cambian.
+
+Si el SL nuevo se pasa del daily loss o del drawdown que queda, el cajón avisa en amarillo («Este SL se pasa de tu daily loss» / «Este SL se pasa de tu drawdown») y Confirmar sigue disponible. Esos dos ya no bloquean. Siguen bloqueando el tope de contratos, un stop ya tocado, una distancia inválida y un redondeo que no cabe.
+
+El bucle del colchón usa la cantidad y el promedio nuevos: el disparo en dólares se recalcula. Si el colchón ya se había movido, no vuelve a bajar el stop. Cuando mueve el stop (`js.modify` / `tvStopOrders`) o el objetivo (`js.modifyTp`), cambia el precio de **todos** los de la posición, no solo el primero. La guarda de flat sigue: con varios brackets activos no da la operación por cerrada y no cancela esas órdenes.
 
 ## 5. Estrategias (`strategies.mjs`)
 Parámetros comunes: `SL_USD`, `TP_USD` (bracket en $), `STEPS` (escalones `{trigger, lock}` en $ brutos), `NET_USD`, `COMM_RT`, `SLIP_TICKS`, `TRIGGER_EXTRA_USD`, `DEFAULT_QTY`, `PROB`.
@@ -105,10 +125,10 @@ Parámetros comunes: `SL_USD`, `TP_USD` (bracket en $), `STEPS` (escalones `{tri
    4. Si nada funciona, aviso rojo.
 
    Si el precio ya está puesto (`ya:true`), no envía nada: así es idempotente. Nunca cancela ni recrea.
-10. **Guarda de flat.** Se declara flat con 3 lecturas vacías seguidas, al menos 1 s desde la primera y **sin órdenes hijas SL/TP activas**. Si siguen activas más de 30 s, salta un aviso. Una lectura vacía aislada queda como `anomalia lectura_vacia_transitoria`.
+10. **Guarda de flat.** Se declara flat con 2 lecturas vacías seguidas, unos 450 ms desde la primera (lo que tardan esas dos lecturas) y **sin órdenes hijas SL/TP activas**. Si siguen activas más de 30 s, salta un aviso. Una lectura vacía aislada queda como `anomalia lectura_vacia_transitoria`.
 11. **Cambio de cuenta en medio de la prueba.** Si la cuenta activa cambia, el motor deja de vigilar **sin cerrar nada** y muestra una alerta.
 12. **La hora no cierra el trade.** El bucle no aplana por reloj. La posición se queda con su stop y su objetivo, y el colchón sigue vigilándola. Cerrar a mano es el botón Detener.
-13. **Fin.** `summarize()` escribe `colchon-resumen.json`, el evento `fin_trade` y `reportes\<día>.md`.
+13. **Fin.** En cuanto queda flat, `summarize()` escribe `colchon-resumen.json` y el evento `fin_trade` con el P&L aproximado, y el panel lo muestra. Hasta unos 3 s después, si llegan las ejecuciones, el mismo cierre (`fin` no cambia) pasa al P&L exacto en el JSON, en la granja y en un evento `fin_trade_pnl`. No se añade otra fila ni se vuelve a celebrar. Si no llegan, se queda el aproximado.
 
 ## 7. Paper frente a Tradovate
 | Aspecto | Paper Trading | Tradovate (Lucid) |

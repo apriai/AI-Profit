@@ -10,6 +10,42 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.55] — 2026-11-25
+### Añadido
+- **Interruptor «Resumen de trades en TradingView»** en el ojo de Profito Algoritmo, debajo de «Sonido de la señal». Empieza en Sí. En No, el motor no dibuja el cierre en el gráfico. El P&L, el resumen de la granja y los registros siguen igual. La preferencia queda en el motor y aguanta un reinicio.
+### Notas
+- No cambia las órdenes ni Agregar/Promediar.
+
+## [0.10.54] — 2026-11-25
+### Cambiado
+- **Agregar/Promediar ya no bloquea por daily loss ni por drawdown.** Si el SL nuevo se pasa de lo que queda, el cajón muestra un aviso amarillo («Este SL se pasa de tu daily loss» o «Este SL se pasa de tu drawdown») y Confirmar sigue. La persona decide. Siguen bloqueando el tope de contratos, un stop ya tocado, una distancia inválida y el redondeo.
+### Notas
+- No cambia el envío de la orden ni la barra de la mascota.
+
+## [0.10.53] — 2026-11-25
+### Cambiado
+- **El resumen del cierre sale al momento.** La guarda de flat pide 2 lecturas vacías, unos 450 ms, y sigue exigiendo que no queden SL ni TP activos. El panel muestra enseguida el P&L aproximado, con «(aprox.)». Si en unos 3 s llega el P&L de las ejecuciones, se actualizan el resumen, la granja y `colchon-resumen.json` en el mismo cierre. Si no llega, se queda el aproximado. El sonido y la celebración suenan una sola vez.
+### Notas
+- No cambia el envío de órdenes ni la barra de la mascota.
+
+## [0.10.52] — 2026-11-25
+### Cambiado
+- **Agregar/Promediar ya no deja el SL y el TP sueltos.** La suma entra a mercado con su propio bracket (el SL y el TP recalculados, ligados entre sí, del tamaño que se agrega). Después solo se cambia el precio del stop y del objetivo que ya estaban, nunca la cantidad. No se cancela nada y no hay un hueco sin stop. Si ese precio no queda, se reintenta una vez y el panel dice «Revisa SL/TP en Tradovate». No se cierra la posición. Cuando el colchón mueve el stop o el objetivo, cambia todos los de la posición.
+### Notas
+- Vale en la cuenta que ya está operando. No cambia la barra de la mascota ni el aspecto del panel.
+
+## [0.10.51] — 2026-11-25
+### Cambiado
+- **Agregar/Promediar cancela el bracket viejo y pone uno nuevo.** Primero entra a mercado sin SL ni TP y lee el promedio real. Después cancela el stop y el objetivo anteriores y coloca uno de cada uno para toda la posición. Si eso no se verifica, lo reintenta una vez. Si sigue fallando, el panel dice «Sin SL/TP, ponlos a mano» y no cierra la posición. Ya no se agranda la cantidad de las órdenes viejas.
+### Notas
+- Vale en la cuenta que ya está operando. No cambia cómo abren las otras estrategias.
+
+## [0.10.50] — 2026-11-25
+### Añadido
+- **Agregar/Promediar** en el panel del trade abierto. Suma contratos a mercado a la posición que ya está abierta y deja un solo SL y un solo TP para toda la posición. El riesgo en dólares se conserva (o la ganancia neta, si el colchón ya se movió) y el objetivo neto no baja. Sigue bloqueando el tope de contratos, el daily loss y el drawdown. El cajón pide Confirmar antes de enviar.
+### Notas
+- No cambia cómo abren las estrategias que ya estaban. La mascota del panel no cambia.
+
 ## [0.10.49] — 2026-11-25
 ### Añadido
 - **Estrategia «Dia minimo (+ Colchon)»** (`dia-minimo-mas-colchon`), justo después de Rascacielo (Dia Minimo+Colchon). En 25K: SL −$100 / TP +$1,600 y el stop protege ~$100 netos. En 50K: SL −$150 / TP +$3,200 y el stop protege ~$150 netos. El disparo es ese neto más la comisión, 1 tick y el mismo extra, también según el tamaño ($15 en 25K, $22.50 en 50K). Sube una sola vez y el trade sigue hasta el TP o el SL. Solo sube, nunca baja. Las demás estrategias no cambian.
@@ -21,6 +57,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **El DD restante usa el pico de cierre del servidor**, no un saldo intradía. Si la flor tenía un pico más alto, lo baja al pico de las 16:00 ET. En una 25K, el piso sigue siendo ese pico menos $1,000.
 ### Notas
 - El pico llega en `/api/colchon/accounts` como `eodPeak`, leído de `sod.json`. No cambia el envío de órdenes.
+
 
 ## [0.10.47] — 2026-11-23
 ### Cambiado

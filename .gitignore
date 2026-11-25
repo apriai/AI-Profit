@@ -28,6 +28,8 @@ tv-reporte.json
 # Versión del indicador ya instalada en el TradingView de esta PC
 algo-tv.json
 algo-tv.json.tmp-*
+resumen-tv.json
+resumen-tv.json.tmp-*
 tv-reporte.json.tmp-*
 estrategias-propias.json.tmp-*
 backups-negocio/

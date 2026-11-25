@@ -125,4 +125,27 @@ await mudo.correr();
 assert.equal(mudo.phase, 'running');
 assert.equal(mudo.scheduled, 1, 'una respuesta sin estado se reintenta');
 
+assert.match(src, /pnlFinalAprox&&window\.__tlRefrescarAprox/);
+assert.match(html, /window\.__tlRefrescarAprox=function/);
+const refSrc = html.slice(html.indexOf('window.__tlRefrescarAprox=function'), html.indexOf('// El pill "Agente"'));
+assert.doesNotMatch(refSrc, /__tlCelebrate/);
+const gref = {
+  phase: 'summary', on: true, shown: [],
+  showSummary(m) { gref.shown.push(m); },
+  setTimeout(fn) { gref.next = fn; return 1; },
+  Date, J: async () => gref.resp,
+};
+vm.createContext(gref);
+gref.window = gref;
+gref.base = { fin, pnlFinalAprox: true, pnlFinalUSD: 10 };
+gref.resp = { fin, pnlFinalAprox: true, pnlFinalUSD: 10 };
+vm.runInContext(refSrc + '\n__tlRefrescarAprox(base);', gref);
+await new Promise(r => setTimeout(r, 0));
+await gref.next();
+assert.equal(gref.shown.length, 0, 'mientras sigue aproximado no repinta');
+gref.resp = { fin, pnlFinalAprox: false, pnlFinalUSD: 0.5 };
+await gref.next();
+assert.equal(gref.shown.length, 1);
+assert.equal(gref.shown[0].pnlFinalUSD, 0.5);
+
 console.log('panel-cierre ok');

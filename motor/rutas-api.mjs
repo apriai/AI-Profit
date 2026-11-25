@@ -113,6 +113,7 @@ export function manejar(q, r, deps) {
         }
         else if (q.url.startsWith('/api/colchon/check')) out = await deps.colchon.check();
         else if (q.url.startsWith('/api/colchon/start') && q.method === 'POST') out = await deps.colchon.start(j);
+        else if (q.url.startsWith('/api/colchon/add') && q.method === 'POST') out = await deps.colchon.add(j || {});
         else if (q.url.startsWith('/api/colchon/stop') && q.method === 'POST') out = await deps.colchon.stop(j);
         else out = { ok: false, err: 'ruta desconocida' };
       } catch (e) { out = { ok: false, err: String(e.message || e) }; }
@@ -120,6 +121,23 @@ export function manejar(q, r, deps) {
       r.end(JSON.stringify(out));
     });
     return;
+  }
+  if (q.url === '/api/resumen-tv' || q.url.startsWith('/api/resumen-tv?')) {
+    const api = deps.resumenTv;
+    if (q.method === 'GET') {
+      const on = api && api.leer ? api.leer().on !== false : true;
+      r.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      return r.end(JSON.stringify({ ok: true, on }));
+    }
+    if (q.method === 'POST') {
+      let b = ''; q.on('data', c => b += c); q.on('end', () => {
+        let j = {}; try { j = JSON.parse(b || '{}'); } catch {}
+        const out = api && api.fijar ? api.fijar(j.on !== false) : { ok: true, on: j.on !== false };
+        r.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+        r.end(JSON.stringify(out));
+      });
+      return;
+    }
   }
   if (q.url === '/api/algo-tv' || q.url.startsWith('/api/algo-tv?')) {
     const algoTv = deps.algoTv();
@@ -187,7 +205,7 @@ export function manejar(q, r, deps) {
       }
     }
   }
-  if (q.method === 'GET' && (q.url === '/granja-flores.mjs' || q.url.startsWith('/granja-flores.mjs?') || q.url === '/cuentas.mjs' || q.url.startsWith('/cuentas.mjs?'))) {
+  if (q.method === 'GET' && (q.url === '/granja-flores.mjs' || q.url.startsWith('/granja-flores.mjs?') || q.url === '/cuentas.mjs' || q.url.startsWith('/cuentas.mjs?') || q.url === '/agregar-promediar.mjs' || q.url.startsWith('/agregar-promediar.mjs?'))) {
     const archivo = path.join(deps.ROOT, 'motor', path.basename(q.url.split('?')[0]));
     if (fs.existsSync(archivo)) {
       r.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });

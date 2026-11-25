@@ -540,6 +540,7 @@ export function createReporte(opts = {}) {
   }
   async function uno(raw) {
     const t0 = now();
+    if (typeof opts.activo === 'function' && opts.activo() === false) return { status: 'apagado', ms: now() - t0 };
     const ev = normalizar(raw);
     if (!ev) return { status: 'ignorado', ms: now() - t0 };
     const prov = claveProvisional(ev);
@@ -698,6 +699,7 @@ export function attachReporte(opts = {}) {
     readExec: async () => cdpEval(port, READ_EXEC_JS(await page())),
     readCharts: async () => cdpEval(port, READ_CHARTS_JS),
     draw: async (plan, chart) => cdpEval(port, expresionDibujo(plan, chart && chart.index)),
+    activo: opts.activo,
   });
   escuchar(rep, port, page).catch(e => (opts.log || console.log)('[reporte] escucha no arrancó', e && e.message));
   return rep;

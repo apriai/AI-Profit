@@ -3,8 +3,9 @@
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
 import * as orders from './orders.mjs';
 import { negocio } from './negocio.mjs';
-import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, diaFarm, fueraDeSesion, cdpEvaluator, PAGE, acctGuard, js, frenaEscaneo, PANEL_PAUSA_MS } from './colchon.mjs';
+import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, conPnlExacto, diaFarm, fueraDeSesion, cdpEvaluator, PAGE, acctGuard, js, frenaEscaneo, PANEL_PAUSA_MS } from './colchon.mjs';
 import { attachReporte } from './tv-reporte.mjs';
+import { fijarResumenTv, resumenTvActivo } from './resumen-tv.mjs';
 import { createVistaPrevia } from './tv-vista-previa.mjs';
 import { estrategiasPropias } from './estrategias-propias.mjs';
 import { execFile } from 'node:child_process';
@@ -153,7 +154,7 @@ const maskId = t => String(t ?? '').replace(/\b([A-Za-z][A-Za-z0-9]{3})[A-Za-z0-
 function maxPuntos(W, t1, tam) { const m = /(\d+)\s*(MNQ|NQ)/i.exec(String(tam || '')); if (!m) return null; const pv = (/^MNQ$/i.test(m[2]) ? 2 : 20) * +m[1]; const v = W.filter(x => x.type === 'lectura' && Date.parse(x.at) <= t1 + 1e3).map(x => x.brokerPl ?? x.chartPl).filter(x => typeof x === 'number' && isFinite(x)); if (!v.length) return null; const q = u => Math.round(u / pv / .25) * .25; return { neg: q(Math.min(0, ...v)), pos: q(Math.max(0, ...v)), n: v.length, fuente: 'lecturas del broker (1/s)' }; }
 function detalleTrade(at) {
   const T = Date.parse(at); if (!isFinite(T)) return { ok: false, err: 'Falta la hora del trade' };
-  let L = []; try { L = fs.readFileSync(path.join(DIR, 'colchon-eventos.jsonl'), 'utf8').split('\n').filter(Boolean).map(x => { try { return JSON.parse(x); } catch { return null; } }).filter(x => x && x.at); } catch {}
+  let L = []; try { L = conPnlExacto(fs.readFileSync(path.join(DIR, 'colchon-eventos.jsonl'), 'utf8').split('\n').filter(Boolean).map(x => { try { return JSON.parse(x); } catch { return null; } }).filter(x => x && x.at)); } catch {}
   const ms = x => Date.parse(x), cierre = f => ms(f.cerradaEn || f.fin || f.at);
   let f = null, best = 120e3; for (const x of L) { if (x.type !== 'fin_trade') continue; const d = Math.abs(cierre(x) - T); if (d < best) { best = d; f = x; } }
   if (!f) return { ok: false, err: 'No hay registro detallado de este trade (por ejemplo, un trade manual).' };
@@ -167,7 +168,7 @@ function detalleTrade(at) {
   const fin = { direccion: f.direccion, tamano: f.tamano, motivo: f.motivo, estrategia: f.estrategia, estrategiaId: f.estrategiaId, modo: f.modo, cuenta: maskId(f.cuenta), abiertaEn: f.abiertaEn, cerradaEn: f.cerradaEn || f.fin, abiertaET: f.abiertaET, cerradaET: f.cerradaET, duracionSeg: f.duracionSeg ?? null, colchonTrasSeg: f.colchonTrasSeg ?? null, entrada: f.entrada ?? null, pnlFinalUSD: f.pnlFinalUSD ?? null, pnlFinalAprox: !!f.pnlFinalAprox, colchonMovido: !!f.colchonMovido, slColchon: f.slColchon ?? null, colchonUSD: f.colchonUSD ?? null, pasos: f.pasos || [], pasosTotal: f.pasosTotal ?? null, ajusteFill: aj, latencia: { metodo: lt.metodo || null, via: lt.via || null, modificarMs: lt.modificarMs ?? null, confirmarMs: lt.confirmarMs ?? null, totalMs: lt.totalDesdeLecturaMs ?? null }, fuenteLider: f.fuenteLider || null, fuenteModo: f.fuenteModo || null };
   return { ok: true, fin, movs, disparos, puntos: maxPuntos(W, t1, f.tamano), lecturas: { n: lec.length, difMedia: dif.length ? Math.round(dif.reduce((a, b) => a + b, 0) / dif.length * 100) / 100 : null, difMax: dif.length ? Math.round(Math.max(...dif) * 100) / 100 : null } };
 }
-function tradesFarm(dia) { let L = []; try { L = fs.readFileSync(path.join(DIR, 'colchon-eventos.jsonl'), 'utf8').split('\n').filter(Boolean).map(x => { try { return JSON.parse(x); } catch { return null; } }).filter(x => x && x.at && diaFarm(Date.parse(x.at)) === dia); } catch {}
+function tradesFarm(dia) { let L = []; try { L = conPnlExacto(fs.readFileSync(path.join(DIR, 'colchon-eventos.jsonl'), 'utf8').split('\n').filter(Boolean).map(x => { try { return JSON.parse(x); } catch { return null; } }).filter(x => x && x.at && diaFarm(Date.parse(x.at)) === dia)); } catch {}
   const out = []; let movs = [];
   for (const x of L) { if (x.type === 'mover_stop' && x.ok) movs.push(x); if (x.type !== 'fin_trade') continue;
     const sid = x.estrategiaId || ''; const cand = [sid && `${sid}-${dia}.md`, `${dia}.md`].filter(Boolean).filter(f => fs.existsSync(path.join(DIR, 'reportes', f)));
@@ -321,8 +322,8 @@ colchonHooks.pnlFinalBroker = async ({ openAt, side, cuenta }) => { try { execCa
 // Reporte de trades en TradingView: solo el cierre que acaba de confirmarse. No barre el historial ni repone dibujos.
 let reporte = null;
 try {
-  reporte = attachReporte({ dir: DIR, raizOcupada: () => colchon.status().state === 'running' ? colchon.status().symbol : null });
-  colchonHooks.onCierre = (s) => { try { reporte.alCerrar(s); } catch (e) { console.log('reporte:', e && e.message); } };
+  reporte = attachReporte({ dir: DIR, raizOcupada: () => colchon.status().state === 'running' ? colchon.status().symbol : null, activo: () => resumenTvActivo(DIR) });
+  colchonHooks.onCierre = (s) => { if (!resumenTvActivo(DIR)) return; try { reporte.alCerrar(s); } catch (e) { console.log('reporte:', e && e.message); } };
   console.log('reporte: Reporte de trades en TradingView listo');
 } catch (e) { console.log('reporte: no arrancó; el motor sigue.', e && e.message); }
 // Vista previa del panel: solo dibuja. No abre, no modifica y no cierra órdenes, y no repone reportes.
@@ -348,6 +349,7 @@ http.createServer((q, r) => manejar(q, r, {
   panelAbierto: () => panelHasta > Date.now(),
   metricasDe, tradesDe, conexion, orders,
   algoTv: () => algoTv, textoVersion, ROOT, HTML,
+  resumenTv: { leer: () => ({ ok: true, on: resumenTvActivo(DIR) }), fijar: (on) => fijarResumenTv(DIR, on) },
 })).listen(PORT, '127.0.0.1', () => console.log(`Granja: http://localhost:${PORT}`));
 let lastFull = 0, lastFunded = 0, lastBusy = Date.now(); const FULL_MS = EVERY_MS, QUIET_MS = 5 * 60 * 1000;
 cycle(); setInterval(cycle, 30 * 1000);
