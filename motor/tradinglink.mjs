@@ -330,7 +330,8 @@ async function brokerExecs(sinceMs) { if (execCache.v && (Date.now() - execCache
   return cortarFills(execCache.v, sinceMs); }
 // Al cerrar, el motor pide el mismo cierre que la fila del historial (pnl tras cerrarSesion y precio de salida).
 colchonHooks.pnlFinalBroker = async ({ openAt, side, cuenta }) => { try { execCache.at = 0; const b = await brokerExecs(); if (!b || !b.ex) return null; return cierreDesdeEjecuciones(b.ex, { openAt, side, cuenta, cuentaBroker: b.cuenta }); } catch { return null; } };
-// Reporte de trades en TradingView: solo el cierre que acaba de confirmarse. No barre el historial ni repone dibujos.
+// Reporte de trades en TradingView: el cierre en vivo se dibuja al confirmarse.
+// El barrido del día calendario solo corre al pasar el interruptor de No a Sí. No barre al arrancar.
 let reporte = null;
 try {
   reporte = attachReporte({ dir: DIR, raizOcupada: () => colchon.status().state === 'running' ? colchon.status().symbol : null, activo: () => resumenTvActivo(DIR) });
@@ -365,7 +366,18 @@ http.createServer((q, r) => manejar(q, r, {
   panelAbierto: () => panelHasta > Date.now(),
   metricasDe, tradesDe, conexion, orders, inicioDiaFarm,
   algoTv: () => algoTv, textoVersion, ROOT, HTML,
-  resumenTv: { leer: () => ({ ok: true, on: resumenTvActivo(DIR) }), fijar: (on) => fijarResumenTv(DIR, on) },
+  resumenTv: {
+    leer: () => ({ ok: true, on: resumenTvActivo(DIR) }),
+    fijar: (on) => {
+      const antes = resumenTvActivo(DIR);
+      const out = fijarResumenTv(DIR, on);
+      if (reporte && antes !== out.on) {
+        const job = out.on ? reporte.alPrender() : reporte.alApagar();
+        Promise.resolve(job).catch(e => console.log('reporte:', e && e.message));
+      }
+      return out;
+    },
+  },
   gex: { estado: () => gexApi ? gexApi.estado() : { ok: true, signo: null, gex: null } },
   descargarLogs: (j) => crearPaqueteLogs({
     dir: DIR,

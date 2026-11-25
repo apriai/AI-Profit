@@ -8,6 +8,7 @@ on:
       - cursor/agregar-promediar-8bec
       - cursor/agregar-fill-y-historial-6767
       - cursor/quitar-evaluacion-rascacielos-6767
+      - cursor/resumen-tv-dia-6767
 
 permissions:
   contents: read
