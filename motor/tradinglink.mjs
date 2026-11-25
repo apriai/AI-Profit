@@ -16,7 +16,7 @@ import { rulesFor, maxQtyFor } from './account-size.mjs';
 import { tipoDe, inicioDe } from './granja-flores.mjs';
 import { debeGuardarSaldo, esPapel, filtroFondeadas } from './cuentas.mjs';
 import { textoVersion } from './version-api.mjs';
-import { cerrarSesion, cierreDesdeEjecuciones, roundTrips } from './pnl-sesion.mjs';
+import { anotarPuntos, cerrarSesion, cierreDesdeEjecuciones, roundTrips } from './pnl-sesion.mjs';
 import { leerEventosDesde, inicioDiaFarm } from './eventos-ventana.mjs';
 import { crearAlgoTv } from './pine-algo.mjs';
 import { manejar } from './rutas-api.mjs';
@@ -175,7 +175,7 @@ function tradesFarm(dia, desdeMs) { let L = []; try { L = conPnlExacto(leerEvent
   const out = []; let movs = [];
   for (const x of L) { if (x.type === 'mover_stop' && x.ok) movs.push(x); if (x.type !== 'fin_trade') continue;
     const sid = x.estrategiaId || ''; const cand = [sid && `${sid}-${dia}.md`, `${dia}.md`].filter(Boolean).filter(f => fs.existsSync(path.join(DIR, 'reportes', f)));
-    out.push({ at: x.fin || x.at, direccion: x.direccion, tamano: x.tamano, pnl: x.pnlFinalUSD ?? null, aprox: !!x.pnlFinalAprox, motivo: x.motivo, estrategia: x.estrategia, modo: x.modo, cuenta: maskId(x.cuenta), stopMovido: !!(x.colchonMovido || movs.length), informe: cand[0] || null }); movs = []; }
+    out.push({ at: x.fin || x.at, direccion: x.direccion, tamano: x.tamano, entrada: x.entrada ?? null, salida: x.salida ?? null, pnl: x.pnlFinalUSD ?? null, pnlBruto: x.pnlBruto ?? null, aprox: !!x.pnlFinalAprox, motivo: x.motivo, estrategia: x.estrategia, modo: x.modo, cuenta: maskId(x.cuenta), stopMovido: !!(x.colchonMovido || movs.length), informe: cand[0] || null }); movs = []; }
   const v = out.filter(t => typeof t.pnl === 'number');
   return { dia, total: Math.round(v.reduce((a, t) => a + t.pnl, 0) * 100) / 100, n: out.length, ganados: v.filter(t => t.pnl > 0).length, trades: out.reverse(), dias: [...new Set([...diasConTrades(), ...diasHist()])].sort().reverse() }; }
 const HDIR = path.join(DIR, 'historial');
@@ -206,7 +206,7 @@ function conNeto(r, id) {
   const ses = cerrarSesion(r.trades, {});
   const base = String(r.fuente || '').replace(/ · neto \([^)]*\)$/, '');
   publicarDia(r.dia, id, ses.neto);
-  return { ...r, trades: ses.trades, bruto: ses.bruto, total: ses.neto, totalNeto: true, saldoDia: ses.neto, resumen: ses.resumen, ganados: ses.resumen.ganados, n: ses.resumen.n, fuente: base ? `${base} · neto (${ses.fuente})` : `neto (${ses.fuente})` };
+  return { ...r, trades: anotarPuntos(ses.trades), bruto: ses.bruto, total: ses.neto, totalNeto: true, saldoDia: ses.neto, resumen: ses.resumen, ganados: ses.resumen.ganados, n: ses.resumen.n, fuente: base ? `${base} · neto (${ses.fuente})` : `neto (${ses.fuente})` };
 }
 function aplicarNetoGuardado() {
   const day = tradingDay(); let cambio = false;

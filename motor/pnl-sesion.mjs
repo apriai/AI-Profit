@@ -37,6 +37,46 @@ export function cierreDesdeEjecuciones(ex, { openAt, side, cuenta, cuentaBroker 
 
 const r2 = x => Math.round(x * 100) / 100;
 
+const PV_PUNTOS = { MNQ: 2, NQ: 20, MES: 5, ES: 50, M2K: 5, RTY: 50, MYM: 0.5, YM: 5 };
+
+function numF(x) { const n = Number(x); return Number.isFinite(n) ? n : null; }
+function precioF(x) { const n = numF(x); return n != null && n > 0 ? n : null; }
+
+export function instrumentoDe(t) {
+  const s = String((t && (t.tamano || t.symbol || t.sym)) || '');
+  const m = s.match(/(\d+(?:\.\d+)?)\s*(MNQ|MES|M2K|MYM|NQ|ES|RTY|YM)\b/i);
+  if (m) return { n: +m[1], sym: m[2].toUpperCase(), pv: PV_PUNTOS[m[2].toUpperCase()] || null };
+  const sym = /MNQ/i.test(s) ? 'MNQ' : /MES/i.test(s) ? 'MES' : /M2K/i.test(s) ? 'M2K' : /MYM/i.test(s) ? 'MYM' : /\bNQ\b/i.test(s) ? 'NQ' : /\bES\b/i.test(s) ? 'ES' : /\bRTY\b/i.test(s) ? 'RTY' : /\bYM\b/i.test(s) ? 'YM' : null;
+  const q = numF(t && t.qty);
+  if (sym && q > 0) return { n: q, sym, pv: PV_PUNTOS[sym] };
+  return { n: 0, sym: null, pv: null };
+}
+
+function esCorto(t) {
+  const d = String((t && (t.direccion || t.side)) || '').toUpperCase();
+  return d === 'VENTA' || d === 'SHORT' || d === '-1' || (t && (t.side === -1 || t.side === 'short'));
+}
+
+/** Puntos por contrato. Promedios del bróker, luego precios guardados, luego el P&L bruto. */
+export function puntosDe(t) {
+  if (!t || typeof t !== 'object') return null;
+  if (typeof t.puntos === 'number' && Number.isFinite(t.puntos)) return r2(t.puntos);
+  const entrada = precioF(t.entradaProm ?? t.entradaPromedio ?? t.avgEntry ?? t.entrada ?? t.entry);
+  const salida = precioF(t.salidaProm ?? t.salidaPromedio ?? t.avgExit ?? t.salida ?? t.exit ?? t.precioSalida);
+  if (entrada != null && salida != null) return r2(esCorto(t) ? entrada - salida : salida - entrada);
+  const bruto = numF(t.pnlBruto) != null ? numF(t.pnlBruto) : (t.neto === false ? numF(t.pnl) : (numF(t.pnl) != null && numF(t.comision) != null ? r2(numF(t.pnl) + numF(t.comision)) : numF(t.pnl)));
+  const { n, pv } = instrumentoDe(t);
+  if (bruto == null || !(n > 0) || !(pv > 0)) return null;
+  return r2(bruto / (n * pv));
+}
+
+export function anotarPuntos(trades) {
+  return (Array.isArray(trades) ? trades : []).map(t => {
+    const p = puntosDe(t);
+    return p == null ? t : { ...t, puntos: p };
+  });
+}
+
 export function contratosDe(t) {
   const m = String(t && (t.tamano || t.symbol) || '').match(/(\d+(?:\.\d+)?)\s*(MNQ|NQ)\b/i);
   if (m) return { n: +m[1], sym: m[2].toUpperCase() };

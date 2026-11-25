@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.62] — 2026-11-25
+### Corregido
+- **La columna Puntos ya no sale en blanco.** Si el bróker trae el promedio de entrada y de salida, se usan esos. Si no, los precios guardados del trade (también en `historial/<día>.json` y en el cierre de la granja). Si tampoco están, los puntos salen del P&L bruto dividido por los contratos y el valor del punto (MNQ $2, NQ $20, MES $5, ES $50). «—» solo queda cuando no hay ninguno de esos datos.
+### Notas
+- No cambia las órdenes ni la mascota.
+
 ## [0.10.61] — 2026-11-25
 ### Corregido
 - **Agregar usa el fill real.** Después de entrar a mercado, el SL y el TP se vuelven a calcular con el promedio y la cantidad que devolvió el bróker (el mismo riesgo en dólares y la misma meta del TP). Si el fill vino peor que la cotización, el stop no se queda más apretado. Si no hay promedio real, se dejan los precios de la cotización. El antes y el después quedan en `colchon.log`. Si no se pueden alinear, solo avisa «Revisa SL/TP en Tradovate» y no cierra.
