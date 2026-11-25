@@ -139,6 +139,16 @@ export function manejar(q, r, deps) {
       return;
     }
   }
+  if (q.url === '/api/descargar-logs' && q.method === 'POST') {
+    let b = ''; q.on('data', c => b += c); q.on('end', async () => {
+      let j = {}; try { j = JSON.parse(b || '{}'); } catch {}
+      let out = { ok: false, err: 'No se pudo guardar' };
+      try { out = await deps.descargarLogs(j); } catch (e) { out = { ok: false, err: String(e && e.message || e) }; }
+      r.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      r.end(JSON.stringify(out));
+    });
+    return;
+  }
   if (q.url === '/api/algo-tv' || q.url.startsWith('/api/algo-tv?')) {
     const algoTv = deps.algoTv();
     if (q.method === 'GET') {

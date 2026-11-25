@@ -1,0 +1,60 @@
+# Instalador de prueba de esta rama. No crea etiqueta ni release.
+name: Instalador de prueba
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - cursor/descargar-logs-8bec
+
+permissions:
+  contents: read
+
+jobs:
+  instalador:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: NSIS 3.11
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = Join-Path $env:TEMP 'nsis-3.11.zip'
+          Invoke-WebRequest -Uri 'https://github.com/tauri-apps/binary-releases/releases/download/nsis-3.11/nsis-3.11.zip' -OutFile $zip
+          $sha = (Get-FileHash -Algorithm SHA1 -LiteralPath $zip).Hash
+          if ($sha -ne 'EF7FF767E5CBD9EDD22ADD3A32C9B8F4500BB10D') { throw "SHA1 de NSIS no coincide: $sha" }
+          $dest = Join-Path $env:TEMP 'nsis-3.11'
+          Expand-Archive -LiteralPath $zip -DestinationPath $dest
+          $exe = Get-ChildItem -Path $dest -Recurse -Filter makensis.exe | Select-Object -First 1
+          if (-not $exe) { throw 'No está makensis.exe' }
+          Add-Content -Path $env:GITHUB_PATH -Value $exe.DirectoryName
+
+      - name: Comprobar imagenes del instalador
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $gfx = 'instalador\gfx'
+          foreach ($nombre in @('1-escenario.jpg','2-multitud-islas.jpg','3-granja-cerca.jpg','4-isla-granja.jpg','p1-bienvenida.bmp','p2-carpeta.bmp','p3-progreso.bmp','p4-listo.bmp','btn-instalar.bmp','btn-abrir.bmp')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $gfx $nombre))) { throw "Falta $gfx\$nombre" }
+          }
+
+      - name: Construir Profito-Setup.exe
+        shell: pwsh
+        run: .\instalador\construir.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Profito-Setup
+          path: dist/Profito-Setup.exe
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Granja-html
+          path: motor/Granja-de-Cuentas-v2.html
+          if-no-files-found: error

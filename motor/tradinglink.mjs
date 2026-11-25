@@ -6,6 +6,7 @@ import { negocio } from './negocio.mjs';
 import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, conPnlExacto, diaFarm, fueraDeSesion, cdpEvaluator, PAGE, acctGuard, js, frenaEscaneo, PANEL_PAUSA_MS } from './colchon.mjs';
 import { attachReporte } from './tv-reporte.mjs';
 import { fijarResumenTv, resumenTvActivo } from './resumen-tv.mjs';
+import { crearPaqueteLogs } from './descargar-logs.mjs';
 import { createVistaPrevia } from './tv-vista-previa.mjs';
 import { estrategiasPropias } from './estrategias-propias.mjs';
 import { execFile } from 'node:child_process';
@@ -350,6 +351,15 @@ http.createServer((q, r) => manejar(q, r, {
   metricasDe, tradesDe, conexion, orders,
   algoTv: () => algoTv, textoVersion, ROOT, HTML,
   resumenTv: { leer: () => ({ ok: true, on: resumenTvActivo(DIR) }), fijar: (on) => fijarResumenTv(DIR, on) },
+  descargarLogs: (j) => crearPaqueteLogs({
+    dir: DIR,
+    version: textoVersion(path.join(ROOT, 'VERSION')),
+    cuentas: state.accounts,
+    conexion,
+    colchon: (() => { const s = colchon.status(); return { state: s.state, strategy: s.strategy || null, symbol: s.symbol || null, side: s.side || null, mode: s.mode || null }; })(),
+    resumenTradingView: resumenTvActivo(DIR),
+    toggles: j && j.toggles,
+  }),
 })).listen(PORT, '127.0.0.1', () => console.log(`Granja: http://localhost:${PORT}`));
 let lastFull = 0, lastFunded = 0, lastBusy = Date.now(); const FULL_MS = EVERY_MS, QUIET_MS = 5 * 60 * 1000;
 cycle(); setInterval(cycle, 30 * 1000);

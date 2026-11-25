@@ -73,7 +73,7 @@ Protección, en este orden (`js.agregarMercado` y `js.alinearBracket`):
 
 No se cambia la cantidad de una hija que ya existe: Tradovate lo rechaza, y un stop más grande que la posición puede voltearla. Si el precio del bracket viejo no queda, el panel dice «Revisa SL/TP en Tradovate» y no se cierra la posición. No hay un limpiador que cancele órdenes huérfanas.
 
-El ojo de Profito Algoritmo tiene «Resumen de trades en TradingView» (`GET`/`POST /api/resumen-tv`, archivo `resumen-tv.json`). Empieza prendido. Apagado, `tv-reporte` no dibuja el cierre. El P&L, el resumen y los registros no cambian.
+El ojo de Profito Algoritmo tiene «Resumen de trades en TradingView» (`GET`/`POST /api/resumen-tv`, archivo `resumen-tv.json`). Empieza prendido. Apagado, `tv-reporte` no dibuja el cierre. El P&L, el resumen y los registros no cambian. Al final del mismo ojo, «Descargar Logs y status» (`POST /api/descargar-logs`) guarda en Descargas `Profito-logs-AAAA-MM-DD_HHMM.zip` con los `.log` de `datos/` y un `status.json` sin claves ni tokens.
 
 Si el SL nuevo se pasa del daily loss o del drawdown que queda, el cajón avisa en amarillo («Este SL se pasa de tu daily loss» / «Este SL se pasa de tu drawdown») y Confirmar sigue disponible. Esos dos ya no bloquean. Siguen bloqueando el tope de contratos, un stop ya tocado, una distancia inválida y un redondeo que no cabe.
 
