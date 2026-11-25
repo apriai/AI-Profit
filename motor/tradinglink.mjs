@@ -16,7 +16,8 @@ import { rulesFor, maxQtyFor } from './account-size.mjs';
 import { tipoDe, inicioDe } from './granja-flores.mjs';
 import { debeGuardarSaldo, esPapel, filtroFondeadas } from './cuentas.mjs';
 import { textoVersion } from './version-api.mjs';
-import { cerrarSesion, cierreDesdeEjecuciones, roundTrips } from './pnl-sesion.mjs';
+import { anotarPuntos, cerrarSesion, cierreDesdeEjecuciones, roundTrips } from './pnl-sesion.mjs';
+import { leerEventosDesde, inicioDiaFarm } from './eventos-ventana.mjs';
 import { crearAlgoTv } from './pine-algo.mjs';
 import { manejar } from './rutas-api.mjs';
 const DIR = dataDir();
@@ -170,11 +171,11 @@ function detalleTrade(at) {
   const fin = { direccion: f.direccion, tamano: f.tamano, motivo: f.motivo, estrategia: f.estrategia, estrategiaId: f.estrategiaId, modo: f.modo, cuenta: maskId(f.cuenta), abiertaEn: f.abiertaEn, cerradaEn: f.cerradaEn || f.fin, abiertaET: f.abiertaET, cerradaET: f.cerradaET, duracionSeg: f.duracionSeg ?? null, colchonTrasSeg: f.colchonTrasSeg ?? null, entrada: f.entrada ?? null, pnlFinalUSD: f.pnlFinalUSD ?? null, pnlFinalAprox: !!f.pnlFinalAprox, colchonMovido: !!f.colchonMovido, slColchon: f.slColchon ?? null, colchonUSD: f.colchonUSD ?? null, pasos: f.pasos || [], pasosTotal: f.pasosTotal ?? null, ajusteFill: aj, latencia: { metodo: lt.metodo || null, via: lt.via || null, modificarMs: lt.modificarMs ?? null, confirmarMs: lt.confirmarMs ?? null, totalMs: lt.totalDesdeLecturaMs ?? null }, fuenteLider: f.fuenteLider || null, fuenteModo: f.fuenteModo || null };
   return { ok: true, fin, movs, disparos, puntos: maxPuntos(W, t1, f.tamano), lecturas: { n: lec.length, difMedia: dif.length ? Math.round(dif.reduce((a, b) => a + b, 0) / dif.length * 100) / 100 : null, difMax: dif.length ? Math.round(Math.max(...dif) * 100) / 100 : null } };
 }
-function tradesFarm(dia) { let L = []; try { L = conPnlExacto(fs.readFileSync(path.join(DIR, 'colchon-eventos.jsonl'), 'utf8').split('\n').filter(Boolean).map(x => { try { return JSON.parse(x); } catch { return null; } }).filter(x => x && x.at && diaFarm(Date.parse(x.at)) === dia)); } catch {}
+function tradesFarm(dia, desdeMs) { let L = []; try { L = conPnlExacto(leerEventosDesde(path.join(DIR, 'colchon-eventos.jsonl'), desdeMs).filter(x => x && x.at && diaFarm(Date.parse(x.at)) === dia)); } catch {}
   const out = []; let movs = [];
   for (const x of L) { if (x.type === 'mover_stop' && x.ok) movs.push(x); if (x.type !== 'fin_trade') continue;
     const sid = x.estrategiaId || ''; const cand = [sid && `${sid}-${dia}.md`, `${dia}.md`].filter(Boolean).filter(f => fs.existsSync(path.join(DIR, 'reportes', f)));
-    out.push({ at: x.fin || x.at, direccion: x.direccion, tamano: x.tamano, pnl: x.pnlFinalUSD ?? null, aprox: !!x.pnlFinalAprox, motivo: x.motivo, estrategia: x.estrategia, modo: x.modo, cuenta: maskId(x.cuenta), stopMovido: !!(x.colchonMovido || movs.length), informe: cand[0] || null }); movs = []; }
+    out.push({ at: x.fin || x.at, direccion: x.direccion, tamano: x.tamano, entrada: x.entrada ?? null, salida: x.salida ?? null, pnl: x.pnlFinalUSD ?? null, pnlBruto: x.pnlBruto ?? null, aprox: !!x.pnlFinalAprox, motivo: x.motivo, estrategia: x.estrategia, modo: x.modo, cuenta: maskId(x.cuenta), stopMovido: !!(x.colchonMovido || movs.length), informe: cand[0] || null }); movs = []; }
   const v = out.filter(t => typeof t.pnl === 'number');
   return { dia, total: Math.round(v.reduce((a, t) => a + t.pnl, 0) * 100) / 100, n: out.length, ganados: v.filter(t => t.pnl > 0).length, trades: out.reverse(), dias: [...new Set([...diasConTrades(), ...diasHist()])].sort().reverse() }; }
 const HDIR = path.join(DIR, 'historial');
@@ -205,7 +206,7 @@ function conNeto(r, id) {
   const ses = cerrarSesion(r.trades, {});
   const base = String(r.fuente || '').replace(/ · neto \([^)]*\)$/, '');
   publicarDia(r.dia, id, ses.neto);
-  return { ...r, trades: ses.trades, bruto: ses.bruto, total: ses.neto, totalNeto: true, saldoDia: ses.neto, resumen: ses.resumen, ganados: ses.resumen.ganados, n: ses.resumen.n, fuente: base ? `${base} · neto (${ses.fuente})` : `neto (${ses.fuente})` };
+  return { ...r, trades: anotarPuntos(ses.trades), bruto: ses.bruto, total: ses.neto, totalNeto: true, saldoDia: ses.neto, resumen: ses.resumen, ganados: ses.resumen.ganados, n: ses.resumen.n, fuente: base ? `${base} · neto (${ses.fuente})` : `neto (${ses.fuente})` };
 }
 function aplicarNetoGuardado() {
   const day = tradingDay(); let cambio = false;
@@ -223,8 +224,10 @@ function histDia(dia, f) { const h = histLeer(dia); if (!h) return null; const c
   const sd = cs.map(([, c]) => c.saldoDia).filter(x => typeof x === 'number');
   return { dia, total: Math.round(v.reduce((a, t) => a + t.pnl, 0) * 100) / 100, saldoDia: sd.length ? Math.round(sd.reduce((a, x) => a + x, 0) * 100) / 100 : null, n: out.length, ganados: v.filter(t => t.pnl > 0).length, trades: out, dias: f.dias, cuenta: cs.length === 1 ? cs[0][0] : null, fuente: 'historial guardado (' + (cs[0][1].fuente || 'bróker') + ')' }; }
 const diaVivo = d => d === diaFarm() || d === diaFarm(Date.now() - 36e5);
-async function tradesDe(dia) { const r = await tradesDe0(dia); if (diaVivo(dia) && r.fuente && /bróker/.test(r.fuente) && !/^historial/.test(r.fuente)) histGuardar(r); return r; }
-async function tradesDe0(dia) { const f = tradesFarm(dia); const b = diaVivo(dia) ? await brokerExecs() : null;
+async function tradesDe(dia, opt) { const r = await tradesDe0(dia, opt); if (diaVivo(dia) && r.fuente && /bróker/.test(r.fuente) && !/^historial/.test(r.fuente)) histGuardar(r); return r; }
+async function tradesDe0(dia, opt = {}) {
+  const desdeMs = opt.desdeMs === undefined ? inicioDiaFarm(dia) : opt.desdeMs;
+  const f = tradesFarm(dia, desdeMs); const b = diaVivo(dia) ? await brokerExecs(opt.fillsDesdeMs) : null;
   if (!b || !b.ex) { const h = histDia(dia, f); if (h) return conNeto(h, h.cuenta); f.fuente = 'informes de la granja (estimado; sin ejecuciones del bróker)'; return conNeto(f); }
   const rt = roundTrips(b.ex).filter(t => diaFarm(Date.parse(t.at)) === dia);
   const farm = [...f.trades]; const out = rt.map(t => { const k = farm.findIndex(x => Math.abs(Date.parse(x.at) - Date.parse(t.at)) < 15000 && x.direccion === t.direccion);
@@ -304,21 +307,27 @@ function agregarMetricas(porDia, meta) {
 async function metricasDe(url) {
   const q = new URL(url, 'http://x').searchParams;
   const hoy = diaFarm();
+  const horas = Number(q.get('horas'));
+  const rango = String(q.get('rango') || 'hoy').toLowerCase();
   const conocidos = [...new Set([...diasConTrades(), ...diasHist()])];
   const { desde, hasta } = rangoMetricas(q, hoy, conocidos);
   const dias = diasEnRango(desde, hasta, hoy, conocidos);
+  const abierto = rango === 'todo' && !(horas > 0) && !q.get('desde') && !q.get('hasta');
+  const desdeMs = abierto ? null : inicioDiaFarm(desde);
+  const fillsDesdeMs = null;
   const porDia = [];
-  for (const dia of dias) porDia.push(await tradesDe(dia));
+  for (const dia of dias) porDia.push(await tradesDe(dia, { desdeMs, fillsDesdeMs }));
   return agregarMetricas(porDia, { desde, hasta });
 }
 // === fin metricas puras ===
 
 // Ejecuciones reales del bróker (solo lectura: ab.executions) -> trades ida y vuelta con P&L bruto (sin comisiones)
 let execCache = { at: 0, v: null };
-async function brokerExecs() { if (execCache.v && (Date.now() - execCache.at < 20000 || colchon.status().state === 'running')) return execCache.v;
+function cortarFills(v, sinceMs) { if (!v || !(sinceMs > 0)) return v; return { ...v, ex: (v.ex || []).filter(x => +x.time >= sinceMs) }; }
+async function brokerExecs(sinceMs) { if (execCache.v && (Date.now() - execCache.at < 20000 || colchon.status().state === 'running')) return cortarFills(execCache.v, sinceMs);
   let E; try { E = await cdpEvaluator(9222); const v = await Promise.race([E.evaluate(`(async function(){${PAGE}var ab=tvBroker(tvTrading());if(!ab||typeof ab.allExecutions!=='function'&&typeof ab.executions!=='function')return null;var n=null;try{var ci=tvWv(ab.currentAccount());var ms=await ab.accountsMetainfo();(ms||[]).forEach(function(m){if(String(m.id)===String(ci))n=m.name})}catch(e){}var l=null;try{l=await ab.allExecutions()}catch(e){}if(!l||!l.length){l=[];var sy=['CME_MINI:MNQZ2026','CME_MINI:NQZ2026'];try{var cs=window.TradingViewApi._activeChartWidgetWV.value().symbol();if(cs&&sy.indexOf(cs)<0)sy.push(cs)}catch(e){}for(var i=0;i<sy.length;i++){try{(await ab.executions(sy[i])||[]).forEach(function(x){if(!l.some(function(y){return String(y.id)===String(x.id)}))l.push(x)})}catch(e){}}}return {cuenta:n,ex:(l||[]).map(function(x){return {id:String(x.id),symbol:x.symbol,price:+x.price,qty:Math.abs(+x.qty),side:+x.side,time:+x.time,comm:x.commission!=null?+x.commission:null}})}})()`), sleep(6000).then(() => null)]);
     if (v) execCache = { at: Date.now(), v }; } catch {} finally { try { E && E.close(); } catch {} }
-  return execCache.v; }
+  return cortarFills(execCache.v, sinceMs); }
 // Al cerrar, el motor pide el mismo cierre que la fila del historial (pnl tras cerrarSesion y precio de salida).
 colchonHooks.pnlFinalBroker = async ({ openAt, side, cuenta }) => { try { execCache.at = 0; const b = await brokerExecs(); if (!b || !b.ex) return null; return cierreDesdeEjecuciones(b.ex, { openAt, side, cuenta, cuentaBroker: b.cuenta }); } catch { return null; } };
 // Reporte de trades en TradingView: solo el cierre que acaba de confirmarse. No barre el historial ni repone dibujos.
@@ -354,7 +363,7 @@ http.createServer((q, r) => manejar(q, r, {
   lastFull: () => lastFull, lastBusy: () => lastBusy, quietMs: () => QUIET_MS,
   pulsoPanel: abierto => { panelHasta = abierto ? Date.now() + PANEL_PAUSA_MS : 0; return panelHasta; },
   panelAbierto: () => panelHasta > Date.now(),
-  metricasDe, tradesDe, conexion, orders,
+  metricasDe, tradesDe, conexion, orders, inicioDiaFarm,
   algoTv: () => algoTv, textoVersion, ROOT, HTML,
   resumenTv: { leer: () => ({ ok: true, on: resumenTvActivo(DIR) }), fijar: (on) => fijarResumenTv(DIR, on) },
   gex: { estado: () => gexApi ? gexApi.estado() : { ok: true, signo: null, gex: null } },

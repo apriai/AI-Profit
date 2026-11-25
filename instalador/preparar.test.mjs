@@ -26,6 +26,7 @@ const debe = [
   'motor/sonidos/despertar-wuhu.wav',
   'motor/rutas-api.mjs',
   'motor/ajustar-profito.mjs',
+  'motor/eventos-ventana.mjs',
   'acceso/profito-estado.mjs',
   'acceso/aviso-actualizacion.mjs',
   'acceso/aviso-actualizacion.ps1',

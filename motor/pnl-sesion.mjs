@@ -6,9 +6,20 @@ const PV = s => { const r = String(s || '').replace(/^.*:/, ''); return /^MNQ/.t
 // La misma ida y vuelta que arma el historial: precios de las ejecuciones del bróker.
 export function roundTrips(ex) {
   const by = {}; for (const x of [...(ex || [])].sort((a, b) => a.time - b.time)) (by[x.symbol] ||= []).push(x);
-  const out = []; for (const [sym, l] of Object.entries(by)) { const pv = PV(sym); let pos = 0, cash = 0, t0 = null, q = 0, first = null, comm = 0, commOk = true, entry = 0;
-    for (const x of l) { if (!pos) { t0 = x.time; first = x.side; q = 0; cash = 0; comm = 0; commOk = true; entry = x.price; } pos += x.side * x.qty; cash -= x.side * x.qty * x.price; if (x.side === first) q += x.qty; if (x.comm == null) commOk = false; else comm += x.comm;
-      if (pos === 0 && pv) { const g = Math.round(cash * pv * 100) / 100; out.push({ abierta: new Date(t0).toISOString(), at: new Date(x.time).toISOString(), direccion: first > 0 ? 'COMPRA' : 'VENTA', tamano: `${q} ${String(sym).replace(/^.*:/, '').replace(/Z?\d{4}$|[FGHJKMNQUVXZ]\d$/, '')}`, entrada: entry, salida: x.price, pnl: commOk ? Math.round((g - comm) * 100) / 100 : g, pnlBruto: g, neto: commOk, fuente: 'broker' }); } } }
+  const out = []; for (const [sym, l] of Object.entries(by)) { const pv = PV(sym); let pos = 0, cash = 0, t0 = null, q = 0, first = null, comm = 0, commOk = true, entry = 0, entNot = 0, entQty = 0, salNot = 0, salQty = 0;
+    for (const x of l) {
+      if (!pos) { t0 = x.time; first = x.side; q = 0; cash = 0; comm = 0; commOk = true; entry = x.price; entNot = 0; entQty = 0; salNot = 0; salQty = 0; }
+      const qx = Math.abs(+x.qty) || 0;
+      if (x.side === first) { entNot += qx * +x.price; entQty += qx; q += x.qty; }
+      else { salNot += qx * +x.price; salQty += qx; }
+      pos += x.side * x.qty; cash -= x.side * x.qty * x.price; if (x.comm == null) commOk = false; else comm += x.comm;
+      if (pos === 0 && pv) {
+        const g = Math.round(cash * pv * 100) / 100;
+        const entradaProm = entQty ? entNot / entQty : null, salidaProm = salQty ? salNot / salQty : null;
+        const puntos = entradaProm != null && salidaProm != null ? Math.round((first > 0 ? salidaProm - entradaProm : entradaProm - salidaProm) * 100) / 100 : null;
+        out.push({ abierta: new Date(t0).toISOString(), at: new Date(x.time).toISOString(), direccion: first > 0 ? 'COMPRA' : 'VENTA', tamano: `${q} ${String(sym).replace(/^.*:/, '').replace(/Z?\d{4}$|[FGHJKMNQUVXZ]\d$/, '')}`, entrada: entry, salida: x.price, entradaProm, salidaProm, puntos, pnl: commOk ? Math.round((g - comm) * 100) / 100 : g, pnlBruto: g, neto: commOk, fuente: 'broker' });
+      }
+    } }
   return out;
 }
 // El P&L que muestra la fila del historial (después de cerrarSesion) y el precio de salida.
@@ -25,6 +36,51 @@ export function cierreDesdeEjecuciones(ex, { openAt, side, cuenta, cuentaBroker 
 }
 
 const r2 = x => Math.round(x * 100) / 100;
+
+const PV_PUNTOS = { MNQ: 2, NQ: 20, MES: 5, ES: 50, M2K: 5, RTY: 50, MYM: 0.5, YM: 5 };
+
+function numF(x) { const n = Number(x); return Number.isFinite(n) ? n : null; }
+function precioF(x) { const n = numF(x); return n != null && n > 0 ? n : null; }
+
+export function instrumentoDe(t) {
+  const s = String((t && (t.tamano || t.symbol || t.sym)) || '');
+  const m = s.match(/(\d+(?:\.\d+)?)\s*(MNQ|MES|M2K|MYM|NQ|ES|RTY|YM)\b/i);
+  if (m) return { n: +m[1], sym: m[2].toUpperCase(), pv: PV_PUNTOS[m[2].toUpperCase()] || null };
+  const sym = /MNQ/i.test(s) ? 'MNQ' : /MES/i.test(s) ? 'MES' : /M2K/i.test(s) ? 'M2K' : /MYM/i.test(s) ? 'MYM' : /\bNQ\b/i.test(s) ? 'NQ' : /\bES\b/i.test(s) ? 'ES' : /\bRTY\b/i.test(s) ? 'RTY' : /\bYM\b/i.test(s) ? 'YM' : null;
+  const q = numF(t && t.qty);
+  if (sym && q > 0) return { n: q, sym, pv: PV_PUNTOS[sym] };
+  return { n: 0, sym: null, pv: null };
+}
+
+function esCorto(t) {
+  const d = String((t && (t.direccion || t.side)) || '').toUpperCase();
+  return d === 'VENTA' || d === 'SHORT' || d === '-1' || (t && (t.side === -1 || t.side === 'short'));
+}
+
+/** Puntos por contrato. Promedios del bróker, luego precios guardados, luego el P&L bruto. */
+export function puntosDe(t) {
+  if (!t || typeof t !== 'object') return null;
+  if (typeof t.puntos === 'number' && Number.isFinite(t.puntos)) return r2(t.puntos);
+  const promE = precioF(t.entradaProm ?? t.entradaPromedio ?? t.avgEntry);
+  const promS = precioF(t.salidaProm ?? t.salidaPromedio ?? t.avgExit);
+  if (promE != null && promS != null) return r2(esCorto(t) ? promE - promS : promS - promE);
+  const { n, pv } = instrumentoDe(t);
+  const bruto = numF(t.pnlBruto);
+  if (bruto != null && n > 0 && pv > 0) return r2(bruto / (n * pv));
+  const entrada = precioF(t.entrada ?? t.entry);
+  const salida = precioF(t.salida ?? t.exit ?? t.precioSalida);
+  if (entrada != null && salida != null) return r2(esCorto(t) ? entrada - salida : salida - entrada);
+  const g = t.neto === false ? numF(t.pnl) : (numF(t.pnl) != null && numF(t.comision) != null ? r2(numF(t.pnl) + numF(t.comision)) : numF(t.pnl));
+  if (g == null || !(n > 0) || !(pv > 0)) return null;
+  return r2(g / (n * pv));
+}
+
+export function anotarPuntos(trades) {
+  return (Array.isArray(trades) ? trades : []).map(t => {
+    const p = puntosDe(t);
+    return p == null ? t : { ...t, puntos: p };
+  });
+}
 
 export function contratosDe(t) {
   const m = String(t && (t.tamano || t.symbol) || '').match(/(\d+(?:\.\d+)?)\s*(MNQ|NQ)\b/i);

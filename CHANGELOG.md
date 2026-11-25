@@ -10,6 +10,42 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.64] — 2026-11-25
+### Corregido
+- **Las estrategias propias se reparan solas.** Si `estrategias-propias.json` está vacío, trae una marca de texto, es una sola estrategia, usa `estrategias` o trae las estrategias como objeto, se lee igual. Si el archivo está cortado o el formato no se reconoce, se copia tal cual a `estrategias-propias.corrupto-AAAAMMDD-HHMMSS.json` (se quedan las últimas 5), se escribe uno nuevo con lo que se pudo rescatar y ya se puede listar, guardar y borrar. La granja avisa una vez, sin bloquear.
+### Notas
+- El zip de «Descargar Logs y status» incluye `estrategias-propias.json`. No cambia las órdenes ni la mascota.
+
+## [0.10.63] — 2026-11-25
+### Corregido
+- Un trade nuevo ya no hereda el promedio ni el tamaño de un Agregar anterior. El resumen usa la entrada y los contratos de ese trade.
+- Las últimas 24 h siguen acotando la lectura del registro de eventos. Las ejecuciones del bróker no se recortan, para no emparejar mal la ida y la vuelta ni guardar mal el día.
+- El SL y el TP recalculados de Agregar solo se usan si el cálculo salió bien. Si no, se quedan los de la cotización.
+- Si el stop ya protegía, Agregar deja anotado ese precio como stop protegido.
+- El aviso de que la pérdida abierta usa parte del riesgo solo sale cuando el P&L está en rojo.
+- Los puntos, si no hay promedio de entrada y de salida, salen del P&L bruto antes que del primer y del último fill.
+### Notas
+- No cambia la mascota.
+
+## [0.10.62] — 2026-11-25
+### Corregido
+- **La columna Puntos ya no sale en blanco.** Si el bróker trae el promedio de entrada y de salida, se usan esos. Si no, los precios guardados del trade (también en `historial/<día>.json` y en el cierre de la granja). Si tampoco están, los puntos salen del P&L bruto dividido por los contratos y el valor del punto (MNQ $2, NQ $20, MES $5, ES $50). «—» solo queda cuando no hay ninguno de esos datos.
+### Notas
+- No cambia las órdenes ni la mascota.
+
+## [0.10.61] — 2026-11-25
+### Corregido
+- **Agregar usa el fill real.** Después de entrar a mercado, el SL y el TP se vuelven a calcular con el promedio y la cantidad que devolvió el bróker (el mismo riesgo en dólares y la misma meta del TP). Si el fill vino peor que la cotización, el stop no se queda más apretado. Si no hay promedio real, se dejan los precios de la cotización. El antes y el después quedan en `colchon.log`. Si no se pueden alinear, solo avisa «Revisa SL/TP en Tradovate» y no cierra.
+- **El resumen aproximado, después de Agregar, usa el promedio y el tamaño nuevos**, con la comisión de todos los contratos. Sigue saliendo al momento y el bróker lo sustituye si llega; no se agregó espera.
+### Añadido
+- En Agregar, antes de confirmar, se ve en amarillo cuántos puntos hay del precio al SL de ahora y al SL nuevo (por ejemplo «SL: 75 → 8 pts del precio») y que la pérdida abierta ya usa parte del riesgo. Confirmar sigue disponible.
+- En el historial, la columna **Puntos** (después de Resultado) muestra los puntos por contrato con signo, desde el promedio de entrada y el de salida de las ejecuciones. Si faltan, sale «—».
+### Cambiado
+- **Volver**, en el detalle de un trade, pinta al momento la lista que ya estaba cargada y el mismo scroll. Si hace falta, refresca detrás sin bloquear ni parpadear.
+- Al abrir Historial o Métrica se leen solo las últimas 24 h (la sesión de hoy). Semana, mes, todo u otro día se piden cuando se eligen, con el mismo resultado de antes.
+### Notas
+- No cambia la barra de la mascota. No aplana la posición si Agregar no puede mover el stop.
+
 ## [0.10.60] — 2026-11-25
 ### Cambiado
 - El GEX neto de QQQ se ve en la barra de arriba: «GEX + · Día de rango» o «GEX − · Día de expansión». Ya no se dibujan muros ni el gamma flip en TradingView, y el reloj de la barra se quitó. Sigue el cálculo cada 20 minutos y el registro en `gex.log`. Si hay un trade abierto, esa vuelta se salta.
