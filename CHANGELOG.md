@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.60] — 2026-11-25
+### Cambiado
+- El GEX neto de QQQ se ve en la barra de arriba: «GEX + · Día de rango» o «GEX − · Día de expansión». Ya no se dibujan muros ni el gamma flip en TradingView, y el reloj de la barra se quitó. Sigue el cálculo cada 20 minutos y el registro en `gex.log`. Si hay un trade abierto, esa vuelta se salta.
+### Notas
+- No cambia las órdenes ni la mascota.
+
 ## [0.10.59] — 2026-11-25
 ### Añadido
 - **«Muros GEX en TradingView»** en el ojo, debajo del resumen. Empieza en Sí. Cada 20 minutos baja las opciones de QQQ, calcula el call wall, el put wall y el gamma flip, y los dibuja en el gráfico de NQ. Si hay un trade abierto, se salta esa vuelta. Si la descarga falla, se quedan las líneas anteriores. El tiempo queda en `gex.log`.

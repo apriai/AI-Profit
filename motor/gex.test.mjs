@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { aNq, aporteGex, calcularGex, crearGex, expresionMuros, fijarGexTv, gammaBS, gexTvActivo, instanteExpira, lineaGex, mismaLinea, parseOpcion, CADA_MS } from './gex.mjs';
+import { aNq, aporteGex, calcularGex, crearGex, expresionLimpiar, gammaBS, instanteExpira, lineaGex, mismaLinea, parseOpcion, CADA_MS } from './gex.mjs';
 
 const AHORA = Date.parse('2026-11-25T15:00:00.000Z');
 assert.equal(new Date(instanteExpira(2026, 11, 24)).toISOString(), '2026-11-24T21:00:00.000Z');
@@ -51,69 +51,66 @@ assert.match(lineaGex({ at: 't', error: 'HTTP 403' }), /error: HTTP 403/);
 assert.equal(mismaLinea({ callNq: 22000.004, putNq: 18000, flipNq: 20100.2 }, { callNq: 22000, putNq: 18000.001, flipNq: 20100.204 }), true);
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gex-'));
-assert.equal(gexTvActivo(dir), true);
-assert.equal(fijarGexTv(dir, false).on, false);
-assert.equal(gexTvActivo(dir), false);
-assert.equal(fijarGexTv(dir, true).on, true);
-
-const dibujos = [];
 let abierto = true;
 let fallo = null;
+let limpiezas = 0;
 const gex = crearGex({
   dir,
   ahora: () => AHORA,
   tradeAbierto: () => abierto,
-  activo: () => true,
   bajar: async () => {
     if (fallo) throw new Error(fallo);
     return { json, bytes: 1234, ms: 40 };
   },
-  precioNq: async () => 20000,
-  dibujar: async (niv, ids) => { dibujos.push({ niv, ids }); return { ok: true, ids: ['a', 'b', 'c'] }; },
+  limpiar: async () => { limpiezas++; return { ok: true, n: 0 }; },
 });
 const salto = await gex.correr();
 assert.equal(salto.saltado, true);
 assert.match(fs.readFileSync(path.join(dir, 'gex.log'), 'utf8'), /saltado: trade abierto/);
-assert.equal(dibujos.length, 0);
+assert.equal(gex.estado().signo, null);
 
 abierto = false;
 const uno = await gex.correr();
 assert.equal(uno.ok, true);
-assert.equal(dibujos.length, 1);
-assert.equal(dibujos[0].niv.callNq, 22000);
-assert.equal(dibujos[0].niv.putNq, 18000);
+assert.equal(gex.estado().signo, '+');
+assert.equal(gex.estado().gex, neto);
 assert.match(uno.linea, /descarga 40 ms/);
 assert.match(uno.linea, /json 1234 B/);
-assert.match(uno.linea, /call QQQ 110 NQ 22000/);
-assert.match(uno.linea, /put QQQ 90 NQ 18000/);
+assert.match(uno.linea, /call QQQ 110/);
+assert.match(uno.linea, /put QQQ 90/);
 assert.match(uno.linea, /signo \+/);
-
-const dos = await gex.correr();
-assert.equal(dos.igual, true);
-assert.equal(dibujos.length, 1);
-assert.match(dos.linea, /sin cambio/);
+assert.doesNotMatch(uno.linea, /dibujo [1-9]/);
 
 fallo = 'HTTP 403';
 const tres = await gex.correr();
 assert.match(tres.linea, /error: HTTP 403/);
-assert.equal(dibujos.length, 1);
-assert.equal(gex.dibujado().callNq, 22000);
+assert.equal(gex.estado().signo, '+');
 
-const expr = expresionMuros({ chartIndex: 0, lineas: [{ precio: 22000, texto: 'Call wall GEX', color: '#22c55e' }, { precio: 18000, texto: 'Put wall GEX', color: '#ef4444' }, { precio: 20100, texto: 'Gamma flip', color: '#eab308' }], quitar: ['viejo'] });
-assert.match(expr, /createShape/);
-assert.match(expr, /horizontal_line/);
+gex.arrancar();
+await Promise.resolve();
+assert.equal(limpiezas, 1);
+gex.detener();
+
+const expr = expresionLimpiar();
+assert.match(expr, /removeEntity/);
 assert.match(expr, /Call wall GEX/);
 assert.match(expr, /Put wall GEX/);
 assert.match(expr, /Gamma flip/);
-assert.match(expr, /removeEntity/);
+assert.doesNotMatch(expr, /createShape/);
 assert.doesNotMatch(expr, /placeOrder/);
 
 const html = fs.readFileSync(new URL('./Granja-de-Cuentas-v2.html', import.meta.url), 'utf8');
 const menu = html.slice(html.indexOf('Resumen de trades en TradingView'), html.indexOf('tlDescargarLogs'));
-assert.match(menu, /Muros GEX en TradingView/);
-assert.match(menu, /id="tlGexTV"/);
-assert.ok(menu.indexOf('Resumen de trades en TradingView') < menu.indexOf('Muros GEX en TradingView'));
-assert.match(html, /\/api\/gex-tv/);
-assert.match(html, /profito\.gexTV/);
+assert.doesNotMatch(menu, /Muros GEX/);
+assert.doesNotMatch(html, /id="tlGexTV"/);
+assert.doesNotMatch(html, /\/api\/gex-tv/);
+const hud = html.slice(html.indexOf('id="tlHudDia"'), html.indexOf('id="tlAlgosBtn"'));
+assert.match(hud, /id="tlGexBadge"/);
+assert.match(hud, /Día de rango|GEX no disponible/);
+assert.doesNotMatch(hud, /Gamma flip|Call wall|Put wall|act\. HH/);
+assert.match(html, /\/api\/gex/);
+assert.match(html, /Día de expansión/);
+assert.doesNotMatch(html, /hudClock/);
+assert.match(html, /let clk=0/);
 
 console.log('gex ok');

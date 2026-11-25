@@ -8,29 +8,10 @@ export const CADA_MS = 20 * 60 * 1000;
 export const TOPE_BANDA = 0.25;
 export const BARRIDO = 0.20;
 export const PASO_BARRIDO = 0.0025;
-const ARCHIVO = 'gex-tv.json';
 const LOG = 'gex.log';
 const MS_ANIO = 365.25 * 24 * 60 * 60 * 1000;
 const INV_SQRT_2PI = 1 / Math.sqrt(2 * Math.PI);
 const AGENTE = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
-
-export function gexTvActivo(dir) {
-  try {
-    const j = JSON.parse(fs.readFileSync(path.join(dir, ARCHIVO), 'utf8'));
-    if (j && j.on === false) return false;
-  } catch {}
-  return true;
-}
-
-export function fijarGexTv(dir, on) {
-  const valor = on !== false;
-  fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, ARCHIVO);
-  const tmp = `${file}.tmp-${process.pid}`;
-  fs.writeFileSync(tmp, JSON.stringify({ on: valor }, null, 1));
-  fs.renameSync(tmp, file);
-  return { ok: true, on: valor };
-}
 
 export function parseOpcion(symbol) {
   const m = /^[A-Z]{1,6}(\d{2})(\d{2})(\d{2})([CP])(\d{8})$/.exec(String(symbol || ''));
@@ -202,69 +183,36 @@ export function lineaGex(r) {
   return r.error ? `${base} · error: ${r.error}` : r.nota ? `${base} · ${r.nota}` : base;
 }
 
-export function expresionMuros({ chartIndex, lineas, quitar }) {
-  const job = JSON.stringify({ chartIndex: chartIndex ?? null, lineas, quitar: quitar || [] });
+const TEXTOS_VIEJOS = ['Call wall GEX', 'Put wall GEX', 'Gamma flip'];
+
+export function expresionLimpiar() {
+  const textos = JSON.stringify(TEXTOS_VIEJOS);
   return `(async function(){
-    var JOB=${job};
-    var api=window.TradingViewApi; if(!api) return {ok:false,reason:'sin-chart',ids:[]};
-    var c=null;
-    try{ if(JOB.chartIndex!=null && typeof api.chart==='function') c=api.chart(JOB.chartIndex); }catch(e){}
-    if(!c){ try{ c=api.activeChart(); }catch(e2){} }
-    if(!c) return {ok:false,reason:'sin-chart',ids:[]};
-    var sym=''; try{ sym=c.symbol()||''; }catch(e){}
-    var x=String(sym).toUpperCase().replace(/^.*:/,'');
-    var root=/^MNQ/.test(x)?'MNQ':/^NQ/.test(x)?'NQ':null;
-    if(root!=='NQ' && root!=='MNQ') return {ok:false,reason:'simbolo',sym:sym,ids:[]};
-    var ahora=Math.floor(Date.now()/1000);
-    var ids=[];
-    try{
-      for(var i=0;i<JOB.lineas.length;i++){
-        var L=JOB.lineas[i];
-        var id=await c.createShape({time:ahora,price:L.precio},{shape:'horizontal_line',text:L.texto,lock:false,overrides:{linecolor:L.color,linewidth:1,showLabel:true,textcolor:L.color,fontsize:12,horzLabelsAlign:'right'}});
-        if(id==null) throw new Error('createShape');
-        ids.push(String(id));
+    var TEXTOS={}; ${textos}.forEach(function(t){ TEXTOS[t]=1; });
+    var api=window.TradingViewApi; if(!api||typeof api.chartsCount!=='function') return {ok:false,n:0};
+    var n=0, charts=0; try{ charts=api.chartsCount(); }catch(e){ return {ok:false,n:0}; }
+    for(var i=0;i<charts;i++){
+      var c=null; try{ c=api.chart(i); }catch(e){ continue; }
+      if(!c) continue;
+      var sym=''; try{ sym=c.symbol()||''; }catch(e2){}
+      var x=String(sym).toUpperCase().replace(/^.*:/,'');
+      if(!/^MNQ/.test(x) && !/^NQ/.test(x)) continue;
+      var shapes=[]; try{ shapes=c.getAllShapes()||[]; }catch(e3){ shapes=[]; }
+      for(var k=0;k<shapes.length;k++){
+        var sh=shapes[k], id=sh&&(sh.id||sh), texto='';
+        try{ var ent=c.getShapeById(id); var pr=ent&&ent.getProperties&&ent.getProperties(); texto=(pr&&(pr.text||pr.title))||''; }catch(e4){}
+        if(TEXTOS[texto]){ try{ c.removeEntity(id); n++; }catch(e5){} }
       }
-      for(var j=0;j<JOB.quitar.length;j++){ try{ c.removeEntity(JOB.quitar[j]); }catch(e3){} }
-      return {ok:true,ids:ids};
-    }catch(e){
-      for(var k=0;k<ids.length;k++){ try{ c.removeEntity(ids[k]); }catch(e4){} }
-      return {ok:false,reason:String(e&&e.message||e),ids:[]};
     }
+    return {ok:true,n:n};
   })()`;
 }
 
-const COLORES = { call: '#22c55e', put: '#ef4444', flip: '#eab308' };
-
-export function lineasDe(niv) {
-  const out = [];
-  if (niv.callNq > 0) out.push({ precio: niv.callNq, texto: 'Call wall GEX', color: COLORES.call });
-  if (niv.putNq > 0) out.push({ precio: niv.putNq, texto: 'Put wall GEX', color: COLORES.put });
-  if (niv.flipNq > 0) out.push({ precio: niv.flipNq, texto: 'Gamma flip', color: COLORES.flip });
-  return out;
-}
-
-async function precioNqPorDefecto() {
-  const { cdpEvaluator, js } = await import('./colchon.mjs');
-  const E = await cdpEvaluator(9222);
-  try {
-    const r = await E.evaluate(js.lastPrice);
-    if (!r || typeof r.price !== 'number' || !Number.isFinite(r.price)) return null;
-    const raiz = String(r.symbol || r.front || '').toUpperCase().replace(/^.*:/, '');
-    if (!/^MNQ/.test(raiz) && !/^NQ/.test(raiz)) return null;
-    return r.price;
-  } finally { try { E.close(); } catch {} }
-}
-
-async function dibujarPorDefecto(niv, ids) {
+async function limpiarMurosPorDefecto() {
   const { cdpEvaluator } = await import('./colchon.mjs');
-  const { READ_CHARTS_JS, elegirChart } = await import('./tv-reporte.mjs');
   const E = await cdpEvaluator(9222);
-  try {
-    const charts = await E.evaluate(READ_CHARTS_JS);
-    const chart = elegirChart(charts, 'NQ') || elegirChart(charts, 'MNQ');
-    if (!chart) return { ok: false, reason: 'sin gráfico NQ' };
-    return await E.evaluate(expresionMuros({ chartIndex: chart.index, lineas: lineasDe(niv), quitar: ids || [] }));
-  } finally { try { E.close(); } catch {} }
+  try { return await E.evaluate(expresionLimpiar()); }
+  finally { try { E.close(); } catch {} }
 }
 
 export async function bajarQqq(fetchImpl = globalThis.fetch) {
@@ -288,13 +236,12 @@ export function crearGex(opts = {}) {
   if (!opts.dir) throw new Error('gex: falta dir');
   const ahora = opts.ahora || (() => Date.now());
   const tradeAbierto = opts.tradeAbierto || (() => false);
-  const activo = opts.activo || (() => gexTvActivo(opts.dir));
   const bajar = opts.bajar || (() => bajarQqq(opts.fetch));
-  const precioNq = opts.precioNq || precioNqPorDefecto;
-  const dibujar = opts.dibujar || dibujarPorDefecto;
-  let dibujado = null;
+  const limpiar = opts.limpiar || limpiarMurosPorDefecto;
+  let ultimo = null;
   let ocupado = false;
   let timer = null;
+  let limpio = false;
 
   async function correr() {
     if (ocupado) return { saltado: 'ocupado' };
@@ -323,38 +270,10 @@ export function crearGex(opts = {}) {
         return { error: String(e && e.message || e), linea };
       }
       const calculoMs = ahora() - tCalc;
-      let nq = null;
-      try { nq = await precioNq(); } catch { nq = null; }
-      const base = { at, descargaMs: pack.ms, bytes: pack.bytes, calculoMs, gex: calc.gex, signo: calc.signo, flipQqq: calc.flipQqq, callQqq: calc.callQqq, putQqq: calc.putQqq };
-      if (!(nq > 0)) {
-        const linea = lineaGex({ ...base, dibujoMs: 0, totalMs: ahora() - t0, error: 'sin precio NQ' });
-        anotar(opts.dir, linea);
-        return { error: 'sin precio NQ', linea, calc };
-      }
-      const niv = nivelesNq(calc, nq);
-      if (activo() === false) {
-        const linea = lineaGex({ ...base, ...niv, dibujoMs: 0, totalMs: ahora() - t0, nota: 'apagado' });
-        anotar(opts.dir, linea);
-        return { apagado: true, linea, niv };
-      }
-      if (mismaLinea(niv, dibujado)) {
-        const linea = lineaGex({ ...base, ...niv, dibujoMs: 0, totalMs: ahora() - t0, nota: 'sin cambio' });
-        anotar(opts.dir, linea);
-        return { igual: true, linea, niv };
-      }
-      const tD = ahora();
-      try {
-        const res = await dibujar(niv, dibujado && dibujado.ids);
-        if (!res || res.ok === false) throw new Error((res && (res.reason || res.error)) || 'dibujo');
-        dibujado = { ...niv, ids: res.ids || [] };
-        const linea = lineaGex({ ...base, ...niv, dibujoMs: ahora() - tD, totalMs: ahora() - t0 });
-        anotar(opts.dir, linea);
-        return { ok: true, linea, niv };
-      } catch (e) {
-        const linea = lineaGex({ ...base, ...niv, dibujoMs: ahora() - tD, totalMs: ahora() - t0, error: String(e && e.message || e) });
-        anotar(opts.dir, linea);
-        return { error: String(e && e.message || e), linea, niv };
-      }
+      ultimo = { signo: calc.signo, gex: calc.gex, at };
+      const linea = lineaGex({ at, descargaMs: pack.ms, bytes: pack.bytes, calculoMs, dibujoMs: 0, totalMs: ahora() - t0, gex: calc.gex, signo: calc.signo, flipQqq: calc.flipQqq, callQqq: calc.callQqq, putQqq: calc.putQqq });
+      anotar(opts.dir, linea);
+      return { ok: true, linea, calc };
     } catch (e) {
       const linea = lineaGex({ at, error: String(e && e.message || e) });
       anotar(opts.dir, linea);
@@ -363,12 +282,20 @@ export function crearGex(opts = {}) {
   }
 
   function arrancar() {
+    if (!limpio) {
+      limpio = true;
+      Promise.resolve().then(() => limpiar()).catch(() => {});
+    }
     correr().catch(() => {});
     timer = setInterval(() => { correr().catch(() => {}); }, opts.cadaMs || CADA_MS);
     return api;
   }
   function detener() { if (timer) clearInterval(timer); timer = null; }
-  const api = { correr, arrancar, detener, dibujado: () => dibujado };
+  function estado() {
+    if (!ultimo) return { ok: true, signo: null, gex: null };
+    return { ok: true, signo: ultimo.signo, gex: ultimo.gex, at: ultimo.at };
+  }
+  const api = { correr, arrancar, detener, estado };
   return api;
 }
 

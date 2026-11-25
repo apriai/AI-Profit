@@ -139,22 +139,10 @@ export function manejar(q, r, deps) {
       return;
     }
   }
-  if (q.url === '/api/gex-tv' || q.url.startsWith('/api/gex-tv?')) {
-    const api = deps.gexTv;
-    if (q.method === 'GET') {
-      const on = api && api.leer ? api.leer().on !== false : true;
-      r.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-      return r.end(JSON.stringify({ ok: true, on }));
-    }
-    if (q.method === 'POST') {
-      let b = ''; q.on('data', c => b += c); q.on('end', () => {
-        let j = {}; try { j = JSON.parse(b || '{}'); } catch {}
-        const out = api && api.fijar ? api.fijar(j.on !== false) : { ok: true, on: j.on !== false };
-        r.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-        r.end(JSON.stringify(out));
-      });
-      return;
-    }
+  if (q.url === '/api/gex' || q.url.startsWith('/api/gex?')) {
+    const out = deps.gex && deps.gex.estado ? deps.gex.estado() : { ok: true, signo: null, gex: null };
+    r.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+    return r.end(JSON.stringify(out));
   }
   if (q.url === '/api/descargar-logs' && q.method === 'POST') {
     let b = ''; q.on('data', c => b += c); q.on('end', async () => {
