@@ -12,7 +12,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 
 ## [0.10.57] — 2026-11-25
 ### Añadido
-- **«Descargar Logs y status»** al final del ojo de Profito Algoritmo. Guarda en Descargas un zip `Profito-logs-AAAA-MM-DD_HHMM.zip` con los `.log` de Profito y un `status.json` (versión, sistema, conexión, cuentas, drawdown, pérdida diaria e interruptores). No incluye claves ni tokens.
+- **«Descargar Logs y status»** al final del ojo de Profito Algoritmo. Guarda en Descargas un zip `Profito-logs-AAAA-MM-DD_HHMM.zip` con los `.log` de Profito (también `datos/logs/`, como `servidor.log` y `lanzador.log`, y `tradinglink.log` de Mac) y un `status.json` (versión, sistema, conexión, cuentas, drawdown, pérdida diaria e interruptores). Cada registro entra con sus últimas 5 MB. No incluye claves ni tokens, tampoco si van entre comillas en JSON.
 ### Notas
 - No cambia las órdenes ni la mascota. El instalador también copia `motor/descargar-logs.mjs`.
 

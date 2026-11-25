@@ -353,6 +353,7 @@ http.createServer((q, r) => manejar(q, r, {
   resumenTv: { leer: () => ({ ok: true, on: resumenTvActivo(DIR) }), fijar: (on) => fijarResumenTv(DIR, on) },
   descargarLogs: (j) => crearPaqueteLogs({
     dir: DIR,
+    root: ROOT,
     version: textoVersion(path.join(ROOT, 'VERSION')),
     cuentas: state.accounts,
     conexion,

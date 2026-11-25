@@ -7,6 +7,9 @@ import zlib from 'node:zlib';
 import { execFile } from 'node:child_process';
 
 const SECRETOS = /password|passwd|token|secret|credential|authorization|cookie|api[_-]?key|clave|bearer/i;
+const CLAVES = 'password|passwd|token|secret|credential|authorization|cookie|api[_-]?key|clave|bearer';
+export const TOPE_LOG = 5 * 1024 * 1024;
+const SALTAR_DIR = new Set(['node_modules', '.git', 'motor', 'acceso', 'assets', 'tradingview-mcp', 'instalador', 'node-win', 'dist', 'backups', 'backups-negocio']);
 
 export function nombreZip(fecha = new Date()) {
   const p = n => String(n).padStart(2, '0');
@@ -14,24 +17,68 @@ export function nombreZip(fecha = new Date()) {
 }
 
 export function esArchivoLog(nombre) {
-  return nombre.endsWith('.log') || /\.log\.\d+$/.test(nombre);
+  return /\.log$/i.test(nombre) || /\.log\.\d+$/i.test(nombre);
+}
+
+function caminarLogs(dir, out) {
+  let entradas = [];
+  try { entradas = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+  for (const e of entradas) {
+    const ruta = path.join(dir, e.name);
+    if (e.isDirectory()) {
+      if (!SALTAR_DIR.has(e.name)) caminarLogs(ruta, out);
+      continue;
+    }
+    if (!e.isFile()) continue;
+    const enCarpetaLogs = path.basename(dir).toLowerCase() === 'logs';
+    if (esArchivoLog(e.name) || (enCarpetaLogs && e.name.toLowerCase() === 'carga.txt')) out.push(ruta);
+  }
 }
 
 export function listarLogs(dir) {
-  let nombres = [];
-  try { nombres = fs.readdirSync(dir); } catch { return []; }
-  return nombres.filter(esArchivoLog).sort().map(n => path.join(dir, n)).filter(f => {
-    try { return fs.statSync(f).isFile(); } catch { return false; }
-  });
+  const out = [];
+  caminarLogs(dir, out);
+  return out.sort();
+}
+
+export function rutaEnZip(archivo, dir) {
+  const rel = path.relative(dir, archivo);
+  const fuera = rel.startsWith('..') || path.isAbsolute(rel);
+  const partes = (fuera ? path.join('raiz', path.basename(archivo)) : rel).split(path.sep);
+  return 'logs/' + partes.join('/');
+}
+
+function leerCola(archivo, tope) {
+  const stat = fs.statSync(archivo);
+  const fd = fs.openSync(archivo, 'r');
+  try {
+    if (stat.size <= tope) {
+      const buf = Buffer.alloc(stat.size);
+      fs.readSync(fd, buf, 0, stat.size, 0);
+      return buf.toString('utf8');
+    }
+    const buf = Buffer.alloc(tope);
+    fs.readSync(fd, buf, 0, tope, stat.size - tope);
+    let i = 0;
+    while (i < buf.length && (buf[i] & 0xc0) === 0x80) i++;
+    return `[solo las últimas ${tope} bytes]\n` + buf.subarray(i).toString('utf8');
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function redactarTexto(texto) {
+  const conComillas = new RegExp(`(["']?)(?:${CLAVES})\\1\\s*[:=]\\s*(["'])(?:\\\\.|(?!\\2).)*\\2`, 'gi');
+  const pelado = new RegExp(`(["']?)(?:${CLAVES})\\1\\s*[:=]\\s*[^\\s"']+`, 'gi');
+  return String(texto)
+    .replace(conComillas, m => m.replace(/(["'])(?:\\.|(?!\1).)*\1\s*$/, '"[redactado]"'))
+    .replace(/(bearer\s+)\S+/gi, '$1[redactado]')
+    .replace(pelado, m => m.replace(/([:=]\s*)\S+\s*$/, '$1[redactado]'));
 }
 
 export function redactar(valor, clave = '') {
   if (SECRETOS.test(String(clave))) return '[redactado]';
-  if (typeof valor === 'string') {
-    return valor
-      .replace(/(bearer\s+)\S+/gi, '$1[redactado]')
-      .replace(/((?:password|passwd|token|secret|api[_-]?key|authorization|clave)\s*[:=]\s*)\S+/gi, '$1[redactado]');
-  }
+  if (typeof valor === 'string') return redactarTexto(valor);
   if (Array.isArray(valor)) return valor.map(v => redactar(v));
   if (valor && typeof valor === 'object') {
     const out = {};
@@ -143,10 +190,21 @@ export async function crearPaqueteLogs(opts = {}) {
   const nombre = nombreZip(ahora);
   const destino = opts.destino || await carpetaDescargas();
   fs.mkdirSync(destino, { recursive: true });
+  const tope = Number.isFinite(opts.topeBytes) ? opts.topeBytes : TOPE_LOG;
   const logs = listarLogs(opts.dir);
+  if (opts.root) {
+    for (const entrada of fs.existsSync(opts.root) ? fs.readdirSync(opts.root) : []) {
+      if (!/^tradinglink\.log(\.\d+)?$/i.test(entrada)) continue;
+      const legado = path.join(opts.root, entrada);
+      try {
+        if (!fs.statSync(legado).isFile()) continue;
+      } catch { continue; }
+      if (!logs.some(f => path.resolve(f) === path.resolve(legado))) logs.push(legado);
+    }
+  }
   const piezas = logs.map(f => ({
-    name: 'logs/' + path.basename(f),
-    data: Buffer.from(redactar(fs.readFileSync(f, 'utf8')), 'utf8'),
+    name: rutaEnZip(f, opts.dir),
+    data: Buffer.from(redactar(leerCola(f, tope)), 'utf8'),
   }));
   let conexion = opts.conexion || null;
   if (typeof conexion === 'function') {
