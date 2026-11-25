@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Profito · Agregar (promediar)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --lime:#cdea1d;
+  --gold:#ffe7a3;
+  --gold2:#ffd86b;
+  --red:#ff6b86;
+  --green:#7dff8a;
+  --text:#ececf3;
+  --muted:rgba(255,255,255,.48);
+  --faint:rgba(255,255,255,.32);
+  --line:rgba(255,255,255,.1);
+  --card:rgba(12,8,24,.82);
+  --inp:rgba(255,255,255,.07);
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#12081e;color:var(--text);font:14px/1.45 Inter,system-ui,-apple-system,sans-serif;font-variant-numeric:tabular-nums}
+body{background:
+  radial-gradient(ellipse at 50% -10%,#5b2a7a 0%,transparent 50%),
+  radial-gradient(ellipse at 100% 100%,#2a1048 0%,#12081e 55%);
+  padding:28px 22px 64px}
+.wrap{max-width:1180px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:28px;height:28px;border-radius:8px;background:var(--lime);color:#12100a;font-weight:800;display:grid;place-items:center;letter-spacing:-.5px}
+.brand h1{margin:0;font-size:20px;font-weight:650;letter-spacing:-.3px}
+.brand h1 span{color:var(--lime);font-weight:600}
+.tag{font-size:11px;font-weight:600;letter-spacing:.4px;color:rgba(255,255,255,.7);border:1px solid var(--line);background:rgba(255,255,255,.05);padding:4px 10px;border-radius:999px}
+.sub{margin:6px 0 0;color:var(--muted);font-size:13px;max-width:52ch}
+.examples{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 16px}
+.examples .lb{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--faint)}
+.chip{border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--text);border-radius:999px;padding:6px 12px;font:600 12px Inter,system-ui;cursor:pointer}
+.chip:hover{border-color:rgba(255,255,255,.22);background:rgba(255,255,255,.08)}
+.chip.on{border-color:rgba(205,234,29,.5);color:var(--lime);background:rgba(205,234,29,.08)}
+.layout{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(320px,.95fr);gap:16px;align-items:start}
+@media (max-width:920px){.layout{grid-template-columns:1fr}}
+.card{background:var(--card);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border:1px solid var(--line);border-radius:18px;padding:18px 18px 16px;box-shadow:0 18px 40px rgba(0,0,0,.35)}
+.card h2{margin:0 0 12px;font-size:11px;font-weight:650;letter-spacing:.9px;text-transform:uppercase;color:var(--muted)}
+.sec{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.sec:first-child{margin-top:0;padding-top:0;border:0}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 12px}
+label.f{display:flex;flex-direction:column;gap:5px;min-width:0}
+label.f span{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--faint)}
+input[type=number],input[type=text]{width:100%;background:var(--inp);border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:10px;padding:8px 10px;font:600 13px Inter,system-ui;font-variant-numeric:tabular-nums}
+input:focus{outline:none;border-color:rgba(205,234,29,.55);box-shadow:0 0 0 3px rgba(205,234,29,.12)}
+input:disabled{opacity:.45}
+.seg{display:flex;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg label{flex:1;text-align:center;padding:7px 6px;font:600 12px Inter,system-ui;cursor:pointer;color:rgba(255,255,255,.7)}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label:has(input:checked){background:rgba(205,234,29,.16);color:var(--lime)}
+.seg.side label:has(input[value=long]:checked){background:linear-gradient(135deg,#7dff8a,#3ccf5a);color:#062a0e}
+.seg.side label:has(input[value=short]:checked){background:linear-gradient(135deg,#ff8fa3,#ff4d6d);color:#2a0610}
+.check{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--muted)}
+.check input{accent-color:var(--lime)}
+.hint{margin:6px 0 0;font-size:11px;color:var(--faint)}
+.results .big{font-size:28px;font-weight:650;letter-spacing:-.8px;color:var(--gold);margin:0 0 2px}
+.results .big sub{font-size:12px;color:var(--muted);letter-spacing:0;font-weight:500}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.kv div{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:8px 10px}
+.kv span{display:block;font-size:10px;letter-spacing:.7px;text-transform:uppercase;color:var(--faint)}
+.kv b{display:block;margin-top:2px;font-size:14px;font-weight:650}
+.kv b.up{color:var(--green)} .kv b.dn{color:var(--red)} .kv b.warn{color:var(--gold2)}
+table.cmp{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}
+table.cmp th,table.cmp td{text-align:left;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.06)}
+table.cmp th{font-size:10px;letter-spacing:.7px;text-transform:uppercase;color:var(--faint);font-weight:600}
+table.cmp td:nth-child(n+2){text-align:right;font-weight:600}
+table.cmp .bad{color:var(--red)}
+.alerts{display:flex;flex-direction:column;gap:8px;margin:12px 0 0}
+.alerts p{margin:0;padding:8px 10px;border-radius:10px;font-size:12px;line-height:1.45}
+.alerts .err{background:rgba(255,77,109,.12);border:1px solid rgba(255,77,109,.35);color:#ffd0d8}
+.alerts .warn{background:rgba(255,216,107,.08);border:1px solid rgba(255,216,107,.22);color:var(--gold)}
+.btn{width:100%;margin-top:12px;border:0;border-radius:12px;padding:11px 14px;font:650 13px Inter,system-ui;cursor:pointer;background:linear-gradient(135deg,#e8f86a,#cdea1d);color:#161408}
+.btn:disabled{opacity:.38;cursor:not-allowed;filter:grayscale(.25)}
+.ladder{position:relative;margin:8px 0 2px;padding:6px 0 6px 18px}
+.ladder::before{content:"";position:absolute;left:6px;top:10px;bottom:10px;width:2px;background:linear-gradient(#cdea1d,rgba(255,255,255,.15),#ff6b86);border-radius:2px}
+.rung{position:relative;display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:4px 0 4px 8px;font-size:12px}
+.rung::before{content:"";position:absolute;left:-16px;top:50%;width:8px;height:8px;border-radius:50%;transform:translateY(-50%);background:#fff;box-shadow:0 0 0 3px rgba(255,255,255,.12)}
+.rung.tp::before{background:var(--lime);box-shadow:0 0 0 3px rgba(205,234,29,.2)}
+.rung.sl::before{background:var(--red);box-shadow:0 0 0 3px rgba(255,77,109,.2)}
+.rung.avg::before{background:var(--gold2);box-shadow:0 0 0 3px rgba(255,216,107,.25)}
+.rung.live::before{background:#fff;box-shadow:0 0 0 3px rgba(255,255,255,.25)}
+.rung.old{opacity:.5}
+.rung .px{font-weight:650}
+.rung .nm{color:var(--muted)}
+.how{margin-top:16px}
+.how h2{font-size:13px;letter-spacing:.4px;text-transform:none;color:var(--gold)}
+.how h3{margin:16px 0 6px;font-size:13px;color:#fff}
+.how p,.how li{color:rgba(255,255,255,.78);font-size:13px;line-height:1.6}
+.how ol{margin:0;padding-left:18px}
+.how .ex{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:12px 14px;margin-top:8px}
+.how code{font:650 12px ui-monospace,Menlo,monospace;color:var(--gold)}
+.modal{position:fixed;inset:0;z-index:40;background:rgba(8,4,16,.66);display:flex;align-items:center;justify-content:center;padding:20px}
+.modal[hidden]{display:none}
+.sheet{width:min(460px,100%);background:rgba(16,10,28,.96);border:1px solid rgba(255,255,255,.14);border-radius:18px;padding:22px;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+.sheet h3{margin:0 0 4px;font-size:18px}
+.sheet .note{color:var(--gold);font-size:12px;margin:0 0 14px}
+.sheet .body{font-size:13px;line-height:1.55;color:rgba(255,255,255,.86)}
+.sheet button{margin-top:16px;width:100%;border:1px solid var(--line);background:rgba(255,255,255,.08);color:#fff;border-radius:10px;padding:9px;font:600 13px Inter,system-ui;cursor:pointer}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="brand">
+        <div class="logo">P</div>
+        <h1>Agregar <span>· promediar</span></h1>
+      </div>
+      <p class="sub">Arma un promedio y un solo SL/TP para toda la posición, con el riesgo en dólares bajo control. Este archivo es un prototipo local: no envía órdenes.</p>
+    </div>
+    <div class="tag">Simulación · sin bróker</div>
+  </header>
+
+  <div class="examples">
+    <span class="lb">Cargar ejemplo</span>
+    <button type="button" class="chip on" data-ex="down">A la baja</button>
+    <button type="button" class="chip" data-ex="pyramid">Piramidar</button>
+    <button type="button" class="chip" data-ex="short">Corto</button>
+    <button type="button" class="chip" data-ex="blocked">Stop ya tocado</button>
+  </div>
+
+  <div class="layout">
+    <form id="f" class="card" autocomplete="off">
+      <div class="sec">
+        <h2>Cuenta y contrato</h2>
+        <div class="grid3">
+          <label class="f"><span>Cuenta</span>
+            <div class="seg">
+              <label><input type="radio" name="plan" value="25K" checked> 25K</label>
+              <label><input type="radio" name="plan" value="50K"> 50K</label>
+            </div>
+          </label>
+          <label class="f"><span>Contrato</span>
+            <div class="seg">
+              <label><input type="radio" name="symbol" value="MNQ" checked> MNQ</label>
+              <label><input type="radio" name="symbol" value="NQ"> NQ</label>
+            </div>
+          </label>
+          <label class="f"><span>Lado</span>
+            <div class="seg side">
+              <label><input type="radio" name="side" value="long" checked> Largo</label>
+              <label><input type="radio" name="side" value="short"> Corto</label>
+            </div>
+          </label>
+        </div>
+        <p class="hint" id="limHint"></p>
+      </div>
+
+      <div class="sec">
+        <h2>Posición actual</h2>
+        <div class="grid">
+          <label class="f"><span>Contratos</span><input type="number" name="qty" min="1" step="1" value="5"></label>
+          <label class="f"><span>Precio promedio</span><input type="number" name="avg" step="0.25" value="21000"></label>
+          <label class="f"><span>SL actual</span><input type="number" name="sl" step="0.25" value="20950"></label>
+          <label class="f"><span>TP actual</span><input type="number" name="tp" step="0.25" value="21160"></label>
+        </div>
+        <p class="hint" id="currentHint"></p>
+      </div>
+
+      <div class="sec">
+        <h2>Qué quieres agregar</h2>
+        <div class="grid">
+          <label class="f"><span>Contratos a agregar</span><input type="number" name="addQty" min="1" step="1" value="5"></label>
+          <label class="f"><span>Precio de agrega</span><input type="number" name="addPrice" step="0.25" value="20960"></label>
+          <label class="f" style="grid-column:1/-1"><span>Precio actual del mercado</span><input type="number" name="live" step="0.25" value="20960"></label>
+        </div>
+        <label class="check"><input type="checkbox" name="syncLive" checked> El precio actual es el de agrega (orden a mercado)</label>
+      </div>
+
+      <div class="sec">
+        <h2>Riesgo del stop</h2>
+        <label class="f"><span>Modo</span>
+          <div class="seg">
+            <label><input type="radio" name="riskMode" value="keep" checked> Mismo riesgo $</label>
+            <label><input type="radio" name="riskMode" value="custom"> Riesgo custom $</label>
+          </div>
+        </label>
+        <label class="f" style="margin-top:8px"><span>Riesgo custom (dólares)</span><input type="number" name="customRisk" min="0" step="1" value="505"></label>
+        <p class="hint">El riesgo incluye la comisión ida y vuelta. Si el stop ya protege ganancia (colchón), “mismo riesgo” conserva esa ganancia neta.</p>
+      </div>
+
+      <div class="sec">
+        <h2>Objetivo del take profit</h2>
+        <label class="f"><span>Modo</span>
+          <div class="seg">
+            <label><input type="radio" name="tpMode" value="keep" checked> Mismo objetivo $</label>
+            <label><input type="radio" name="tpMode" value="custom"> Objetivo custom $</label>
+          </div>
+        </label>
+        <label class="f" style="margin-top:8px"><span>Objetivo custom neto (dólares)</span><input type="number" name="customTp" min="0" step="1" value="1600"></label>
+        <p class="hint">En 25K una meta típica de estrategia es $1,600 netos; en 50K, $3,200. El TP se redondea para que el neto real quede en o por encima de esa cifra.</p>
+      </div>
+
+      <div class="sec">
+        <h2>Límites Lucid y comisión</h2>
+        <div class="grid3">
+          <label class="f"><span>Daily loss que te queda $</span><input type="number" name="ddlLeft" min="0" step="1" value="600"></label>
+          <label class="f"><span>DD de cierre que te queda $</span><input type="number" name="ddLeft" min="0" step="1" value="1000"></label>
+          <label class="f"><span>Comisión ida y vuelta / contrato $</span><input type="number" name="comm" min="0" step="0.1" value="1"></label>
+        </div>
+        <p class="hint">25K: daily loss típico $600 y drawdown $1,000. 50K: $1,200 y $2,000. Lucid no publica la tabla del daily loss en su ayuda; estas cifras son las que usa Profito.</p>
+      </div>
+    </form>
+
+    <aside>
+      <div class="card results">
+        <h2>Resultado</h2>
+        <div class="big" id="avgOut">—</div>
+        <div class="hint" id="avgSub" style="margin-top:0"></div>
+        <div class="kv" id="kv"></div>
+        <h2 style="margin-top:8px">Comparación</h2>
+        <table class="cmp" id="cmp"></table>
+        <h2 style="margin-top:14px">Escala de precios</h2>
+        <div class="ladder" id="ladder"></div>
+        <div class="alerts" id="alerts"></div>
+        <button type="button" class="btn" id="confirm" disabled>Confirmar (solo simulación)</button>
+        <p class="hint" style="text-align:center">No se envía nada al bróker ni a Profito.</p>
+      </div>
+    </aside>
+  </div>
+
+  <section class="card how">
+    <h2>Cómo se calcula</h2>
+    <p>Todo se calcula en dólares de la posición completa, con el promedio exacto (el que usa el bróker para el P&amp;L). El tick de NQ y MNQ es 0.25. MNQ vale $2 por punto ($0.50 por tick). NQ vale $20 por punto ($5 por tick).</p>
+
+    <h3>1. El promedio nuevo</h3>
+    <p><code>(contratos actuales × entrada + contratos nuevos × precio de agrega) ÷ total de contratos</code>. Se muestra exacto y redondeado al tick, solo para leerlo. El riesgo y el objetivo se calculan con el promedio exacto, no con el redondeado.</p>
+
+    <h3>2. El riesgo del stop (incluye comisión)</h3>
+    <p>Si te sacan en el SL, pagas la comisión ida y vuelta de todos los contratos. Por eso:</p>
+    <p><code>Riesgo actual = contratos × |promedio − SL| × $ por punto + comisión de lo que ya tienes</code>.</p>
+    <p>Para mantener ese riesgo (o uno que tú pongas) después de agregar:</p>
+    <p><code>Distancia del SL en puntos = (riesgo objetivo − comisión total) ÷ (contratos totales × $ por punto)</code>.</p>
+    <p>Esa distancia se convierte en un precio y se redondea al tick en la dirección segura: más cerca del precio, para que el riesgo real quede <strong>igual o menor</strong> que el objetivo. En un largo el SL se redondea hacia arriba (ceil); en un corto, hacia abajo (floor). Si el stop actual ya protege ganancia (el colchón de Profito ya se movió), “mismo riesgo” en realidad conserva esa ganancia neta, y el redondeo no la reduce.</p>
+
+    <h3>3. El take profit (neto, después de comisión)</h3>
+    <p><code>Objetivo actual neto = contratos × |TP − promedio| × $ por punto − comisión actual</code>.</p>
+    <p><code>Distancia del TP en puntos = (objetivo neto + comisión total) ÷ (contratos totales × $ por punto)</code>.</p>
+    <p>El TP se aleja al tick para que el neto real quede <strong>igual o por encima</strong> de la meta. No se usa el tick más cercano, porque ese podría dejarte corto de la meta.</p>
+
+    <h3>4. Si dejas el SL y el TP donde están</h3>
+    <p>El promedio y el tamaño cambian, pero los precios del stop y del objetivo no. El riesgo en dólares casi siempre sube —sobre todo si piramidas a favor—, y puede pasarse del daily loss o del drawdown. El panel te muestra esa alternativa al lado del recálculo, para que veas la diferencia.</p>
+
+    <h3>5. Cuándo se bloquea</h3>
+    <ol>
+      <li>El total de contratos supera el tope Lucid (25K: 20 MNQ o 2 NQ; 50K: 40 MNQ o 4 NQ).</li>
+      <li>El riesgo real supera el daily loss o el drawdown de cierre que te queda.</li>
+      <li>El SL nuevo quedaría del lado malo del precio actual (el stop ya estaría tocado) o a menos de 1 tick del promedio.</li>
+    </ol>
+    <p>Promediar en contra (precio peor que tu entrada) y piramidar a favor se avisan, pero no se bloquean por sí solos.</p>
+
+    <h3>Ejemplo trabajado (MNQ, largo, 25K)</h3>
+    <div class="ex">
+      <p>Tienes <strong>5 MNQ a 21,000</strong>, SL en <strong>20,950</strong> y TP en <strong>21,160</strong>. El riesgo actual es 5 × 50 pts × $2 + $5 de comisión = <strong>$505</strong>. El objetivo neto es 5 × 160 pts × $2 − $5 = <strong>$1,595</strong>.</p>
+      <p>Agregas <strong>5 más a 20,960</strong>. El promedio nuevo es (5 × 21,000 + 5 × 20,960) ÷ 10 = <strong>20,980</strong> exacto (ya cae en tick). La comisión total pasa a $10.</p>
+      <p>Para dejar el riesgo en $505: distancia = (505 − 10) ÷ (10 × 2) = <strong>24.75 pts</strong> (99 ticks, sin redondeo). SL nuevo = 20,980 − 24.75 = <strong>20,955.25</strong>. Riesgo real: $505.</p>
+      <p>Para dejar el objetivo en $1,595: distancia = (1,595 + 10) ÷ 20 = <strong>80.25 pts</strong>. TP nuevo = 20,980 + 80.25 = <strong>21,060.25</strong>. Neto real: $1,595.</p>
+      <p>Si dejaras el SL en 20,950 y el TP en 21,160, el riesgo subiría a 10 × 30 pts × $2 + $10 = <strong>$610</strong> (ya se pasa de un daily loss de $600) y el objetivo neto a <strong>$3,590</strong>.</p>
+    </div>
+  </section>
+</div>
+
+<div class="modal" id="modal" hidden>
+  <div class="sheet" role="dialog" aria-labelledby="mdTitle">
+    <h3 id="mdTitle">Simulación lista</h3>
+    <p class="note">No se envió ninguna orden. Esto solo te muestra el plan.</p>
+    <div class="body" id="mdBody"></div>
+    <button type="button" id="mdClose">Cerrar</button>
+  </div>
+</div>
+
+<script>
+// Cálculo puro del prototipo Agregar / promediar. Lo usa el HTML (copiado) y este test.
+const TICK = 0.25;
+
+const SPEC = {
+  MNQ: { pt: 2, tickUsd: 0.5, comm: 1 },
+  NQ:  { pt: 20, tickUsd: 5, comm: 3.5 },
+};
+
+const LIMITS = {
+  '25K': { MNQ: 20, NQ: 2, ddl: 600, dd: 1000, tp: 1600 },
+  '50K': { MNQ: 40, NQ: 4, ddl: 1200, dd: 2000, tp: 3200 },
+};
+
+const ceilTick = (x) => Math.ceil(x / TICK - 1e-9) * TICK;
+const floorTick = (x) => Math.floor(x / TICK + 1e-9) * TICK;
+const roundTick = (x) => Math.round(x / TICK) * TICK;
+const money = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
+const onTick = (x) => Number.isFinite(x) && Math.abs(x / TICK - Math.round(x / TICK)) < 1e-8;
+
+function avgPrice(q1, p1, q2, p2) {
+  const qty = q1 + q2;
+  const exact = (q1 * p1 + q2 * p2) / qty;
+  return { exact, tick: roundTick(exact), qty };
+}
+
+/** PnL neto si se sale a exitPx (incluye comisión ida y vuelta de toda la posición). */
+function exitPnl({ long, qty, avg, exitPx, pt, comm }) {
+  const dir = long ? 1 : -1;
+  return qty * dir * (exitPx - avg) * pt - comm;
+}
+
+/**
+ * SL en el lado de riesgo (pérdida), redondeado al tick en dirección segura:
+ * más cerca del promedio / del precio, de modo que el riesgo real ≤ objetivo.
+ * Long: SL = ceilTick(avg - dist). Short: SL = floorTick(avg + dist).
+ */
+function slForRisk({ long, avg, dist }) {
+  return long ? ceilTick(avg - dist) : floorTick(avg + dist);
+}
+
+/**
+ * SL que protege una ganancia neta (colchón ya movido), redondeado para que
+ * lo protegido real sea ≥ al objetivo. Long sube el SL; short lo baja.
+ */
+function slForLock({ long, avg, dist }) {
+  return long ? ceilTick(avg + dist) : floorTick(avg - dist);
+}
+
+/**
+ * TP redondeado para que el neto real sea ≥ al objetivo.
+ * Long: ceilTick(avg + dist). Short: floorTick(avg - dist).
+ */
+function tpForTarget({ long, avg, dist }) {
+  return long ? ceilTick(avg + dist) : floorTick(avg - dist);
+}
+
+function compute(i) {
+  const errors = [];
+  const warnings = [];
+  const symbol = i.symbol === 'NQ' ? 'NQ' : 'MNQ';
+  const plan = i.plan === '50K' ? '50K' : '25K';
+  const inst = SPEC[symbol];
+  const lim = LIMITS[plan];
+  const pt = inst.pt;
+  const commUnit = Number(i.comm);
+  const long = i.side !== 'short';
+  const q1 = Number(i.qty);
+  const p1 = Number(i.avg);
+  const sl0 = Number(i.sl);
+  const tp0 = Number(i.tp);
+  const q2 = Number(i.addQty);
+  const p2 = Number(i.addPrice);
+  const live = Number(i.live != null ? i.live : i.addPrice);
+  const ddlLeft = Number(i.ddlLeft);
+  const ddLeft = Number(i.ddLeft);
+
+  const numOk = [q1, p1, sl0, tp0, q2, p2, live, commUnit, ddlLeft, ddLeft].every(Number.isFinite);
+  if (!numOk) {
+    return { ok: false, errors: ['Faltan datos numéricos o hay un valor inválido.'], warnings };
+  }
+  if (!Number.isInteger(q1) || q1 < 1 || !Number.isInteger(q2) || q2 < 1) {
+    errors.push('Las cantidades tienen que ser enteros de al menos 1 contrato.');
+  }
+  if (p1 <= 0 || p2 <= 0 || live <= 0 || sl0 <= 0 || tp0 <= 0) {
+    errors.push('Los precios tienen que ser mayores que cero.');
+  }
+  if (commUnit < 0) errors.push('La comisión no puede ser negativa.');
+  for (const [label, px] of [['entrada actual', p1], ['SL actual', sl0], ['TP actual', tp0], ['precio de agrega', p2], ['precio actual', live]]) {
+    if (Number.isFinite(px) && px > 0 && !onTick(px)) {
+      warnings.push(`El ${label} (${px}) no cae en un tick de 0.25. Revisa ese precio.`);
+    }
+  }
+
+  const Q = q1 + q2;
+  const comm1 = q1 * commUnit;
+  const commQ = Q * commUnit;
+  const avgExact = (q1 * p1 + q2 * p2) / Q;
+  const avgTick = roundTick(avgExact);
+
+  const slRiskSide = long ? sl0 < p1 - 1e-12 : sl0 > p1 + 1e-12;
+  const slLockSide = long ? sl0 > p1 + 1e-12 : sl0 < p1 - 1e-12;
+  const currentGrossSl = q1 * Math.abs(p1 - sl0) * pt;
+  const currentRisk = slRiskSide ? money(currentGrossSl + comm1) : 0;
+  const currentLock = slLockSide ? money(currentGrossSl - comm1) : 0;
+  const currentTarget = money(q1 * Math.abs(tp0 - p1) * pt - comm1);
+
+  const against = long ? p2 < p1 - 1e-12 : p2 > p1 + 1e-12;
+  const favor = long ? p2 > p1 + 1e-12 : p2 < p1 - 1e-12;
+  if (against) {
+    warnings.push('Promedias en contra: el precio de agrega está peor que tu entrada. El riesgo sube fácil y el stop nuevo puede quedar ya tocado.');
+  } else if (favor) {
+    warnings.push('Piramidas a favor: el precio de agrega está mejor que tu entrada. Si dejas el SL donde está, el riesgo en dólares crece mucho.');
+  }
+
+  const maxQty = lim[symbol];
+  if (Q > maxQty) {
+    errors.push(`El total sería ${Q} ${symbol}, por encima del tope Lucid de ${maxQty} en una cuenta ${plan}.`);
+  }
+
+  const leaveSlPnl = exitPnl({ long, qty: Q, avg: avgExact, exitPx: sl0, pt, comm: commQ });
+  const leaveTpPnl = exitPnl({ long, qty: Q, avg: avgExact, exitPx: tp0, pt, comm: commQ });
+  const leave = {
+    sl: sl0,
+    tp: tp0,
+    risk: leaveSlPnl < 0 ? money(-leaveSlPnl) : 0,
+    lock: leaveSlPnl >= 0 ? money(leaveSlPnl) : 0,
+    target: money(leaveTpPnl),
+    slAlreadyHit: long ? sl0 >= live - 1e-12 : sl0 <= live + 1e-12,
+    tpAlreadyHit: long ? tp0 <= live + 1e-12 : tp0 >= live - 1e-12,
+  };
+
+  const riskMode = i.riskMode === 'custom' ? 'custom' : 'keep';
+  const tpMode = i.tpMode === 'custom' ? 'custom' : 'keep';
+
+  let sl = null;
+  let slKind = 'risk';
+  let targetRisk = null;
+  let targetLock = null;
+
+  if (riskMode === 'keep' && slLockSide) {
+    slKind = 'lock';
+    targetLock = currentLock;
+    const dist = (targetLock + commQ) / (Q * pt);
+    if (!Number.isFinite(dist) || dist <= 0) {
+      errors.push('No se puede mantener lo protegido: el colchón neto actual no alcanza para cubrir la comisión de la posición nueva.');
+    } else {
+      sl = slForLock({ long, avg: avgExact, dist });
+    }
+  } else {
+    slKind = 'risk';
+    targetRisk = riskMode === 'keep' ? currentRisk : Number(i.customRisk);
+    if (!Number.isFinite(targetRisk) || targetRisk <= 0) {
+      errors.push('Indica un riesgo objetivo en dólares mayor que cero.');
+    } else if (targetRisk <= commQ + 1e-9) {
+      errors.push(`El riesgo objetivo ($${money(targetRisk)}) no alcanza ni para la comisión total ($${money(commQ)}).`);
+    } else {
+      const dist = (targetRisk - commQ) / (Q * pt);
+      sl = slForRisk({ long, avg: avgExact, dist });
+    }
+  }
+
+  let slPnl = null;
+  let realRisk = null;
+  let realLock = null;
+  let slDistPts = null;
+  if (sl != null) {
+    slPnl = exitPnl({ long, qty: Q, avg: avgExact, exitPx: sl, pt, comm: commQ });
+    realRisk = slPnl < 0 ? money(-slPnl) : 0;
+    realLock = slPnl >= 0 ? money(slPnl) : 0;
+    slDistPts = money(Math.abs(avgExact - sl));
+    if (slDistPts + 1e-9 < TICK) {
+      errors.push('El SL nuevo quedaría a menos de 1 tick del promedio. No hay distancia válida.');
+    }
+    if (long && sl >= live - 1e-12) {
+      errors.push(`El SL nuevo (${fmtPx(sl)}) quedaría en o por encima del precio actual (${fmtPx(live)}). El stop ya estaría tocado. Prueba un riesgo mayor, menos contratos o no agregar aquí.`);
+    }
+    if (!long && sl <= live + 1e-12) {
+      errors.push(`El SL nuevo (${fmtPx(sl)}) quedaría en o por debajo del precio actual (${fmtPx(live)}). El stop ya estaría tocado. Prueba un riesgo mayor, menos contratos o no agregar aquí.`);
+    }
+    if (slKind === 'risk' && targetRisk != null && realRisk > targetRisk + 0.009) {
+      errors.push('El redondeo no pudo dejar el riesgo por debajo del objetivo. Revisa los precios.');
+    }
+  }
+
+  const targetUsd = tpMode === 'keep' ? currentTarget : Number(i.customTp);
+  let tp = null;
+  let realTarget = null;
+  let tpDistPts = null;
+  if (!Number.isFinite(targetUsd)) {
+    errors.push('Indica un objetivo en dólares.');
+  } else {
+    const distTp = (targetUsd + commQ) / (Q * pt);
+    if (distTp <= 0) {
+      errors.push('El objetivo en dólares es demasiado bajo (ni cubre la comisión).');
+    } else {
+      tp = tpForTarget({ long, avg: avgExact, dist: distTp });
+      realTarget = money(exitPnl({ long, qty: Q, avg: avgExact, exitPx: tp, pt, comm: commQ }));
+      tpDistPts = money(Math.abs(tp - avgExact));
+      if (long && tp <= live + 1e-12) {
+        warnings.push(`El TP nuevo (${fmtPx(tp)}) ya está en o por debajo del precio actual. El objetivo ya se habría alcanzado.`);
+      }
+      if (!long && tp >= live - 1e-12) {
+        warnings.push(`El TP nuevo (${fmtPx(tp)}) ya está en o por encima del precio actual. El objetivo ya se habría alcanzado.`);
+      }
+      if (realTarget + 0.009 < targetUsd) {
+        errors.push('El redondeo no pudo dejar el objetivo neto en o por encima de la meta.');
+      }
+    }
+  }
+
+  if (realRisk != null && realRisk > ddlLeft + 1e-9) {
+    errors.push(`El riesgo real ($${money(realRisk)}) supera el daily loss que te queda ($${money(ddlLeft)}).`);
+  }
+  if (realRisk != null && realRisk > ddLeft + 1e-9) {
+    errors.push(`El riesgo real ($${money(realRisk)}) supera el drawdown de cierre que te queda ($${money(ddLeft)}).`);
+  }
+  if (leave.risk > ddlLeft + 1e-9) {
+    warnings.push(`Si dejas el SL donde está, el riesgo sería $${money(leave.risk)} y se pasa del daily loss que te queda ($${money(ddlLeft)}).`);
+  }
+  if (leave.risk > ddLeft + 1e-9) {
+    warnings.push(`Si dejas el SL donde está, el riesgo sería $${money(leave.risk)} y se pasa del drawdown de cierre que te queda ($${money(ddLeft)}).`);
+  }
+  if (leave.slAlreadyHit) {
+    warnings.push('El SL actual ya está en o más allá del precio de ahora. Si lo dejas ahí, el stop ya estaría tocado.');
+  }
+
+  const ok = errors.length === 0 && sl != null && tp != null;
+  return {
+    ok,
+    errors,
+    warnings,
+    symbol,
+    plan,
+    long,
+    pt,
+    q1,
+    p1,
+    q2,
+    p2,
+    live,
+    Q,
+    comm1: money(comm1),
+    commQ: money(commQ),
+    commUnit: money(commUnit),
+    avgExact,
+    avgTick,
+    slIsRisk: slRiskSide,
+    slIsLock: slLockSide,
+    currentRisk,
+    currentLock,
+    currentTarget,
+    against,
+    favor,
+    maxQty,
+    leave,
+    riskMode,
+    tpMode,
+    slKind,
+    targetRisk: targetRisk != null ? money(targetRisk) : null,
+    targetLock: targetLock != null ? money(targetLock) : null,
+    targetUsd: Number.isFinite(targetUsd) ? money(targetUsd) : null,
+    sl,
+    tp,
+    slDistPts,
+    tpDistPts,
+    realRisk,
+    realLock,
+    realTarget,
+    sl0,
+    tp0,
+  };
+}
+
+function fmtPx(x) {
+  if (!Number.isFinite(x)) return '—';
+  return x.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtUsd(x) {
+  if (!Number.isFinite(x)) return '—';
+  const n = money(x);
+  const sign = n < 0 ? '−' : '';
+  return sign + '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+
+
+const EXAMPLES = {
+  down: { plan:'25K', symbol:'MNQ', side:'long', qty:5, avg:21000, sl:20950, tp:21160, addQty:5, addPrice:20960, live:20960, riskMode:'keep', tpMode:'keep', customRisk:505, customTp:1600, ddlLeft:600, ddLeft:1000, comm:1, syncLive:true },
+  pyramid: { plan:'25K', symbol:'MNQ', side:'long', qty:5, avg:21000, sl:20950, tp:21160, addQty:5, addPrice:21040, live:21040, riskMode:'keep', tpMode:'keep', customRisk:505, customTp:1600, ddlLeft:600, ddLeft:1000, comm:1, syncLive:true },
+  short: { plan:'25K', symbol:'MNQ', side:'short', qty:5, avg:21000, sl:21050, tp:20840, addQty:5, addPrice:21040, live:21040, riskMode:'keep', tpMode:'keep', customRisk:505, customTp:1600, ddlLeft:600, ddLeft:1000, comm:1, syncLive:true },
+  blocked: { plan:'25K', symbol:'MNQ', side:'long', qty:5, avg:21000, sl:20950, tp:21160, addQty:5, addPrice:20900, live:20900, riskMode:'keep', tpMode:'keep', customRisk:505, customTp:1600, ddlLeft:600, ddLeft:1000, comm:1, syncLive:true },
+};
+
+const f = document.getElementById('f');
+const $ = (n) => f.elements[n];
+const radio = (n) => (f.elements[n].value);
+
+function read() {
+  if ($('syncLive').checked) $('live').value = $('addPrice').value;
+  return {
+    plan: radio('plan'),
+    symbol: radio('symbol'),
+    side: radio('side'),
+    qty: $('qty').value,
+    avg: $('avg').value,
+    sl: $('sl').value,
+    tp: $('tp').value,
+    addQty: $('addQty').value,
+    addPrice: $('addPrice').value,
+    live: $('live').value,
+    riskMode: radio('riskMode'),
+    customRisk: $('customRisk').value,
+    tpMode: radio('tpMode'),
+    customTp: $('customTp').value,
+    ddlLeft: $('ddlLeft').value,
+    ddLeft: $('ddLeft').value,
+    comm: $('comm').value,
+  };
+}
+
+function applyEx(ex, key) {
+  const e = EXAMPLES[key];
+  for (const k of ['plan','symbol','side','riskMode','tpMode']) {
+    for (const el of f.elements[k]) el.checked = el.value === e[k];
+  }
+  for (const k of ['qty','avg','sl','tp','addQty','addPrice','live','customRisk','customTp','ddlLeft','ddLeft','comm']) {
+    $(k).value = e[k];
+  }
+  $('syncLive').checked = !!e.syncLive;
+  document.querySelectorAll('.chip').forEach(b => b.classList.toggle('on', b.dataset.ex === key));
+  render();
+}
+
+function loadDefaultsForPlanSymbol() {
+  const plan = radio('plan');
+  const symbol = radio('symbol');
+  const lim = LIMITS[plan];
+  $('comm').value = SPEC[symbol].comm;
+  $('customTp').value = lim.tp;
+  $('ddlLeft').value = lim.ddl;
+  $('ddLeft').value = lim.dd;
+}
+
+function fmtAvg(x) {
+  if (!Number.isFinite(x)) return '—';
+  if (onTick(x)) return fmtPx(x);
+  return x.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+}
+
+function render() {
+  const inp = read();
+  $('customRisk').disabled = inp.riskMode !== 'custom';
+  $('customTp').disabled = inp.tpMode !== 'custom';
+  $('live').disabled = $('syncLive').checked;
+  const lim = LIMITS[inp.plan === '50K' ? '50K' : '25K'];
+  const sym = inp.symbol === 'NQ' ? 'NQ' : 'MNQ';
+  const inst = SPEC[sym];
+  document.getElementById('limHint').textContent =
+    `${inp.plan}: tope ${lim[sym]} ${sym} · ${inst.pt === 2 ? '$2 por punto, $0.50 por tick' : '$20 por punto, $5 por tick'} · meta típica de estrategia ${fmtUsd(lim.tp)} netos.`;
+
+  const r = compute(inp);
+  const currentBits = [];
+  if (r.currentRisk) currentBits.push('Riesgo actual si toca el SL: ' + fmtUsd(r.currentRisk) + ' (ya con comisión)');
+  if (r.currentLock) currentBits.push('El SL actual ya protege ' + fmtUsd(r.currentLock) + ' netos (colchón).');
+  if (Number.isFinite(r.currentTarget)) currentBits.push('Objetivo neto actual: ' + fmtUsd(r.currentTarget) + '.');
+  document.getElementById('currentHint').textContent = currentBits.join(' ');
+
+  const avgOut = document.getElementById('avgOut');
+  const avgSub = document.getElementById('avgSub');
+  if (Number.isFinite(r.avgExact)) {
+    avgOut.innerHTML = fmtAvg(r.avgExact) + ' <sub>promedio nuevo</sub>';
+    avgSub.textContent = onTick(r.avgExact)
+      ? `Cae exacto en tick. ${r.Q} ${r.symbol} en total (tope ${r.maxQty} en ${r.plan}).`
+      : `Exacto ${fmtAvg(r.avgExact)} · en tick ${fmtPx(r.avgTick)} (solo lectura; el cálculo usa el exacto). ${r.Q} ${r.symbol} en total (tope ${r.maxQty} en ${r.plan}).`;
+  } else {
+    avgOut.textContent = '—';
+    avgSub.textContent = 'Completa los datos para ver el promedio.';
+  }
+
+  const slLabel = r.slKind === 'lock' ? 'SL (protege)' : 'SL nuevo';
+  const riskLabel = r.slKind === 'lock' ? 'Protege neto' : 'Riesgo real';
+  const riskVal = r.slKind === 'lock' ? r.realLock : r.realRisk;
+  const kv = document.getElementById('kv');
+  kv.innerHTML = `
+    <div><span>Contratos</span><b>${Number.isFinite(r.Q) ? (r.q1 + ' + ' + r.q2 + ' = ' + r.Q + ' ' + (r.symbol||'')) : '—'}</b></div>
+    <div><span>Comisión total</span><b>${fmtUsd(r.commQ)}</b></div>
+    <div><span>${slLabel}</span><b class="dn">${r.sl!=null? fmtPx(r.sl)+' · '+r.slDistPts+' pts' : '—'}</b></div>
+    <div><span>${riskLabel}</span><b class="${r.ok?'':'warn'}">${r.slKind==='lock'?fmtUsd(r.realLock):fmtUsd(r.realRisk)}</b></div>
+    <div><span>TP nuevo</span><b class="up">${r.tp!=null? fmtPx(r.tp)+' · '+r.tpDistPts+' pts' : '—'}</b></div>
+    <div><span>Objetivo neto real</span><b class="up">${fmtUsd(r.realTarget)}</b></div>`;
+
+  const leaveRiskTxt = r.leave
+    ? (r.leave.lock ? 'protege ' + fmtUsd(r.leave.lock) : fmtUsd(r.leave.risk))
+    : '—';
+  const leaveRiskBad = r.leave && r.leave.risk && (r.leave.risk > Number(inp.ddlLeft) || r.leave.risk > Number(inp.ddLeft));
+  document.getElementById('cmp').innerHTML = `
+    <tr><th></th><th>Recalculado</th><th>Dejar SL/TP</th></tr>
+    <tr><td>SL</td><td>${r.sl!=null?fmtPx(r.sl):'—'}</td><td>${r.leave?fmtPx(r.leave.sl):'—'}</td></tr>
+    <tr><td>Riesgo / protegido</td><td>${r.slKind==='lock'?('protege '+fmtUsd(r.realLock)):fmtUsd(r.realRisk)}</td><td class="${leaveRiskBad?'bad':''}">${leaveRiskTxt}</td></tr>
+    <tr><td>TP</td><td>${r.tp!=null?fmtPx(r.tp):'—'}</td><td>${r.leave?fmtPx(r.leave.tp):'—'}</td></tr>
+    <tr><td>Objetivo neto</td><td>${fmtUsd(r.realTarget)}</td><td>${r.leave?fmtUsd(r.leave.target):'—'}</td></tr>`;
+
+  const marks = [];
+  const addMark = (price, name, kind) => {
+    if (!Number.isFinite(price)) return;
+    marks.push({ price, name, kind });
+  };
+  addMark(r.tp, 'TP nuevo', 'tp');
+  addMark(r.tp0, 'TP actual', 'tp old');
+  addMark(r.live, r.live===r.p2 ? 'Precio actual = agrega' : 'Precio actual', 'live');
+  if (r.p2 !== r.live) addMark(r.p2, 'Precio de agrega', 'live');
+  addMark(r.avgExact, 'Promedio nuevo', 'avg');
+  addMark(r.p1, 'Entrada original', 'old');
+  addMark(r.sl, 'SL nuevo', 'sl');
+  addMark(r.sl0, 'SL actual', 'sl old');
+  marks.sort((a,b) => b.price - a.price);
+  const merged = [];
+  for (const m of marks) {
+    const last = merged[merged.length-1];
+    if (last && Math.abs(last.price - m.price) < 1e-9) last.name += ' · ' + m.name;
+    else merged.push({ ...m });
+  }
+  document.getElementById('ladder').innerHTML = merged.map(m =>
+    `<div class="rung ${m.kind}"><span class="px">${onTick(m.price)?fmtPx(m.price):fmtAvg(m.price)}</span><span class="nm">${m.name}</span></div>`
+  ).join('') || '<p class="hint">Ahí se verá la escala.</p>';
+
+  const alerts = document.getElementById('alerts');
+  const bits = [];
+  for (const e of (r.errors||[])) bits.push(`<p class="err">${e}</p>`);
+  for (const w of (r.warnings||[])) bits.push(`<p class="warn">${w}</p>`);
+  alerts.innerHTML = bits.join('');
+  document.getElementById('confirm').disabled = !r.ok;
+  window.__last = r;
+}
+
+function showModal() {
+  const r = window.__last;
+  if (!r || !r.ok) return;
+  const lado = r.long ? 'largos' : 'cortos';
+  const riskLine = r.slKind === 'lock'
+    ? `El SL en ${fmtPx(r.sl)} protegería ${fmtUsd(r.realLock)} netos.`
+    : `El SL en ${fmtPx(r.sl)} deja un riesgo real de ${fmtUsd(r.realRisk)}${r.targetRisk!=null ? ' (objetivo '+fmtUsd(r.targetRisk)+')' : ''}.`;
+  const leave = r.leave.lock
+    ? `Si dejaras el SL/TP donde están, el stop protegería ${fmtUsd(r.leave.lock)} y el objetivo neto sería ${fmtUsd(r.leave.target)}.`
+    : `Si dejaras el SL/TP donde están, el riesgo sería ${fmtUsd(r.leave.risk)} y el objetivo neto ${fmtUsd(r.leave.target)}.`;
+  document.getElementById('mdBody').innerHTML = `
+    <p><strong>Agregar ${r.q2} ${r.symbol} ${lado}</strong> a ${fmtPx(r.p2)}, en una cuenta ${r.plan}. La posición pasaría de ${r.q1} a <strong>${r.Q}</strong> (tope ${r.maxQty}).</p>
+    <p>Promedio nuevo: <strong>${fmtAvg(r.avgExact)}</strong>${onTick(r.avgExact)?'':' (tick '+fmtPx(r.avgTick)+')'}.</p>
+    <p>${riskLine}</p>
+    <p>El TP en ${fmtPx(r.tp)} deja un objetivo neto real de ${fmtUsd(r.realTarget)}${r.targetUsd!=null?' (meta '+fmtUsd(r.targetUsd)+')':''}.</p>
+    <p>${leave}</p>`;
+  document.getElementById('modal').hidden = false;
+}
+
+let lastPlan = '25K', lastSym = 'MNQ';
+f.addEventListener('input', () => {
+  if ($('syncLive').checked) $('live').value = $('addPrice').value;
+  render();
+});
+f.addEventListener('change', (ev) => {
+  const t = ev.target;
+  if (t && (t.name === 'plan' || t.name === 'symbol')) {
+    if (radio('plan') !== lastPlan || radio('symbol') !== lastSym) {
+      loadDefaultsForPlanSymbol();
+      lastPlan = radio('plan');
+      lastSym = radio('symbol');
+    }
+  }
+  render();
+});
+document.querySelectorAll('.chip').forEach(b => b.addEventListener('click', () => applyEx(null, b.dataset.ex)));
+document.getElementById('confirm').addEventListener('click', showModal);
+document.getElementById('mdClose').addEventListener('click', () => { document.getElementById('modal').hidden = true; });
+document.getElementById('modal').addEventListener('click', (e) => { if (e.target.id === 'modal') e.target.hidden = true; });
+render();
+
+</script>
+</body>
+</html>

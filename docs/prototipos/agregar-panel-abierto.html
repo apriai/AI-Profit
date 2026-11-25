@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Profito · Agregar/Promediar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+#prLive{position:fixed;left:22px;right:auto;top:92px;z-index:12;width:316px;max-width:calc(100vw - 20px);max-height:calc(100vh - 180px);overflow-y:auto;padding:14px;border-radius:16px;background:rgba(12,8,24,.86);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border:1px solid rgba(255,255,255,.08);font:12px Inter,system-ui;color:#ececf3;display:none;font-variant-numeric:tabular-nums}
+#prLive .h{display:flex;justify-content:space-between;font-weight:600;margin-bottom:10px}#prLive .h span:last-child{font-weight:500;font-size:11px;color:rgba(255,255,255,.5)}
+#prLive .kv{display:grid;grid-template-columns:1fr 1fr;gap:6px}#prLive .kv div{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:6px 9px;font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:rgba(255,255,255,.42)}#prLive .kv b{display:block;margin-top:2px;font-size:13px;letter-spacing:0;text-transform:none;color:#fff}
+#prLive .lat{margin-top:8px;padding:8px 10px;border-radius:10px;background:rgba(255,216,107,.06);border:1px solid rgba(255,216,107,.15);font-size:11px;line-height:1.55;color:rgba(255,255,255,.75)}#prLive .lat b{color:#ffe7a3}
+#prLive .lg{margin-top:8px;max-height:72px;overflow:auto;font:10px/1.45 ui-monospace,Consolas,monospace;color:rgba(255,255,255,.45);white-space:pre-wrap}
+#prLive .act{margin-top:10px;width:100%;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;border-radius:10px;padding:8px;font:600 12px Inter,system-ui;cursor:pointer}#prLive .act.gold{background:linear-gradient(135deg,#ffd86b,#ffb300);color:#1a0f00;border:none}
+#prLive .big{font-size:30px;font-weight:650;letter-spacing:-.8px;margin:2px 0 10px}
+#tlRealModal{position:fixed;inset:0;z-index:10000;display:none;align-items:center;justify-content:center;background:rgba(6,3,14,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}#tlRealModal.open{display:flex}#tlRealModal .box{width:380px;max-width:90vw;padding:24px 24px 18px;border-radius:16px;background:rgba(18,12,32,.96);border:1px solid rgba(255,255,255,.1);box-shadow:0 30px 80px rgba(0,0,0,.6);color:#ececf3;font:14px/1.5 Inter,system-ui;text-align:center}#tlRealModal .ic{width:44px;height:44px;margin:0 auto 10px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(211,47,47,.15);color:#ff6b6b;font-size:22px}#tlRealModal h3{margin:0 0 6px;font-size:17px}#tlRealModal p{margin:0 0 18px;color:rgba(255,255,255,.78)}#tlRealModal .bt{display:flex;gap:10px}#tlRealModal button{flex:1;padding:10px;border-radius:10px;font:600 14px Inter,system-ui;cursor:pointer;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#fff}#tlRealModal button[data-ok]{background:#cdea1d;border-color:#cdea1d;color:#0d1a12}#tlRealModal button:hover{filter:brightness(1.08)}
+#tlLuces{display:inline-flex;gap:7px;align-items:center;font-size:12px}#tlLuces .tlEstT{font-weight:600;margin-right:2px}#tlLuces span{position:relative;display:inline-flex;padding:6px;margin:-3px;cursor:help;border-radius:50%;pointer-events:auto}#tlLuces span i{pointer-events:auto;cursor:help}#tlLuces span[data-tip]:hover::after{content:attr(data-tip);position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);white-space:nowrap;background:rgba(20,12,40,.95);color:#fff;font-size:12px;font-weight:600;padding:4px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.2);box-shadow:0 4px 12px rgba(0,0,0,.4);z-index:99999;pointer-events:none}#tlLuces span:hover{background:rgba(255,255,255,.12)}#tlLuces i{margin-right:0!important}
+#tlLuces i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;background:#888;box-shadow:0 0 0 2px rgba(0,0,0,.15)}
+#tlLuces i.ok{background:#cdea1d;box-shadow:0 0 8px #cdea1d}#tlLuces i.ko{background:#ff4d5e;box-shadow:0 0 8px #ff4d5e}
+.tlBig{font:800 34px/1.1 Inter,system-ui;text-align:center;margin:4px 0 10px;font-variant-numeric:tabular-nums}
+.tlBig.pos{color:#cdea1d}.tlBig.neg{color:#ff8a9a}
+#prLive{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.22) transparent}
+#prLive .hd{margin-bottom:6px}#prLive .hd .t{display:flex;align-items:center;gap:8px;flex-wrap:wrap}#prLive .hd .t b{font-size:15px;font-weight:700;color:#fff}
+#prLive .hd .sd{font-size:11px;font-weight:700;letter-spacing:.4px;padding:2px 9px;border-radius:999px;background:rgba(255,255,255,.08);color:#ececf3}#prLive .hd .sd.l{color:#bff5c8}#prLive .hd .sd.s{color:#ffd0b0}
+#prLive .hd .ac{margin-top:6px}
+#prLive .plw{text-align:center;margin:6px 0 4px}#prLive .plw small{display:block;font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:rgba(255,255,255,.42)}
+.tlBig{font:800 34px/1.1 Inter,system-ui;text-align:center;margin:2px 0 4px;font-variant-numeric:tabular-nums}
+#prLive .rng{margin:10px 3px 4px}
+#prLive .rng .rl{display:flex;justify-content:space-between;gap:8px;font-size:10.5px;color:rgba(255,255,255,.5)}#prLive .rng .rl b{color:#fff;font-weight:600;margin-left:3px}
+#prLive .rng .trk{position:relative;height:10px;margin:22px 0 15px;border-radius:5px;background:linear-gradient(90deg,rgba(255,138,154,.45) 0,rgba(255,138,154,.12) var(--e),rgba(205,234,29,.12) var(--e),rgba(205,234,29,.45) 100%)}
+#prLive .rng .en{position:absolute;top:-4px;width:2px;height:18px;margin-left:-1px;border-radius:1px;background:#ffd86b}
+#prLive .rng .px{position:absolute;top:-2px;width:14px;height:14px;margin-left:-7px;border-radius:50%;border:2px solid #fff;box-sizing:border-box;transition:left .5s ease,background .3s}
+/* Mascota del precio actual + Logs colapsable */
+#prLive .rng .tlMas{position:absolute;top:-10px;width:30px;height:30px;margin-left:-15px;z-index:3;display:block;transition:left .55s cubic-bezier(.3,.7,.3,1)}
+#prLive .rng .tlMas .ro,#prLive .rng .tlMas .sv{display:block;width:30px;height:30px}
+#prLive .rng .tlMas .ro{transform:rotate(var(--lean,0deg));transform-origin:50% 90%}
+#prLive .rng .tlMas svg{display:block;width:30px;height:30px;overflow:visible}
+#prLive .rng .tlMas .bz{transform-origin:50% 92%;animation:tlBreath 3s ease-in-out infinite;animation-delay:var(--bd,0s)}
+#prLive .rng .tlMas .s1{stop-color:hsl(var(--mh,68) 96% 70%)}#prLive .rng .tlMas .s2{stop-color:hsl(var(--mh,68) 88% 52%)}#prLive .rng .tlMas .s3{stop-color:hsl(var(--mh,68) 85% 38%)}
+#prLive .rng .tlMas .ey{transform:translate(var(--lx,0px),0);transition:transform .3s ease}
+#prLive .rng .tlMas .e{fill:#1b1a20;transform-box:fill-box;transform-origin:center;transform:scale(calc(1 + .5*var(--wo,0)),calc(1 + .22*var(--wo,0)))}
+#prLive .rng .tlMas.hp .ey{transform:translate(var(--lx,0px),-.7px)}
+#prLive .rng .tlMas .br{display:none;fill:none;stroke:#1b1a20;stroke-width:1.5;stroke-linecap:round;opacity:var(--bo,0)}
+#prLive .rng .tlMas .dpw{display:none;opacity:var(--so,0)}#prLive .rng .tlMas .dp{fill:#a8e0ff;stroke:rgba(255,255,255,.7);stroke-width:.5;animation:tlDrip 1.9s ease-in infinite;animation-delay:var(--bd,0s)}
+#prLive .rng .tlMas.wr .br,#prLive .rng .tlMas.wr .dpw{display:inline}
+#prLive .rng .tlMas.wr .sv{animation:tlShiv var(--sh,.5s) linear infinite;animation-delay:var(--bd,0s)}
+#prLive .rng .tlMas.mvr .ro{animation:tlRollR .7s ease-out both}
+#prLive .rng .tlMas.mvl .ro{animation:tlRollL .7s ease-out both}
+@keyframes tlBreath{0%,100%{transform:scale(1,1)}50%{transform:scale(1.035,.955)}}
+@keyframes tlShiv{0%,100%{transform:translate(0,0)}25%{transform:translate(-.7px,.2px)}50%{transform:translate(.6px,-.2px)}75%{transform:translate(-.5px,.2px)}}
+@keyframes tlDrip{0%{transform:translateY(0);opacity:0}15%{opacity:1}80%{opacity:.9}100%{transform:translateY(5px);opacity:0}}
+@keyframes tlRollR{0%{transform:rotate(0)}35%{transform:translateY(-3px) rotate(32deg) scale(1.06,.94)}100%{transform:rotate(var(--lean,9deg))}}
+@keyframes tlRollL{0%{transform:rotate(0)}35%{transform:translateY(-3px) rotate(-32deg) scale(1.06,.94)}100%{transform:rotate(var(--lean,-9deg))}}
+@media (prefers-reduced-motion:reduce){#prLive .rng .tlMas,#prLive .rng .tlMas *{animation:none!important;transition:none!important}#prLive .rng .tlMas .dp{opacity:1}}
+#prLive .tlLogB{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:8px;padding:6px;background:transparent;border:1px dashed rgba(255,255,255,.16);color:rgba(255,255,255,.6);border-radius:10px;font:600 11.5px Inter,system-ui;cursor:pointer}
+#prLive .tlLogB:hover{color:#fff;background:rgba(255,255,255,.05)}
+#prLive .tlLogs{margin-top:6px}#prLive .tlLogs[hidden]{display:none}#prLive .tlLogs .lat{margin-top:0}
+/* Detener y cerrar posición: único botón rojo del panel */
+#prLive .act[data-stop]{background:linear-gradient(180deg,#e5484d,#c92a30);color:#fff;border:1px solid rgba(255,255,255,.14);box-shadow:0 2px 10px rgba(201,42,48,.28);transition:background .15s,box-shadow .15s,transform .1s}
+#prLive .act[data-stop]:hover{background:linear-gradient(180deg,#f05a5f,#d8343a);box-shadow:0 3px 14px rgba(216,52,58,.42)}
+#prLive .act[data-stop]:active{transform:translateY(1px);background:#b8242a}
+#prLive .act[data-stop]:focus-visible{outline:2px solid rgba(255,255,255,.7);outline-offset:2px}
+#prLive .act[data-stop]:disabled{opacity:.55;cursor:default}
+#prLive .act[data-stop]{padding:13px 10px;font:700 13.5px/1.2 Inter,system-ui}
+
+#prLive .rng .lk{position:absolute;top:-10px;margin-left:-5px;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid #cdea1d}
+#prLive .rng .eb{position:relative;height:15px}#prLive .rng .eb span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap;font-size:10.5px;color:#ffd86b}
+#prLive .lockb{margin:8px 0 6px;padding:8px 10px;border-radius:10px;background:rgba(205,234,29,.12);border:1px solid rgba(205,234,29,.38);color:#e8ffb0;font-weight:700;font-size:12px}#prLive .lockb small{display:block;margin-top:3px;font-weight:500;font-size:10.5px;line-height:1.35;color:rgba(255,255,255,.62)}
+#prLive .lockb.pend{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.14);color:rgba(255,255,255,.8)}
+#prLive .prog{margin:8px 3px 6px}#prLive .prog .bh{display:flex;justify-content:space-between;font-size:10.5px;color:rgba(255,255,255,.55)}#prLive .prog .bh b{color:#fff;font-weight:600}
+#prLive .prog .bt{height:6px;margin-top:4px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden}#prLive .prog .bt i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#8fbf1a,#cdea1d);transition:width .5s ease}
+#prLive .kv small{display:block;font-size:10px}#prLive .kv .w{grid-column:1/-1}#prLive .kv b.ok{color:#cdea1d}
+#prLive .src{margin:6px 0 2px;font-size:10.5px;color:rgba(255,255,255,.45)}#prLive .src b{color:rgba(255,255,255,.7);font-weight:600}
+#prLive .al{margin:6px 0;padding:6px 9px;border-radius:8px;background:rgba(255,200,100,.1);border:1px solid rgba(255,200,100,.25);color:#ffd9a0;font-size:11px}
+@media (max-width:760px){#prLive{left:10px;top:70px;width:min(316px,calc(100vw - 20px));max-height:calc(100vh - 150px)}}
+.tlAT{display:inline-flex;align-items:center;gap:6px;font:700 11px Inter,system-ui;letter-spacing:.4px;text-transform:uppercase;padding:3px 10px;border-radius:999px;color:#fff;border:1px solid rgba(255,255,255,.16)}
+.tlAT.ev{background:linear-gradient(90deg,rgba(255,216,107,.22),rgba(255,160,60,.18));color:#ffe6a3}
+.tlAT.fd{background:linear-gradient(90deg,rgba(205,234,29,.24),rgba(120,220,120,.18));color:#e8ffb0}
+html,body{margin:0;min-height:100%;background:#12081e;color:#ececf3;font:13px/1.45 Inter,system-ui,-apple-system,sans-serif}
+body{background:
+  radial-gradient(ellipse at 18% 0%,rgba(91,42,122,.7) 0%,transparent 46%),
+  radial-gradient(ellipse at 90% 110%,#2a1048 0%,#12081e 58%);
+  min-height:100vh}
+#prLive{display:block!important;box-shadow:0 22px 60px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.04);max-height:calc(100vh - 120px)}
+.chrome{position:fixed;top:22px;left:22px;right:22px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;z-index:8;pointer-events:none}
+.chrome .who{pointer-events:none}
+.chrome h1{margin:0;font-size:15px;font-weight:700;letter-spacing:-.2px}
+.chrome h1 em{font-style:normal;color:#cdea1d}
+.chrome p{margin:3px 0 0;font-size:11px;color:rgba(255,255,255,.45)}
+.tools{pointer-events:auto;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.tools button{border:1px solid rgba(255,255,255,.12);background:rgba(12,8,24,.7);color:rgba(255,255,255,.78);border-radius:999px;padding:5px 11px;font:600 11px Inter,system-ui;cursor:pointer;backdrop-filter:blur(12px)}
+.tools button:hover{color:#fff;border-color:rgba(255,255,255,.28)}
+.tools button.on{color:#cdea1d;border-color:rgba(205,234,29,.5);background:rgba(205,234,29,.1)}
+#toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(12px);opacity:0;pointer-events:none;z-index:30;padding:9px 16px;border-radius:999px;background:rgba(12,8,24,.92);border:1px solid rgba(255,255,255,.14);color:#fff;font:600 12px Inter,system-ui;box-shadow:0 10px 30px rgba(0,0,0,.4);transition:opacity .28s,transform .28s}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* Botón y cajón Agregar/Promediar */
+#prLive .act.addBtn{margin-top:10px;background:linear-gradient(180deg,rgba(205,234,29,.18),rgba(205,234,29,.07));border:1px solid rgba(205,234,29,.42);color:#cdea1d;box-shadow:0 0 18px rgba(205,234,29,.12);letter-spacing:.2px;transition:background .18s,box-shadow .18s,transform .12s,border-color .18s}
+#prLive .act.addBtn:hover{background:linear-gradient(180deg,rgba(205,234,29,.28),rgba(205,234,29,.1));box-shadow:0 0 22px rgba(205,234,29,.22);border-color:rgba(205,234,29,.65)}
+#prLive .act.addBtn:active{transform:translateY(1px) scale(.99)}
+#prLive .act.addBtn[aria-expanded="true"]{background:linear-gradient(180deg,rgba(205,234,29,.3),rgba(205,234,29,.12));box-shadow:inset 0 0 0 1px rgba(205,234,29,.25),0 0 16px rgba(205,234,29,.16)}
+#prLive .addWrap{display:grid;grid-template-rows:0fr;opacity:0;margin:0;transition:grid-template-rows .4s cubic-bezier(.22,.8,.24,1),opacity .28s ease,margin .4s cubic-bezier(.22,.8,.24,1)}
+#prLive .addWrap.open{grid-template-rows:1fr;opacity:1;margin-top:8px}
+#prLive .addInner{overflow:hidden;min-height:0}
+#prLive .addCard{margin:1px;padding:12px 11px 11px;border-radius:14px;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.03));border:1px solid rgba(205,234,29,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 8px 24px rgba(0,0,0,.18)}
+#prLive .addCard .lb{font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:rgba(255,255,255,.42);margin:0 0 6px}
+#prLive .addCard .blk+.blk{margin-top:10px}
+#prLive .addQty,#prLive .addSeg{display:flex;gap:6px}
+#prLive .addQty button,#prLive .addSeg label{flex:1;text-align:center;padding:8px 0;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#fff;font:700 12px Inter,system-ui;cursor:pointer;transition:transform .12s,background .16s,border-color .16s,box-shadow .16s,color .16s}
+#prLive .addSeg input{position:absolute;opacity:0;pointer-events:none}
+#prLive .addQty button:hover,#prLive .addSeg label:hover{border-color:rgba(205,234,29,.4);background:rgba(205,234,29,.08)}
+#prLive .addQty button:active,#prLive .addSeg label:active{transform:scale(.96)}
+#prLive .addQty button.on,#prLive .addSeg label:has(input:checked){background:linear-gradient(180deg,#e8f86a,#cdea1d);color:#161408;border-color:transparent;box-shadow:0 0 16px rgba(205,234,29,.3)}
+#prLive .addCard input[type=number]{width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:10px;padding:8px 10px;font:600 13px Inter,system-ui;font-variant-numeric:tabular-nums}
+#prLive .addCard input[type=number]:focus{outline:none;border-color:rgba(205,234,29,.55);box-shadow:0 0 0 3px rgba(205,234,29,.12)}
+#prLive .limRow{display:none;margin-top:8px}
+#prLive .limRow.show{display:block}
+#prLive .prev{border-radius:12px;padding:9px 10px;background:rgba(8,5,16,.45);border:1px solid rgba(255,255,255,.07)}
+#prLive .prev .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:4px 0;font-size:12px}
+#prLive .prev .row span{color:rgba(255,255,255,.5)}
+#prLive .prev .row b{color:#fff;font-weight:700}
+#prLive .prev .row b.lime{color:#cdea1d}
+#prLive .prev .row b.gold{color:#ffe7a3}
+#prLive .prev .row b.red{color:#ff8a9a}
+#prLive .badges{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+#prLive .badges i{display:inline-flex;align-items:center;font-style:normal;font-size:10px;font-weight:700;letter-spacing:.2px;padding:3px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:rgba(255,255,255,.8)}
+#prLive .badges i.ok{color:#d8f44a;border-color:rgba(205,234,29,.35);background:rgba(205,234,29,.1)}
+#prLive .badges i.warn{color:#ffe7a3;border-color:rgba(255,216,107,.35);background:rgba(255,216,107,.1)}
+#prLive .badges i.bad{color:#ffd0d8;border-color:rgba(255,77,109,.4);background:rgba(255,77,109,.12)}
+#prLive .addErr{display:none;margin-top:8px;padding:7px 9px;border-radius:10px;background:rgba(255,77,109,.12);border:1px solid rgba(255,77,109,.35);color:#ffd0d8;font-size:11px;line-height:1.4}
+#prLive .addErr.show{display:block}
+#prLive .addActs{display:flex;gap:7px;margin-top:11px}
+#prLive .addActs button{flex:1;border-radius:11px;padding:9px 8px;font:700 12px Inter,system-ui;cursor:pointer;transition:transform .12s,filter .15s,box-shadow .15s,background .15s}
+#prLive .addActs button:active{transform:translateY(1px) scale(.99)}
+#prLive .addActs .cancel{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#fff}
+#prLive .addActs .cancel:hover{background:rgba(255,255,255,.1)}
+#prLive .addActs .go{border:0;background:linear-gradient(180deg,#e8f86a,#cdea1d);color:#161408;box-shadow:0 4px 16px rgba(205,234,29,.28)}
+#prLive .addActs .go:hover{filter:brightness(1.06);box-shadow:0 6px 20px rgba(205,234,29,.38)}
+#prLive .addActs .go:disabled{opacity:.38;cursor:not-allowed;filter:grayscale(.2);box-shadow:none}
+#prLive.pop .hd .sd,#prLive.pop .tlBig{animation:popQty .55s ease}
+@keyframes popQty{0%{transform:scale(1)}35%{transform:scale(1.06)}100%{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){
+  #prLive .addWrap{transition:none}
+  #prLive.pop .hd .sd,#prLive.pop .tlBig{animation:none}
+}
+@media (max-width:760px){.chrome{left:10px;right:10px;top:10px}}
+</style>
+</head>
+<body>
+  <div class="chrome">
+    <div class="who">
+      <h1>Profito <em>· prototipo</em></h1>
+      <p>Panel de trade abierto · Agregar/Promediar · no envía órdenes</p>
+    </div>
+    <div class="tools">
+      <button type="button" data-sym="MNQ" class="on">MNQ</button>
+      <button type="button" data-sym="NQ">NQ</button>
+      <button type="button" data-plan="25K" class="on">25K</button>
+      <button type="button" data-plan="50K">50K</button>
+      <button type="button" id="resetBtn">Reiniciar trade</button>
+    </div>
+  </div>
+
+  <div id="prLive">
+    <div id="liveHead"></div>
+    <div id="liveViz"></div>
+    <button type="button" class="act addBtn" id="addToggle" aria-expanded="false">Agregar/Promediar</button>
+    <div class="addWrap" id="addWrap">
+      <div class="addInner">
+        <div class="addCard">
+          <div class="blk">
+            <p class="lb" id="qtyLb">Agregar contratos</p>
+            <div class="addQty" id="qtyBtns"></div>
+          </div>
+          <div class="blk">
+            <p class="lb">Vista previa · mismo riesgo $ y mismo objetivo neto</p>
+            <div class="prev" id="prev"></div>
+            <div class="badges" id="badges"></div>
+            <div class="addErr" id="addErr"></div>
+          </div>
+          <div class="addActs">
+            <button type="button" class="cancel" id="addCancel">Cancelar</button>
+            <button type="button" class="go" id="addGo" disabled>Confirmar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <button type="button" class="act" data-stop>Detener y cerrar posición</button>
+    <div class="kv" id="liveKv"></div>
+  </div>
+  <div id="toast"></div>
+
+<script>
+// Cálculo puro del prototipo Agregar / promediar. Lo usa el HTML (copiado) y este test.
+const TICK = 0.25;
+
+const SPEC = {
+  MNQ: { pt: 2, tickUsd: 0.5, comm: 1 },
+  NQ:  { pt: 20, tickUsd: 5, comm: 3.5 },
+};
+
+const LIMITS = {
+  '25K': { MNQ: 20, NQ: 2, ddl: 600, dd: 1000, tp: 1600 },
+  '50K': { MNQ: 40, NQ: 4, ddl: 1200, dd: 2000, tp: 3200 },
+};
+
+const ceilTick = (x) => Math.ceil(x / TICK - 1e-9) * TICK;
+const floorTick = (x) => Math.floor(x / TICK + 1e-9) * TICK;
+const roundTick = (x) => Math.round(x / TICK) * TICK;
+const money = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
+const onTick = (x) => Number.isFinite(x) && Math.abs(x / TICK - Math.round(x / TICK)) < 1e-8;
+
+function avgPrice(q1, p1, q2, p2) {
+  const qty = q1 + q2;
+  const exact = (q1 * p1 + q2 * p2) / qty;
+  return { exact, tick: roundTick(exact), qty };
+}
+
+/** PnL neto si se sale a exitPx (incluye comisión ida y vuelta de toda la posición). */
+function exitPnl({ long, qty, avg, exitPx, pt, comm }) {
+  const dir = long ? 1 : -1;
+  return qty * dir * (exitPx - avg) * pt - comm;
+}
+
+/**
+ * SL en el lado de riesgo (pérdida), redondeado al tick en dirección segura:
+ * más cerca del promedio / del precio, de modo que el riesgo real ≤ objetivo.
+ * Long: SL = ceilTick(avg - dist). Short: SL = floorTick(avg + dist).
+ */
+function slForRisk({ long, avg, dist }) {
+  return long ? ceilTick(avg - dist) : floorTick(avg + dist);
+}
+
+/**
+ * SL que protege una ganancia neta (colchón ya movido), redondeado para que
+ * lo protegido real sea ≥ al objetivo. Long sube el SL; short lo baja.
+ */
+function slForLock({ long, avg, dist }) {
+  return long ? ceilTick(avg + dist) : floorTick(avg - dist);
+}
+
+/**
+ * TP redondeado para que el neto real sea ≥ al objetivo.
+ * Long: ceilTick(avg + dist). Short: floorTick(avg - dist).
+ */
+function tpForTarget({ long, avg, dist }) {
+  return long ? ceilTick(avg + dist) : floorTick(avg - dist);
+}
+
+function compute(i) {
+  const errors = [];
+  const warnings = [];
+  const symbol = i.symbol === 'NQ' ? 'NQ' : 'MNQ';
+  const plan = i.plan === '50K' ? '50K' : '25K';
+  const inst = SPEC[symbol];
+  const lim = LIMITS[plan];
+  const pt = inst.pt;
+  const commUnit = Number(i.comm);
+  const long = i.side !== 'short';
+  const q1 = Number(i.qty);
+  const p1 = Number(i.avg);
+  const sl0 = Number(i.sl);
+  const tp0 = Number(i.tp);
+  const q2 = Number(i.addQty);
+  const p2 = Number(i.addPrice);
+  const live = Number(i.live != null ? i.live : i.addPrice);
+  const ddlLeft = Number(i.ddlLeft);
+  const ddLeft = Number(i.ddLeft);
+
+  const numOk = [q1, p1, sl0, tp0, q2, p2, live, commUnit, ddlLeft, ddLeft].every(Number.isFinite);
+  if (!numOk) {
+    return { ok: false, errors: ['Faltan datos numéricos o hay un valor inválido.'], warnings };
+  }
+  if (!Number.isInteger(q1) || q1 < 1 || !Number.isInteger(q2) || q2 < 1) {
+    errors.push('Las cantidades tienen que ser enteros de al menos 1 contrato.');
+  }
+  if (p1 <= 0 || p2 <= 0 || live <= 0 || sl0 <= 0 || tp0 <= 0) {
+    errors.push('Los precios tienen que ser mayores que cero.');
+  }
+  if (commUnit < 0) errors.push('La comisión no puede ser negativa.');
+  for (const [label, px] of [['entrada actual', p1], ['SL actual', sl0], ['TP actual', tp0], ['precio de agrega', p2], ['precio actual', live]]) {
+    if (Number.isFinite(px) && px > 0 && !onTick(px)) {
+      warnings.push(`El ${label} (${px}) no cae en un tick de 0.25. Revisa ese precio.`);
+    }
+  }
+
+  const Q = q1 + q2;
+  const comm1 = q1 * commUnit;
+  const commQ = Q * commUnit;
+  const avgExact = (q1 * p1 + q2 * p2) / Q;
+  const avgTick = roundTick(avgExact);
+
+  const slRiskSide = long ? sl0 < p1 - 1e-12 : sl0 > p1 + 1e-12;
+  const slLockSide = long ? sl0 > p1 + 1e-12 : sl0 < p1 - 1e-12;
+  const currentGrossSl = q1 * Math.abs(p1 - sl0) * pt;
+  const currentRisk = slRiskSide ? money(currentGrossSl + comm1) : 0;
+  const currentLock = slLockSide ? money(currentGrossSl - comm1) : 0;
+  const currentTarget = money(q1 * Math.abs(tp0 - p1) * pt - comm1);
+
+  const against = long ? p2 < p1 - 1e-12 : p2 > p1 + 1e-12;
+  const favor = long ? p2 > p1 + 1e-12 : p2 < p1 - 1e-12;
+  if (against) {
+    warnings.push('Promedias en contra: el precio de agrega está peor que tu entrada. El riesgo sube fácil y el stop nuevo puede quedar ya tocado.');
+  } else if (favor) {
+    warnings.push('Piramidas a favor: el precio de agrega está mejor que tu entrada. Si dejas el SL donde está, el riesgo en dólares crece mucho.');
+  }
+
+  const maxQty = lim[symbol];
+  if (Q > maxQty) {
+    errors.push(`El total sería ${Q} ${symbol}, por encima del tope Lucid de ${maxQty} en una cuenta ${plan}.`);
+  }
+
+  const leaveSlPnl = exitPnl({ long, qty: Q, avg: avgExact, exitPx: sl0, pt, comm: commQ });
+  const leaveTpPnl = exitPnl({ long, qty: Q, avg: avgExact, exitPx: tp0, pt, comm: commQ });
+  const leave = {
+    sl: sl0,
+    tp: tp0,
+    risk: leaveSlPnl < 0 ? money(-leaveSlPnl) : 0,
+    lock: leaveSlPnl >= 0 ? money(leaveSlPnl) : 0,
+    target: money(leaveTpPnl),
+    slAlreadyHit: long ? sl0 >= live - 1e-12 : sl0 <= live + 1e-12,
+    tpAlreadyHit: long ? tp0 <= live + 1e-12 : tp0 >= live - 1e-12,
+  };
+
+  const riskMode = i.riskMode === 'custom' ? 'custom' : 'keep';
+  const tpMode = i.tpMode === 'custom' ? 'custom' : 'keep';
+
+  let sl = null;
+  let slKind = 'risk';
+  let targetRisk = null;
+  let targetLock = null;
+
+  if (riskMode === 'keep' && slLockSide) {
+    slKind = 'lock';
+    targetLock = currentLock;
+    const dist = (targetLock + commQ) / (Q * pt);
+    if (!Number.isFinite(dist) || dist <= 0) {
+      errors.push('No se puede mantener lo protegido: el colchón neto actual no alcanza para cubrir la comisión de la posición nueva.');
+    } else {
+      sl = slForLock({ long, avg: avgExact, dist });
+    }
+  } else {
+    slKind = 'risk';
+    targetRisk = riskMode === 'keep' ? currentRisk : Number(i.customRisk);
+    if (!Number.isFinite(targetRisk) || targetRisk <= 0) {
+      errors.push('Indica un riesgo objetivo en dólares mayor que cero.');
+    } else if (targetRisk <= commQ + 1e-9) {
+      errors.push(`El riesgo objetivo ($${money(targetRisk)}) no alcanza ni para la comisión total ($${money(commQ)}).`);
+    } else {
+      const dist = (targetRisk - commQ) / (Q * pt);
+      sl = slForRisk({ long, avg: avgExact, dist });
+    }
+  }
+
+  let slPnl = null;
+  let realRisk = null;
+  let realLock = null;
+  let slDistPts = null;
+  if (sl != null) {
+    slPnl = exitPnl({ long, qty: Q, avg: avgExact, exitPx: sl, pt, comm: commQ });
+    realRisk = slPnl < 0 ? money(-slPnl) : 0;
+    realLock = slPnl >= 0 ? money(slPnl) : 0;
+    slDistPts = money(Math.abs(avgExact - sl));
+    if (slDistPts + 1e-9 < TICK) {
+      errors.push('El SL nuevo quedaría a menos de 1 tick del promedio. No hay distancia válida.');
+    }
+    if (long && sl >= live - 1e-12) {
+      errors.push(`El SL nuevo (${fmtPx(sl)}) quedaría en o por encima del precio actual (${fmtPx(live)}). El stop ya estaría tocado. Prueba un riesgo mayor, menos contratos o no agregar aquí.`);
+    }
+    if (!long && sl <= live + 1e-12) {
+      errors.push(`El SL nuevo (${fmtPx(sl)}) quedaría en o por debajo del precio actual (${fmtPx(live)}). El stop ya estaría tocado. Prueba un riesgo mayor, menos contratos o no agregar aquí.`);
+    }
+    if (slKind === 'risk' && targetRisk != null && realRisk > targetRisk + 0.009) {
+      errors.push('El redondeo no pudo dejar el riesgo por debajo del objetivo. Revisa los precios.');
+    }
+  }
+
+  const targetUsd = tpMode === 'keep' ? currentTarget : Number(i.customTp);
+  let tp = null;
+  let realTarget = null;
+  let tpDistPts = null;
+  if (!Number.isFinite(targetUsd)) {
+    errors.push('Indica un objetivo en dólares.');
+  } else {
+    const distTp = (targetUsd + commQ) / (Q * pt);
+    if (distTp <= 0) {
+      errors.push('El objetivo en dólares es demasiado bajo (ni cubre la comisión).');
+    } else {
+      tp = tpForTarget({ long, avg: avgExact, dist: distTp });
+      realTarget = money(exitPnl({ long, qty: Q, avg: avgExact, exitPx: tp, pt, comm: commQ }));
+      tpDistPts = money(Math.abs(tp - avgExact));
+      if (long && tp <= live + 1e-12) {
+        warnings.push(`El TP nuevo (${fmtPx(tp)}) ya está en o por debajo del precio actual. El objetivo ya se habría alcanzado.`);
+      }
+      if (!long && tp >= live - 1e-12) {
+        warnings.push(`El TP nuevo (${fmtPx(tp)}) ya está en o por encima del precio actual. El objetivo ya se habría alcanzado.`);
+      }
+      if (realTarget + 0.009 < targetUsd) {
+        errors.push('El redondeo no pudo dejar el objetivo neto en o por encima de la meta.');
+      }
+    }
+  }
+
+  if (realRisk != null && realRisk > ddlLeft + 1e-9) {
+    errors.push(`El riesgo real ($${money(realRisk)}) supera el daily loss que te queda ($${money(ddlLeft)}).`);
+  }
+  if (realRisk != null && realRisk > ddLeft + 1e-9) {
+    errors.push(`El riesgo real ($${money(realRisk)}) supera el drawdown de cierre que te queda ($${money(ddLeft)}).`);
+  }
+  if (leave.risk > ddlLeft + 1e-9) {
+    warnings.push(`Si dejas el SL donde está, el riesgo sería $${money(leave.risk)} y se pasa del daily loss que te queda ($${money(ddlLeft)}).`);
+  }
+  if (leave.risk > ddLeft + 1e-9) {
+    warnings.push(`Si dejas el SL donde está, el riesgo sería $${money(leave.risk)} y se pasa del drawdown de cierre que te queda ($${money(ddLeft)}).`);
+  }
+  if (leave.slAlreadyHit) {
+    warnings.push('El SL actual ya está en o más allá del precio de ahora. Si lo dejas ahí, el stop ya estaría tocado.');
+  }
+
+  const ok = errors.length === 0 && sl != null && tp != null;
+  return {
+    ok,
+    errors,
+    warnings,
+    symbol,
+    plan,
+    long,
+    pt,
+    q1,
+    p1,
+    q2,
+    p2,
+    live,
+    Q,
+    comm1: money(comm1),
+    commQ: money(commQ),
+    commUnit: money(commUnit),
+    avgExact,
+    avgTick,
+    slIsRisk: slRiskSide,
+    slIsLock: slLockSide,
+    currentRisk,
+    currentLock,
+    currentTarget,
+    against,
+    favor,
+    maxQty,
+    leave,
+    riskMode,
+    tpMode,
+    slKind,
+    targetRisk: targetRisk != null ? money(targetRisk) : null,
+    targetLock: targetLock != null ? money(targetLock) : null,
+    targetUsd: Number.isFinite(targetUsd) ? money(targetUsd) : null,
+    sl,
+    tp,
+    slDistPts,
+    tpDistPts,
+    realRisk,
+    realLock,
+    realTarget,
+    sl0,
+    tp0,
+  };
+}
+
+function fmtPx(x) {
+  if (!Number.isFinite(x)) return '—';
+  return x.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtUsd(x) {
+  if (!Number.isFinite(x)) return '—';
+  const n = money(x);
+  const sign = n < 0 ? '−' : '';
+  return sign + '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+window.__tlMascota=function(x,fp,sp,px){const S=window.__tlMasS||(window.__tlMasS={x:null,dir:0}),prev=S.x,dx=prev==null?0:x-prev,mv=Math.abs(dx)>.25,f=fp<0&&sp>0?Math.min(1,-fp/sp):0;
+ if(prev==null)S.dir=fp>.5?1:fp<-.5?-1:0;else if(mv)S.dir=dx>0?1:-1;S.x=x;
+ const wr=f>.02,hue=(68-68*f).toFixed(1),sh=(.55-.43*f).toFixed(2),wo=Math.min(1,f*2).toFixed(2),bo=Math.min(1,f*3).toFixed(2),so=Math.min(1,f*2.5).toFixed(2),lx=((S.dir||(wr?-1:0))*2.4).toFixed(1),ph=((performance.now()/1000)%3).toFixed(2),start=mv&&prev!=null?prev:x;
+ Promise.resolve().then(()=>{const el=document.querySelector("#prLive .tlMas");if(el){void el.offsetWidth;el.style.left=x.toFixed(2)+"%"}});
+ return`<i class="tlMas${wr?" wr":fp>0?" hp":""}${mv?(dx>0?" mvr":" mvl"):""}" style="left:${start.toFixed(2)}%;--mh:${hue};--sh:${sh}s;--wo:${wo};--bo:${bo};--so:${so};--lx:${lx}px;--lean:${S.dir*9}deg;--bd:-${ph}s" title="Precio ${px}"><span class=ro><span class=sv><svg class=bz viewBox="0 0 40 40" aria-hidden="true"><defs><radialGradient id=tlMg cx=".36" cy=".3" r=".85"><stop offset="0" class=s1 /><stop offset=".55" class=s2 /><stop offset="1" class=s3 /></radialGradient></defs><ellipse cx="20" cy="37.5" rx="11" ry="2" fill="#000" opacity=".28" /><ellipse cx="20" cy="20" rx="17.5" ry="17" fill="url(#tlMg)" /><ellipse cx="12.5" cy="11" rx="5.6" ry="3.1" transform="rotate(-35 12.5 11)" fill="#fff" opacity=".55" /><circle cx="29.5" cy="9.5" r="1.3" fill="#fff" opacity=".6" /><g class=ey><rect class=e x="12.8" y="14.2" width="4.4" height="9" rx="2.2" /><rect class=e x="22.8" y="14.2" width="4.4" height="9" rx="2.2" /></g><g class=br><path d="M10.2 12.4 L16.6 9.4" /><path d="M29.8 12.4 L23.4 9.4" /></g><g class=dpw><path class=dp d="M33 12.5 q2.5 3.5 0 5.2 q-2.5 -1.7 0 -5.2z" /></g></svg></span></span></i>`};
+
+window.__tlViz=function(s){if(!s)return"";const nf=(v,sg)=>(sg?(v<0?"−":"+"):"")+"$"+Math.abs(v).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}),p=s.pnl!=null?Number(s.pnl):(s.brokerPl!=null?Number(s.brokerPl):NaN),okp=isFinite(p);
+ let h=`<div class=plw><small>P&amp;L bruto</small><div class="tlBig ${!okp?"":p>=0?"pos":"neg"}">${okp?nf(p,1):"—"}</div></div>`;
+ const en=+s.entry,lg=s.side==="long",sp=+s.slPts,tpPr=+s.tpPrice,tpP=isFinite(+s.tpPts)&&+s.tpPts>0?+s.tpPts:(isFinite(tpPr)&&isFinite(en)?Math.abs(tpPr-en):NaN),px=+s.price,st=s.steps||[],k=s.step||0,fv=v=>lg?v-en:en-v;
+ if([en,sp,tpP].every(isFinite)&&sp>0&&tpP>0){const tot=sp+tpP,X=f=>Math.max(0,Math.min(100,(f+sp)/tot*100)),ex=X(0),slI=lg?en-sp:en+sp,tpI=isFinite(tpPr)?tpPr:(lg?en+tpP:en-tpP),fp=isFinite(px)?fv(px):null,lk=(k>0||s.locked)&&isFinite(+s.sl)?fv(+s.sl):null,eL=Math.max(17,Math.min(83,ex));
+  h+=`<div class=rng title="SL a la izquierda, TP a la derecha. La mascota es el precio actual."><div class=rl><span>SL<b>${+slI.toFixed(2)}</b></span><span>TP<b>${tpI}</b></span></div><div class=trk style="--e:${ex.toFixed(2)}%"><i class=en style="left:${ex.toFixed(2)}%"></i>${lk!=null?`<i class=lk style="left:${X(lk).toFixed(2)}%" title="Stop actual ${s.sl}"></i>`:""}${fp!=null?window.__tlMascota(X(fp),fp,sp,px):""}</div><div class=eb><span style="left:${eL.toFixed(2)}%">Entrada ${en}</span></div></div>`}
+ const cur=k>0?st[k-1]:null,nx=st[k];
+ if(cur||s.locked){const lp=cur?cur.lockPts:null,lu=cur?cur.lockUsd:null,tk=lp!=null?Math.round(lp/.25):null,be=lp!=null&&lp<=1;
+  h+=`<div class=lockb${be?' title="TradingView casi no lo muestra: el stop queda pegado a la entrada, pero la orden ya está movida."':""}>✓ ${lp===0?"Stop en break even":be?"Stop en break even (+"+tk+" ticks)":lu!=null?"Stop protegido +"+nf(lu):"Stop movido"} · SL ${s.sl??"—"}</div>`}
+ else if(s.lockPending)h+=`<div class="lockb pend">Moviendo el stop…</div>`;
+ if(nx&&okp){const tr=+nx.triggerUsd||0,pc=tr>0?Math.max(0,Math.min(100,p/tr*100)):0;h+=`<div class=prog><div class=bh><span>Hacia el paso ${nx.n}</span><b>${nf(Math.max(p,0))} / ${nf(tr)}</b></div><div class=bt><i style="width:${pc.toFixed(1)}%"></i></div></div>`}
+ return h};
+
+const fm = (v) => "$" + Math.abs(+v).toLocaleString("en-US", { maximumFractionDigits: 2 });
+const nfPnl = (v) => (v < 0 ? "−" : "+") + "$" + Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const px = (v) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function stepsFor(symbol, qty) {
+  const pt = SPEC[symbol].pt, tUsd = pt * TICK * qty, comm = SPEC[symbol].comm;
+  const NET = 100, SLIP = 1, EXTRA = 15;
+  const lockUsd = Math.round(Math.ceil((NET + comm * qty + SLIP * tUsd) / tUsd - 1e-9) * tUsd * 100) / 100;
+  const triggerUsd = Math.round((lockUsd + Math.ceil(EXTRA / tUsd - 1e-9) * tUsd) * 100) / 100;
+  const lockPts = Math.round(lockUsd / (pt * qty) / TICK) * TICK;
+  return [{ n: 1, triggerUsd, lockUsd, lockPts }];
+}
+
+function seedTrade(symbol, plan) {
+  const long = true;
+  const qty = symbol === "NQ" ? 1 : 5;
+  const entry = 21000;
+  const slPts = symbol === "NQ" ? 15 : 50;
+  const tpPts = symbol === "NQ" ? 80 : 160;
+  const sl = entry - slPts;
+  const tp = entry + tpPts;
+  return {
+    symbol, plan, side: "long", long,
+    qty, entry, sl, tp, slPts, riskPts: slPts, tpPts,
+    price: entry + 8 * TICK,
+    strategy: { name: "Rascacielo (Dia Minimo+Colchon)" },
+    mode: "real", realLabel: "evaluación",
+    step: 0, locked: false, lockPending: false,
+    steps: stepsFor(symbol, qty),
+    comm: SPEC[symbol].comm,
+    ddlLeft: LIMITS[plan].ddl,
+    ddLeft: LIMITS[plan].dd,
+    log: ["prototipo: trade de ejemplo · " + qty + " " + symbol + " @ " + entry]
+  };
+}
+
+let T = seedTrade("MNQ", "25K");
+let addQty = 2;
+let drawerOpen = false;
+let ticking = true;
+
+function pnlNow() {
+  const dir = T.long ? 1 : -1;
+  return money(T.qty * dir * (T.price - T.entry) * SPEC[T.symbol].pt);
+}
+
+function status() {
+  const p = pnlNow();
+  return {
+    ...T,
+    pnl: p,
+    price: money(T.price),
+    entry: money(T.entry),
+    sl: money(T.sl),
+    tpPrice: money(T.tp),
+    slPts: T.riskPts,
+    tpPts: T.tpPts,
+    fuenteLider: "broker-lectura",
+    fuenteModo: "prototipo"
+  };
+}
+
+function renderHeadKv() {
+  const s = status();
+  const st = s.steps || [], k = s.step || 0;
+  const nm = s.strategy.name;
+  const acct = '<span class="tlAT ev">🌱 LucidFlex · evaluación</span>';
+  document.getElementById("liveHead").innerHTML =
+    `<div class=hd><div class=t><b>Estrategia: ${nm}</b><span class="sd ${s.side==="long"?"l":"s"}">${s.side==="long"?"COMPRA":"VENTA"} ${s.qty} ${s.symbol}</span></div><div class=ac>${acct}</div></div>`;
+  const lt = (lp) => Math.round(lp / .25);
+  let tl = `<div><small>Entrada</small><b>${px(s.entry)}</b></div><div><small>Precio</small><b id="kvPx">${px(s.price)}</b></div><div><small>SL actual</small><b id="kvSl">${px(s.sl)}</b></div>`;
+  const nx = st[k];
+  tl += `<div><small>Paso ${k}/${st.length || 1}</small><b class="${k?"ok":""}" id="kvPaso">${k?"Movido ✓":"Sin mover"}</b></div><div class=w><small>Siguiente</small><b id="kvNext">${nx ? "+" + fm(nx.triggerUsd) + " → protege +" + fm(nx.lockUsd) + (nx.lockPts > 0 && nx.lockPts <= 1 ? " (" + lt(nx.lockPts) + " ticks)" : nx.lockPts === 0 ? " (entrada)" : "") : "— (último)"}</b></div>`;
+  document.getElementById("liveKv").innerHTML = tl;
+}
+
+function renderViz() {
+  document.getElementById("liveViz").innerHTML = window.__tlViz(status());
+}
+
+function addPrice() {
+  return T.price;
+}
+
+function preview() {
+  return compute({
+    symbol: T.symbol, plan: T.plan, side: T.side,
+    qty: T.qty, avg: T.entry, sl: T.sl, tp: T.tp,
+    addQty, addPrice: addPrice(), live: T.price,
+    riskMode: "keep", tpMode: "keep",
+    comm: T.comm, ddlLeft: T.ddlLeft, ddLeft: T.ddLeft
+  });
+}
+
+function renderPreview() {
+  const r = preview();
+  const riskTxt = r.slKind === "lock" ? ("protege " + fmtUsd(r.realLock)) : fmtUsd(r.realRisk);
+  document.getElementById("prev").innerHTML = `
+    <div class="row"><span>Agrega</span><b>${r.q2 || addQty} ${T.symbol} @ ${fmtPx(T.price)} · mercado</b></div>
+    <div class="row"><span>Promedio nuevo</span><b class="gold">${r.avgExact!=null?(onTick(r.avgExact)?fmtPx(r.avgExact):fmtPx(r.avgExact)+" · tick "+fmtPx(r.avgTick)): "—"}</b></div>
+    <div class="row"><span>SL nuevo</span><b class="red">${r.sl!=null?fmtPx(r.sl):"—"}</b></div>
+    <div class="row"><span>Riesgo real</span><b>${riskTxt}</b></div>
+    <div class="row"><span>TP nuevo</span><b class="lime">${r.tp!=null?fmtPx(r.tp):"—"}</b></div>
+    <div class="row"><span>Objetivo neto</span><b class="lime">${fmtUsd(r.realTarget)}</b></div>`;
+  const max = r.maxQty || LIMITS[T.plan][T.symbol];
+  const Q = (r.Q != null ? r.Q : T.qty + addQty);
+  const badges = [];
+  if (r.against) badges.push('<i class="warn">En contra</i>');
+  else if (r.favor) badges.push('<i class="ok">A favor</i>');
+  else badges.push('<i>Mismo precio</i>');
+  badges.push(`<i class="${Q>max?"bad":"ok"}">${Q} / ${max} ${T.symbol}</i>`);
+  if (r.realRisk != null) {
+    badges.push(`<i class="${r.realRisk>T.ddlLeft?"bad":"ok"}">DDL ${fmtUsd(T.ddlLeft)}</i>`);
+    badges.push(`<i class="${r.realRisk>T.ddLeft?"bad":"ok"}">DD ${fmtUsd(T.ddLeft)}</i>`);
+  }
+  document.getElementById("badges").innerHTML = badges.join("");
+  const err = document.getElementById("addErr");
+  if (r.errors && r.errors.length) {
+    err.textContent = r.errors[0];
+    err.classList.add("show");
+  } else {
+    err.classList.remove("show");
+    err.textContent = "";
+  }
+  document.getElementById("addGo").disabled = !r.ok;
+  window.__prev = r;
+}
+
+function renderQtyBtns() {
+  const opts = T.symbol === "NQ" ? (T.plan === "50K" ? [1, 2] : [1]) : [1, 2, 5, 10];
+  if (!opts.includes(addQty)) addQty = opts[0];
+  document.getElementById("qtyLb").textContent = "Agregar contratos " + T.symbol;
+  document.getElementById("qtyBtns").innerHTML = opts.map(n =>
+    `<button type="button" data-q="${n}" class="${n===addQty?"on":""}">+${n}</button>`
+  ).join("");
+}
+
+function toast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.classList.remove("show"), 2800);
+}
+
+function log(line) {
+  T.log.push(line);
+  T.log = T.log.slice(-8);
+}
+
+function maybeLock() {
+  if (T.locked || T.step > 0) return;
+  const st = T.steps[0];
+  const p = pnlNow();
+  if (st && p >= st.triggerUsd) {
+    const dir = T.long ? 1 : -1;
+    T.sl = roundTick(T.entry + dir * st.lockPts);
+    T.locked = true;
+    T.step = 1;
+    log("colchón: stop a " + fmtPx(T.sl) + " · protege +" + fm(st.lockUsd));
+    renderHeadKv();
+  }
+}
+
+function tick() {
+  if (!ticking) return;
+  const lo = Math.min(T.sl, T.tp) + TICK;
+  const hi = Math.max(T.sl, T.tp) - TICK;
+  const mid = T.entry;
+  let step = 0;
+  const r = Math.random();
+  if (r < 0.28) step = 0;
+  else if (r < 0.78) step = TICK;
+  else if (r < 0.95) step = TICK * 2;
+  else step = TICK * 3;
+  const sign = (Math.random() < 0.47 + 0.12 * Math.sign(mid - T.price)) ? 1 : -1;
+  let nx = roundTick(T.price + sign * step);
+  if (nx < lo) nx = lo;
+  if (nx > hi) nx = hi;
+  T.price = nx;
+  maybeLock();
+  const p = pnlNow();
+  const big = document.querySelector("#prLive .tlBig");
+  if (big) {
+    big.textContent = nfPnl(p);
+    big.className = "tlBig " + (p >= 0 ? "pos" : "neg");
+  }
+  const kvPx = document.getElementById("kvPx");
+  if (kvPx) kvPx.textContent = px(T.price);
+  const kvSl = document.getElementById("kvSl");
+  if (kvSl) kvSl.textContent = px(T.sl);
+  renderViz();
+  const prog = document.querySelector("#prLive .prog .bt i");
+  const stepN = T.steps[T.step];
+  if (prog && stepN) {
+    const pc = stepN.triggerUsd > 0 ? Math.max(0, Math.min(100, Math.max(p, 0) / stepN.triggerUsd * 100)) : 0;
+    prog.style.width = pc.toFixed(1) + "%";
+  }
+  if (drawerOpen) renderPreview();
+}
+
+function openDrawer(open) {
+  drawerOpen = !!open;
+  document.getElementById("addWrap").classList.toggle("open", drawerOpen);
+  document.getElementById("addToggle").setAttribute("aria-expanded", drawerOpen ? "true" : "false");
+  if (drawerOpen) {
+    renderQtyBtns();
+    renderPreview();
+  }
+}
+
+function confirmAdd() {
+  const r = preview();
+  if (!r || !r.ok) return;
+  T.qty = r.Q;
+  T.entry = r.avgExact;
+  T.sl = r.sl;
+  T.tp = r.tp;
+  T.tpPts = r.tpDistPts;
+  T.steps = stepsFor(T.symbol, T.qty);
+  if (r.slKind === "lock") {
+    T.locked = true;
+    T.step = 1;
+    T.riskPts = T.riskPts || r.slDistPts;
+  } else {
+    T.locked = false;
+    T.step = 0;
+    T.riskPts = r.slDistPts;
+  }
+  log("simulación: +" + r.q2 + " " + T.symbol + " @ " + fmtPx(r.p2) + " (mercado) · avg " + fmtPx(r.avgExact) + " · SL " + fmtPx(r.sl) + " · TP " + fmtPx(r.tp));
+  renderHeadKv();
+  renderViz();
+  const live = document.getElementById("prLive");
+  live.classList.remove("pop");
+  void live.offsetWidth;
+  live.classList.add("pop");
+  openDrawer(false);
+  toast("Simulación: se agregaron " + r.q2 + " " + T.symbol + " a " + fmtPx(r.p2) + ". No se envió ninguna orden.");
+}
+
+function resetTrade(symbol, plan) {
+  T = seedTrade(symbol || T.symbol, plan || T.plan);
+  window.__tlMasS = { x: null, dir: 0 };
+  addQty = T.symbol === "NQ" ? 1 : 2;
+  renderHeadKv();
+  renderViz();
+  renderQtyBtns();
+  if (drawerOpen) renderPreview();
+  document.querySelectorAll(".tools [data-sym]").forEach(b => b.classList.toggle("on", b.dataset.sym === T.symbol));
+  document.querySelectorAll(".tools [data-plan]").forEach(b => b.classList.toggle("on", b.dataset.plan === T.plan));
+}
+
+document.getElementById("addToggle").addEventListener("click", () => openDrawer(!drawerOpen));
+document.getElementById("addCancel").addEventListener("click", () => openDrawer(false));
+document.getElementById("addGo").addEventListener("click", confirmAdd);
+document.getElementById("qtyBtns").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-q]");
+  if (!b) return;
+  addQty = +b.dataset.q;
+  renderQtyBtns();
+  renderPreview();
+});
+document.querySelector("[data-stop]").addEventListener("click", () => {
+  toast("En este prototipo no se cierra la posición.");
+});
+document.querySelectorAll(".tools [data-sym]").forEach(b => b.addEventListener("click", () => resetTrade(b.dataset.sym, T.plan)));
+document.querySelectorAll(".tools [data-plan]").forEach(b => b.addEventListener("click", () => resetTrade(T.symbol, b.dataset.plan)));
+document.getElementById("resetBtn").addEventListener("click", () => { resetTrade(T.symbol, T.plan); toast("Trade de ejemplo reiniciado."); });
+
+resetTrade("MNQ", "25K");
+setInterval(tick, 650);
+</script>
+</body>
+</html>
