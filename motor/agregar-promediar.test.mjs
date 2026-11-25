@@ -43,23 +43,33 @@ assert.equal(tocado.ok, false);
 assert.ok(money(tocado.realRisk) <= 401);
 assert.ok(tocado.errors.some(e => /ya estaría tocado/.test(e)));
 
-function broker() {
+function broker({ fallaBracket = false } = {}) {
   const st = { qty: 5, entry: 21000, price: 20960, stop: 20950, tp: 21160 };
   const llamadas = [];
+  let cerro = false;
   return {
     st, llamadas,
+    cerro: () => cerro,
     position() {
       return { side: 'long', qty: st.qty, entry: st.entry, price: st.price, stop: st.stop, raw: { takeProfit: st.tp }, pnl: -400 };
     },
-    async agregar(req) {
-      llamadas.push(req);
+    async agregarMercado(req) {
+      llamadas.push({ op: 'market', ...req });
+      if (req.sl != null || req.tp != null || req.stopLoss != null) throw new Error('el mercado no lleva bracket');
       const avg = (st.qty * st.entry + req.addQty * 20960) / (st.qty + req.addQty);
       st.qty += req.addQty;
       st.entry = avg;
+      return { ok: true, qty: st.qty, avg, price: st.price };
+    },
+    async reemplazarBracket(req) {
+      llamadas.push({ op: 'replace', ...req });
+      if (req.qty != null && req.qty > st.qty) throw new Error('stop más grande que la posición');
+      if (fallaBracket) return { ok: false, err: 'verificacion', stops: 0, tps: 0, qty: st.qty };
       st.stop = req.sl;
       st.tp = req.tp;
-      return { ok: true, qty: st.qty, avg, price: st.price, extras: 0, via: 'modifyOrder' };
+      return { ok: true, qty: st.qty, stops: 1, tps: 1 };
     },
+    async flatten() { cerro = true; return 'ok'; },
   };
 }
 
@@ -74,7 +84,9 @@ const k = createColchon(() => ({
   stop: async () => b.st.stop,
   working: async () => [],
   openBracket: async () => 'ok market',
-  agregar: req => b.agregar(req),
+  agregarMercado: req => b.agregarMercado(req),
+  reemplazarBracket: req => b.reemplazarBracket(req),
+  flatten: () => b.flatten(),
   ticker: null,
 }));
 
@@ -82,16 +94,19 @@ const abierto = await k.start({ side: 'long', symbol: 'MNQ', qty: 5, accountId: 
 assert.equal(abierto.ok, true, abierto.err);
 const r = await k.add({ addQty: 5 });
 assert.equal(r.ok, true, r.err);
-assert.equal(b.llamadas.length, 1);
+assert.deepEqual(b.llamadas.map(x => x.op), ['market', 'replace']);
 assert.equal(b.llamadas[0].addQty, 5);
-assert.equal(b.llamadas[0].tradeSymbol, 'MNQH6');
-assert.ok(Math.abs(b.llamadas[0].sl - 20955.25) < 1e-6, 'un solo SL recalculado');
-assert.ok(Math.abs(b.llamadas[0].tp - 21060.25) < 1e-6, 'un solo TP recalculado');
+assert.equal(b.llamadas[0].sl, undefined);
+assert.equal(b.llamadas[1].tradeSymbol, 'MNQH6');
+assert.ok(Math.abs(b.llamadas[1].sl - 20955.25) < 1e-6, 'un solo SL recalculado');
+assert.ok(Math.abs(b.llamadas[1].tp - 21060.25) < 1e-6, 'un solo TP recalculado');
 assert.equal(r.qty, 10);
 assert.equal(k.status().qty, 10);
+assert.equal(b.cerro(), false);
 await k.stop({ flatten: false });
 
 const real = broker();
+const fallo = broker({ fallaBracket: true });
 const kReal = createColchon(() => ({
   kind: 'api',
   account: async () => ({ name: 'LFE0TEST000026', broker: 'Tradovate' }),
@@ -102,7 +117,9 @@ const kReal = createColchon(() => ({
   stop: async () => real.st.stop,
   working: async () => [],
   openBracket: async () => 'ok market',
-  agregar: req => real.agregar(req),
+  agregarMercado: req => real.agregarMercado(req),
+  reemplazarBracket: req => real.reemplazarBracket(req),
+  flatten: () => real.flatten(),
   ticker: null,
 }));
 const abiertoReal = await kReal.start({ side: 'long', symbol: 'MNQ', qty: 5, accountId: 'r1', accountName: 'LFE0TEST000026' });
@@ -110,7 +127,34 @@ assert.equal(abiertoReal.ok, true, abiertoReal.err);
 assert.equal(kReal.status().mode, 'real');
 const enReal = await kReal.add({ addQty: 1 });
 assert.equal(enReal.ok, true, enReal.err);
-assert.equal(real.llamadas.length, 1);
+assert.equal(real.llamadas[0].op, 'market');
+assert.equal(real.cerro(), false);
 await kReal.stop({ flatten: false });
+
+const kFallo = createColchon(() => ({
+  kind: 'api',
+  account: async () => ({ name: 'LFE0TEST000026', broker: 'Tradovate' }),
+  accountId: async () => 'r2',
+  preparar: async () => ({ accountId: 'r2', name: 'LFE0TEST000026', brokerId: 'tradovate', tradeSymbol: 'MNQH6' }),
+  cotizacion: async () => ({ bid: 20959.75, ask: 20960, last: 20960, leido: Date.now() }),
+  position: async () => fallo.position(),
+  stop: async () => fallo.st.stop,
+  working: async () => [],
+  openBracket: async () => 'ok market',
+  agregarMercado: req => fallo.agregarMercado(req),
+  reemplazarBracket: req => fallo.reemplazarBracket(req),
+  flatten: () => fallo.flatten(),
+  ticker: null,
+}));
+const abiertoFallo = await kFallo.start({ side: 'long', symbol: 'MNQ', qty: 5, accountId: 'r2', accountName: 'LFE0TEST000026' });
+assert.equal(abiertoFallo.ok, true, abiertoFallo.err);
+const mal = await kFallo.add({ addQty: 5 });
+assert.equal(mal.ok, false);
+assert.equal(mal.err, 'Sin SL/TP, ponlos a mano');
+assert.equal(kFallo.status().alerta, 'Sin SL/TP, ponlos a mano');
+assert.equal(fallo.llamadas.filter(x => x.op === 'replace').length, 2, 'un reintento del bracket');
+assert.equal(fallo.cerro(), false, 'un fallo no cierra la posición');
+assert.equal(kFallo.status().qty, 10);
+await kFallo.stop({ flatten: false });
 
 console.log('agregar-promediar ok');

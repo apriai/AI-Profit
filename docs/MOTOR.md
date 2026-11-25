@@ -64,9 +64,16 @@ El arranque de un clic es el acceso **AI Profit**. En Windows lo crea `instalar-
 
 Con el trade abierto, el panel manda `POST /api/colchon/add`. El promedio nuevo es el promedio ponderado. El SL conserva el riesgo en dólares (o la ganancia neta si el colchón ya se movió) y se redondea al tick hacia el precio, para que el riesgo real no pase del objetivo. El TP se aleja al tick para que el neto no baje de la meta.
 
-Protección: la orden que agrega va a mercado **sin** bracket propio. Antes del envío se ensancha la cantidad del SL y del TP que ya existen (mismos precios), así el fill no queda descubierto. Al ver el promedio real se mueven esos mismos precios. En Tradovate (`supportPositionBrackets: false`) eso es `modifyOrder` sobre la hija stop y la hija límite. En el otro camino (paper, con brackets de posición) además se llama `editPositionBrackets` una vez, con el SL y el TP nuevos. Cualquier hija nueva que haya nacido con la orden de agregar se cancela. Queda un SL y un TP para toda la posición.
+Protección, en este orden (`js.agregarMercado` y `js.reemplazarBracket`):
 
-El bucle del colchón usa la cantidad y el promedio nuevos: el disparo en dólares se recalcula. Si el colchón ya se había movido, no vuelve a bajar el stop.
+1. La orden que agrega va a mercado **sin** SL ni TP. Se espera el fill y se lee la cantidad y el promedio reales.
+2. Se cancelan el SL y el TP viejos de esa posición.
+3. Se pone **un** SL y **un** TP nuevos para toda la cantidad. En Tradovate (`supportPositionBrackets: false`) son dos `placeOrder` ligados a la posición (`parentType` 2), con `qty` igual a la posición. En paper, `editPositionBrackets` una vez con ambos precios.
+4. Durante unos 3 s se comprueba que hay exactamente un SL y un TP, y que ninguno es más grande que la posición. Si no, se reintenta el paso 3 una vez.
+
+No se cambia la cantidad de una hija que ya existe: Tradovate lo rechaza, y un stop más grande que la posición puede voltearla. Si el bracket nuevo no queda verificado, el panel dice «Sin SL/TP, ponlos a mano» y no se cierra la posición.
+
+El bucle del colchón usa la cantidad y el promedio nuevos: el disparo en dólares se recalcula. Si el colchón ya se había movido, no vuelve a bajar el stop. Si no hay bracket, ese bucle no intenta mover el stop.
 
 ## 5. Estrategias (`strategies.mjs`)
 Parámetros comunes: `SL_USD`, `TP_USD` (bracket en $), `STEPS` (escalones `{trigger, lock}` en $ brutos), `NET_USD`, `COMM_RT`, `SLIP_TICKS`, `TRIGGER_EXTRA_USD`, `DEFAULT_QTY`, `PROB`.

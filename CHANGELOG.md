@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.51] — 2026-11-25
+### Cambiado
+- **Agregar/Promediar cancela el bracket viejo y pone uno nuevo.** Primero entra a mercado sin SL ni TP y lee el promedio real. Después cancela el stop y el objetivo anteriores y coloca uno de cada uno para toda la posición. Si eso no se verifica, lo reintenta una vez. Si sigue fallando, el panel dice «Sin SL/TP, ponlos a mano» y no cierra la posición. Ya no se agranda la cantidad de las órdenes viejas.
+### Notas
+- Vale en la cuenta que ya está operando. No cambia cómo abren las otras estrategias.
+
 ## [0.10.50] — 2026-11-25
 ### Añadido
 - **Agregar/Promediar** en el panel del trade abierto. Suma contratos a mercado a la posición que ya está abierta y deja un solo SL y un solo TP para toda la posición. El riesgo en dólares se conserva (o la ganancia neta, si el colchón ya se movió) y el objetivo neto no baja. Sigue bloqueando el tope de contratos, el daily loss y el drawdown. El cajón pide Confirmar antes de enviar.
