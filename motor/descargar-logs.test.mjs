@@ -91,7 +91,7 @@ assert.match(texto, /"version": "0.10.57"/);
 assert.match(texto, /"dailyLoss": 600/);
 
 const html = fs.readFileSync(new URL('./Granja-de-Cuentas-v2.html', import.meta.url), 'utf8');
-const menu = html.slice(html.indexOf('Sonido de la señal'), html.indexOf('tlLogsAviso') + 20);
+const menu = html.slice(html.indexOf('Sonido de un Profito en TradingView'), html.indexOf('tlLogsAviso') + 20);
 assert.match(menu, /Resumen de trades en TradingView/);
 assert.match(menu, /Descargar Logs y status/);
 assert.ok(menu.indexOf('Resumen de trades en TradingView') < menu.indexOf('Descargar Logs y status'));

@@ -13,7 +13,7 @@ assert.equal(fijarResumenTv(dir, true).on, true);
 assert.equal(resumenTvActivo(dir), true);
 
 const html = fs.readFileSync(new URL('./Granja-de-Cuentas-v2.html', import.meta.url), 'utf8');
-const ojo = html.slice(html.indexOf('Sonido de la señal'), html.indexOf('Sonido de la señal') + 400);
+const ojo = html.slice(html.indexOf('Sonido de un Profito en TradingView'), html.indexOf('Sonido de un Profito en TradingView') + 500);
 assert.match(ojo, /Resumen de trades en TradingView/);
 assert.match(ojo, /id="tlResumenTV"/);
 assert.match(html, /profito\.resumenTV/);

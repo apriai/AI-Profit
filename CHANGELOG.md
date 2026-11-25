@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.58] — 2026-11-25
+### Cambiado
+- En el ojo de Profito Algoritmo, la etiqueta del sonido ahora dice «Sonido de un Profito en TradingView». El interruptor sigue siendo el mismo.
+### Notas
+- No cambia las órdenes ni la mascota.
+
 ## [0.10.57] — 2026-11-25
 ### Añadido
 - **«Descargar Logs y status»** al final del ojo de Profito Algoritmo. Guarda en Descargas un zip `Profito-logs-AAAA-MM-DD_HHMM.zip` con los `.log` de Profito (también `datos/logs/`, como `servidor.log` y `lanzador.log`, y `tradinglink.log` de Mac) y un `status.json` (versión, sistema, conexión, cuentas, drawdown, pérdida diaria e interruptores). Cada registro entra con sus últimas 5 MB. No incluye claves ni tokens, tampoco si van entre comillas en JSON.
