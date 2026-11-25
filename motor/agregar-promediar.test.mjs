@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { compute, money } from './agregar-promediar.mjs';
+import { roundTrips } from './pnl-sesion.mjs';
 import { createColchon, js } from './colchon.mjs';
 
 const base = {
@@ -56,6 +57,36 @@ const granja = fs.readFileSync(new URL('./Granja-de-Cuentas-v2.html', import.met
 assert.match(granja, /Este SL se pasa de tu daily loss/);
 assert.match(granja, /Este SL se pasa de tu drawdown/);
 assert.match(granja, /addWarn/);
+assert.match(granja, /pts del precio/);
+assert.match(granja, /La pérdida abierta ya usa parte del riesgo/);
+assert.match(granja, /<span>Puntos<\/span>/);
+assert.match(granja, /function volver\(/);
+assert.match(granja, /horas=24/);
+assert.doesNotMatch(granja, /\.back"\)\.onclick=list/);
+assert.doesNotMatch(granja, /NO VEO EL STOP/);
+
+const peorPx = 20960 - 3.75;
+const conFill = compute({ ...base, side: 'long', addPrice: peorPx, live: peorPx });
+assert.equal(conFill.ok, true, conFill.errors && conFill.errors.join(' | '));
+assert.ok(conFill.sl < uno.sl, 'el fill peor aleja el SL para conservar el riesgo');
+assert.ok(conFill.realRisk <= conFill.currentRisk + 0.009);
+const cortoPeor = compute({ ...base, side: 'short', sl: 21050, tp: 20840, addPrice: 21040 + 3.75, live: 21043.75 });
+assert.equal(cortoPeor.ok, true, cortoPeor.errors && cortoPeor.errors.join(' | '));
+assert.ok(cortoPeor.sl > corto.sl, 'en corto el fill peor sube el SL');
+assert.ok(cortoPeor.realRisk <= cortoPeor.currentRisk + 0.009);
+
+const trips = roundTrips([
+  { id: 'a', symbol: 'CME_MINI:MNQZ2026', price: 25206, qty: 1, side: -1, time: 1 },
+  { id: 'b', symbol: 'CME_MINI:MNQZ2026', price: 25230, qty: 5, side: -1, time: 2 },
+  { id: 'c', symbol: 'CME_MINI:MNQZ2026', price: 25236, qty: 6, side: 1, time: 3 },
+]);
+assert.equal(trips.length, 1);
+assert.equal(trips[0].entrada, 25206);
+assert.equal(trips[0].salida, 25236);
+assert.equal(Math.round(trips[0].entradaProm * 100) / 100, 25226);
+assert.equal(trips[0].salidaProm, 25236);
+assert.equal(trips[0].puntos, -10);
+assert.equal(trips[0].direccion, 'VENTA');
 
 function broker({ fallaBracket = false } = {}) {
   const st = { qty: 5, entry: 21000, price: 20960, stop: 20950, tp: 21160 };
@@ -317,6 +348,109 @@ function pagina() {
   assert.equal(kFlat.status().state, 'running', 'varios brackets no dan la posición por cerrada');
   assert.equal(flats, 0);
   await kFlat.stop({ flatten: false });
+}
+
+{
+  const peor = broker();
+  const viejo = peor.agregarMercado.bind(peor);
+  peor.agregarMercado = async req => {
+    const antes = peor.st.price;
+    peor.st.price = antes - 3.75;
+    const r = await viejo(req);
+    peor.st.price = antes;
+    return r;
+  };
+  const kPeor = createColchon(() => ({
+    kind: 'api',
+    account: async () => ({ name: 'Practice Demo', broker: 'Tradovate Practice' }),
+    accountId: async () => 'p2',
+    preparar: async () => ({ accountId: 'p2', name: 'Practice Demo', brokerId: 'paper', tradeSymbol: 'MNQH6' }),
+    cotizacion: async () => ({ bid: 20959.75, ask: 20960, last: 20960, leido: Date.now() }),
+    position: async () => peor.position(),
+    stop: async () => peor.st.stop,
+    working: async () => [],
+    openBracket: async () => 'ok market',
+    agregarMercado: req => peor.agregarMercado(req),
+    alinearBracket: req => peor.alinearBracket(req),
+    flatten: () => peor.flatten(),
+    ticker: null,
+  }), { pollMs: 40, logFile: path.join(os.tmpdir(), 'tl-agregar-peor.log'), ignoreClock: true, noTicks: true });
+  const ab = await kPeor.start({ side: 'long', symbol: 'MNQ', qty: 5, accountId: 'p2', accountName: 'Practice Demo' });
+  assert.equal(ab.ok, true, ab.err);
+  const add = await kPeor.add({ addQty: 5 });
+  assert.equal(add.ok, true, add.err);
+  assert.equal(peor.llamadas[0].stopLoss, uno.sl, 'la orden sale con el SL de la cotización');
+  assert.ok(Math.abs(peor.llamadas[1].sl - conFill.sl) < 1e-6, 'alinear usa el SL del fill real');
+  assert.ok(Math.abs(peor.llamadas[1].tp - conFill.tp) < 1e-6);
+  assert.notEqual(peor.llamadas[1].sl, peor.llamadas[0].stopLoss);
+  assert.equal(peor.cerro(), false);
+  const logPeor = fs.readFileSync(path.join(os.tmpdir(), 'tl-agregar-peor.log'), 'utf8');
+  assert.match(logPeor, /AGREGAR recálculo · antes SL/);
+  assert.match(logPeor, /después SL/);
+  await kPeor.stop({ flatten: false });
+}
+
+{
+  let viva = true;
+  const st = { qty: 5, entry: 21000, price: 20970, stop: 20950, tp: 21160 };
+  const llamadas = [];
+  const logFile = path.join(os.tmpdir(), 'tl-agregar-resumen.log');
+  const kRes = createColchon(() => ({
+    kind: 'api',
+    account: async () => ({ name: 'Practice Demo', broker: 'Tradovate Practice' }),
+    accountId: async () => 'p3',
+    preparar: async () => ({ accountId: 'p3', name: 'Practice Demo', brokerId: 'paper', tradeSymbol: 'MNQH6' }),
+    cotizacion: async () => ({ bid: 20959.75, ask: 20960, last: 20960, leido: Date.now() }),
+    position: async () => viva ? { side: 'long', qty: st.qty, entry: 21000, price: st.price, stop: st.stop, raw: { takeProfit: st.tp } } : null,
+    stop: async () => st.stop,
+    working: async () => [],
+    openBracket: async () => 'ok market',
+    agregarMercado: async req => {
+      const fill = 20956.25;
+      const avg = (5 * 21000 + req.addQty * fill) / (5 + req.addQty);
+      llamadas.push({ op: 'market', sl: req.sl, tp: req.tp });
+      return { ok: true, qty: 5 + req.addQty, avg, price: st.price, viejos: ['S0', 'T0'] };
+    },
+    alinearBracket: async req => { llamadas.push({ op: 'alinear', sl: req.sl, tp: req.tp }); return { ok: true, qty: 10, stops: 2, tps: 2 }; },
+    flatten: async () => 'ok',
+    ticker: null,
+  }), { pollMs: 30, logFile, ignoreClock: true, noTicks: true, flatConfirm: { reads: 1, ms: 0 } });
+  const ab = await kRes.start({ side: 'long', symbol: 'MNQ', qty: 5, accountId: 'p3', accountName: 'Practice Demo' });
+  assert.equal(ab.ok, true, ab.err);
+  await new Promise(r => setTimeout(r, 120));
+  const add = await kRes.add({ addQty: 5 });
+  assert.equal(add.ok, true, add.err);
+  const avg = (5 * 21000 + 5 * 20956.25) / 10;
+  assert.equal(kRes.status().promedio, avg);
+  assert.equal(kRes.status().qtyProm, 10);
+  viva = false;
+  const tope = Date.now() + 2000;
+  let sm = null;
+  while (Date.now() < tope) {
+    sm = kRes.summary();
+    if (sm && sm.inicio === kRes.status().startedAt) break;
+    await new Promise(r => setTimeout(r, 40));
+  }
+  assert.ok(sm, 'hay resumen');
+  assert.equal(sm.entrada, avg);
+  assert.equal(sm.tamano, '10 MNQ');
+  const comm = 10;
+  const neto = Math.round(((20970 - avg) * 2 * 10 - comm) * 100) / 100;
+  assert.equal(sm.pnlFinalAprox, true);
+  assert.equal(sm.pnlFinalUSD, neto);
+  assert.notEqual(sm.entrada, 21000);
+  await kRes.stop({ flatten: false });
+}
+
+{
+  const pg = pagina();
+  const puesto = await pg.evaluate(js.agregarMercado({ root: 'MNQ', tradeSymbol: 'CME_MINI:MNQH6', side: 'long', addQty: 5, sl: 20955.25, tp: 21060.25 }));
+  const visto = await pg.evaluate(js.alinearBracket({ root: 'MNQ', sl: 20940, tp: 21070, viejos: puesto.viejos }));
+  assert.equal(visto.ok, true, JSON.stringify(visto));
+  assert.ok(pg.ordenes.filter(o => o.type === 3).every(o => o.stopPrice === 20940));
+  assert.ok(pg.ordenes.filter(o => o.type === 1).every(o => o.limitPrice === 21070));
+  assert.equal(pg.cierres(), 0);
+  assert.equal(pg.canceles(), 0);
 }
 
 console.log('agregar-promediar ok');

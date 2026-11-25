@@ -10,6 +10,19 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.61] — 2026-11-25
+### Corregido
+- **Agregar usa el fill real.** Después de entrar a mercado, el SL y el TP se vuelven a calcular con el promedio y la cantidad que devolvió el bróker (el mismo riesgo en dólares y la misma meta del TP). Si el fill vino peor que la cotización, el stop no se queda más apretado. Si no hay promedio real, se dejan los precios de la cotización. El antes y el después quedan en `colchon.log`. Si no se pueden alinear, solo avisa «Revisa SL/TP en Tradovate» y no cierra.
+- **El resumen aproximado, después de Agregar, usa el promedio y el tamaño nuevos**, con la comisión de todos los contratos. Sigue saliendo al momento y el bróker lo sustituye si llega; no se agregó espera.
+### Añadido
+- En Agregar, antes de confirmar, se ve en amarillo cuántos puntos hay del precio al SL de ahora y al SL nuevo (por ejemplo «SL: 75 → 8 pts del precio») y que la pérdida abierta ya usa parte del riesgo. Confirmar sigue disponible.
+- En el historial, la columna **Puntos** (después de Resultado) muestra los puntos por contrato con signo, desde el promedio de entrada y el de salida de las ejecuciones. Si faltan, sale «—».
+### Cambiado
+- **Volver**, en el detalle de un trade, pinta al momento la lista que ya estaba cargada y el mismo scroll. Si hace falta, refresca detrás sin bloquear ni parpadear.
+- Al abrir Historial o Métrica se leen solo las últimas 24 h (la sesión de hoy). Semana, mes, todo u otro día se piden cuando se eligen, con el mismo resultado de antes.
+### Notas
+- No cambia la barra de la mascota. No aplana la posición si Agregar no puede mover el stop.
+
 ## [0.10.60] — 2026-11-25
 ### Cambiado
 - El GEX neto de QQQ se ve en la barra de arriba: «GEX + · Día de rango» o «GEX − · Día de expansión». Ya no se dibujan muros ni el gamma flip en TradingView, y el reloj de la barra se quitó. Sigue el cálculo cada 20 minutos y el registro en `gex.log`. Si hay un trade abierto, esa vuelta se salta.

@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - cursor/agregar-promediar-8bec
+      - cursor/agregar-fill-y-historial-6767
 
 permissions:
   contents: read

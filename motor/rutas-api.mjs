@@ -100,8 +100,14 @@ export function manejar(q, r, deps) {
           };
         } else if (q.url.startsWith('/api/colchon/metricas')) out = await deps.metricasDe(q.url);
         else if (q.url.startsWith('/api/colchon/trades')) {
-          const d = new URL(q.url, 'http://x').searchParams.get('dia');
-          out = await deps.tradesDe(/^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d : deps.diaFarm());
+          const u = new URL(q.url, 'http://x');
+          const d = u.searchParams.get('dia');
+          const horas = Number(u.searchParams.get('horas'));
+          const dia = /^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d : deps.diaFarm();
+          const corte = horas > 0 ? Date.now() - horas * 3600000 : null;
+          const inicio = deps.inicioDiaFarm ? deps.inicioDiaFarm(dia) : null;
+          const desdeMs = corte == null ? inicio : (inicio == null ? corte : Math.min(inicio, corte));
+          out = await deps.tradesDe(dia, { desdeMs, fillsDesdeMs: d ? null : corte });
         } else if (q.url.startsWith('/api/colchon/conexion')) out = await deps.conexion();
         else if (q.url.startsWith('/api/colchon/status')) out = { ...deps.colchon.status(), cfg: deps.colchonCFG };
         else if (q.url.startsWith('/api/colchon/summary')) out = deps.colchon.summary() || { ok: false, err: 'Todavía no hay resumen' };

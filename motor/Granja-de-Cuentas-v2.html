@@ -137,7 +137,7 @@
         arr.push({ abierta: new Date(endMs - dur * 1000).toISOString(), at: new Date(endMs).toISOString(), direccion: long_ ? 'COMPRA' : 'VENTA',
           tamano: qty + ' MNQ', entrada: en, salida: sa, pnl: pnl, pnlBruto: pnl, neto: false, fuente: 'broker', aprox: false, cuenta: IDS[ak],
           modo: auto ? 'real' : null, estrategia: auto ? 'Evaluaci\u00f3n' : 'Manual / fuera de la granja', motivo: auto ? (R() < 0.8 ? 'Take profit' : 'Stop loss') : null,
-          stopMovido: auto ? R() < 0.45 : null, informe: auto ? day + '.md' : null, granja: auto, pnlGranja: pnl });
+          stopMovido: auto ? R() < 0.45 : null, informe: auto ? day + '.md' : null, granja: auto, pnlGranja: pnl, puntos: long_ ? Math.round((sa - en) * 100) / 100 : Math.round((en - sa) * 100) / 100 });
       }
       best = { trades: arr.reverse(), gross: Math.round(gross * 100) / 100, qty: qsum };
       if (isT ? (gross >= 650 && gross <= 700) : (gross >= 330 && gross <= 900)) break;
@@ -5911,12 +5911,12 @@ window.__tlOpenTrade=async function(hint){try{const name=hint&&(hint.name||hint)
 #prLive .al{margin:6px 0;padding:6px 9px;border-radius:8px;background:rgba(255,200,100,.1);border:1px solid rgba(255,200,100,.25);color:#ffd9a0;font-size:11px}
 @media (max-width:760px){#prLive{left:10px;top:70px;width:min(316px,calc(100vw - 20px));max-height:calc(100vh - 150px)}}
 #tradesBtn{left:22px;right:auto}
-#tradesView{position:fixed;left:22px;bottom:84px;width:470px;max-height:78vh;overflow:auto;padding:20px;z-index:12;background:rgba(12,8,24,.9);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.08);border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.5);color:#ececf3;font:13px Inter,system-ui;display:none;font-variant-numeric:tabular-nums}
+#tradesView{position:fixed;left:22px;bottom:84px;width:min(560px,calc(100vw - 28px));max-height:78vh;overflow:auto;padding:20px;z-index:12;background:rgba(12,8,24,.9);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.08);border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.5);color:#ececf3;font:13px Inter,system-ui;display:none;font-variant-numeric:tabular-nums}
 #tradesView.open{display:block}#tradesView h2{font-size:19px;margin:0 0 4px}#tradesView .close{position:absolute;top:10px;right:12px;background:none;border:0;color:#fff;font-size:20px;cursor:pointer}
 #tradesView .tot{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
 #tradesView .tot div{background:rgba(255,255,255,.05);border-radius:10px;padding:8px;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.5)}
 #tradesView .tot b{display:block;font-size:18px;color:#fff;text-transform:none;letter-spacing:0}
-#tradesView .tr{display:grid;grid-template-columns:78px 66px 1fr 74px 64px;gap:6px;align-items:center;padding:9px 6px;border-bottom:1px solid rgba(255,255,255,.08);cursor:pointer;border-radius:8px}
+#tradesView .tr{display:grid;grid-template-columns:64px 58px minmax(0,1.2fr) 70px 52px 56px;gap:6px;align-items:center;padding:9px 6px;border-bottom:1px solid rgba(255,255,255,.08);cursor:pointer;border-radius:8px}
 #tradesView .tr:hover{background:rgba(255,255,255,.06)}#tradesView .th{cursor:default;font-size:10.5px;text-transform:uppercase;color:rgba(255,255,255,.45)}#tradesView .th:hover{background:none}
 #tradesView select{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:3px 6px}
 #tradesView pre{white-space:pre-wrap;font:11.5px/1.5 ui-monospace,Consolas,monospace;background:rgba(255,255,255,.04);padding:10px;border-radius:10px;color:rgba(255,255,255,.85)}
@@ -6005,18 +6005,28 @@ async function conn(){let c=null;try{c=await (await fetch("/api/colchon/conexion
 conn();setInterval(conn,5000);
 
 // 4) Historial de trades
-const v=document.getElementById("tradesView");let dia=null;
-const mk=c=>{c=String(c??"");const m=c.match(/^([A-Za-z0-9]{4})[A-Za-z0-9…]*?([0-9A-Za-z]{3})$/);return c.length>8&&m?m[1]+"…"+m[2]:c};async function list(){v.classList.remove("det");let d;try{d=await (await fetch("/api/colchon/trades"+(dia?"?dia="+dia:""),{cache:"no-store"})).json()}catch(e){v.innerHTML='<button class=close>×</button><h2>📈 Historial de trades</h2><p>No pude leer los trades.</p>';v.querySelector(".close").onclick=()=>v.classList.remove("open");return}
- dia=d.dia;let _nt=null;if(d.totalNeto&&typeof d.saldoDia==="number")_nt=d.saldoDia;else{try{const _a=await (await fetch("/accounts.json",{cache:"no-store"})).json();if(_a&&_a.daily&&typeof _a.daily[d.dia]==="number")_nt=_a.daily[d.dia]}catch(e){}if(_nt==null&&typeof d.saldoDia==="number")_nt=d.saldoDia}const _tn=_nt!=null?_nt:d.total,_sb=(typeof d.bruto==="number"&&d.bruto!==_tn)?`<small style="display:block;font-size:10px;font-weight:400;opacity:.65">bruto, sin comisiones: ${$u(d.bruto)}</small>`:"";const dias=[...new Set([d.dia,...(d.dias||[])])];
+const v=document.getElementById("tradesView");let dia=null,diaElegido=false,cacheLista=null,refN=0;
+const mk=c=>{c=String(c??"");const m=c.match(/^([A-Za-z0-9]{4})[A-Za-z0-9…]*?([0-9A-Za-z]{3})$/);return c.length>8&&m?m[1]+"…"+m[2]:c};function fmtPuntos(n){if(n==null||!isFinite(+n))return "—";var r=Math.round(+n*100)/100,a=Math.abs(r),s=Math.abs(a-Math.round(a))<1e-9?String(Math.round(a)):(Math.abs(Math.round(a*4)-a*4)<1e-6?String(Math.round(a*4)/4):String(Math.round(a*100)/100));return r>0?"+"+s:r<0?"−"+s:"0"}
+function firmaLista(d){return JSON.stringify([d&&d.dia,d&&d.total,d&&d.saldoDia,d&&d._nt,d&&d.n,(d&&d.trades||[]).map(function(t){return [t.at,t.pnl,t.puntos,t.direccion,t.tamano,t.motivo,t.cuenta]})])}
+function pedirTrades(){var q=diaElegido&&dia?"?dia="+encodeURIComponent(dia):"?horas=24";return fetch("/api/colchon/trades"+q,{cache:"no-store"}).then(function(r){return r.json()})}
+async function prepararLista(d){dia=d.dia;let _nt=null;if(d.totalNeto&&typeof d.saldoDia==="number")_nt=d.saldoDia;else{try{const _a=await (await fetch("/accounts.json",{cache:"no-store"})).json();if(_a&&_a.daily&&typeof _a.daily[d.dia]==="number")_nt=_a.daily[d.dia]}catch(e){}if(_nt==null&&typeof d.saldoDia==="number")_nt=d.saldoDia}d._nt=_nt;
  /* Una sola fila por trade: si hay un registro sin resultado (al abrir) y luego el cierre del mismo trade (misma cuenta/dirección/contratos, apertura ±5 min), se queda solo el cierre. */
  {const T=x=>+new Date(x),cl=(d.trades||[]).filter(t=>t.pnl!=null);d.trades=(d.trades||[]).filter(t=>{if(t.pnl!=null)return true;return !cl.some(c=>c.cuenta===t.cuenta&&c.direccion===t.direccion&&c.tamano===t.tamano&&Math.abs(T(c.abierta||c.at)-T(t.at))<=5*60e3&&T(c.at)>=T(t.at)-60e3)});d.n=d.trades.length;d.ganados=d.trades.filter(t=>(t.pnl||0)>0).length;
   d.trades.forEach(t=>{if(t.abierta&&t.at){const sg=Math.round((T(t.at)-T(t.abierta))/1000);if(sg>=0)t.__dur=sg<60?sg+" s":Math.floor(sg/60)+" min "+(sg%60)+" s"}})}
- const rows=d.trades.map((t,i)=>`<div class=tr data-i=${i}><span>${new Date(t.at).toLocaleTimeString("es",{timeZone:"America/New_York"})}</span><span style="color:${t.direccion==="COMPRA"?"#cdea1d":"#ff4d5e"};font-weight:700">${esc(t.direccion)}</span><span>${esc(t.tamano)}${t.modo==="real"?' <b style="background:#cdea1d;color:#0d1a12;padding:0 4px;border-radius:3px;font-size:10px">AUTO</b>':""}${t.stopMovido?' <b title="Stop movido por el agente" style="background:rgba(205,234,29,.15);color:#cdea1d;border:1px solid rgba(205,234,29,.5);padding:0 4px;border-radius:3px;font-size:10px">agente</b>':""}${t.granja===false?' <b style="background:#555;color:#fff;padding:0 4px;border-radius:3px;font-size:10px">MANUAL</b>':""}</span><b style="color:${(t.pnl||0)>=0?"#cdea1d":"#ff4d5e"}">${t.pnl==null&&!t.motivo?"en curso":$u(t.pnl)}${t.aprox&&t.pnl!=null?"*":""}${t.motivo||t.__dur?`<small style="display:block;font-weight:500;font-size:10px;opacity:.7">${esc(t.motivo||"")}${t.motivo&&t.__dur?" · ":""}${t.__dur||""}</small>`:""}</b><span style="white-space:nowrap;font-size:11px;opacity:.85">${esc(mk(t.cuenta))||"—"}</span></div>`).join("");
+ return d}
+function pintarLista(d,scroll){const _nt=d._nt!=null?d._nt:(typeof d.saldoDia==="number"?d.saldoDia:null),_tn=_nt!=null?_nt:d.total,_sb=(typeof d.bruto==="number"&&d.bruto!==_tn)?`<small style="display:block;font-size:10px;font-weight:400;opacity:.65">bruto, sin comisiones: ${$u(d.bruto)}</small>`:"",dias=[...new Set([d.dia,...(d.dias||[])])];
+ const rows=(d.trades||[]).map((t,i)=>{const pts=typeof t.puntos==="number"&&isFinite(t.puntos)?t.puntos:null;return `<div class=tr data-i=${i}><span>${new Date(t.at).toLocaleTimeString("es",{timeZone:"America/New_York"})}</span><span style="color:${t.direccion==="COMPRA"?"#cdea1d":"#ff4d5e"};font-weight:700">${esc(t.direccion)}</span><span>${esc(t.tamano)}${t.modo==="real"?' <b style="background:#cdea1d;color:#0d1a12;padding:0 4px;border-radius:3px;font-size:10px">AUTO</b>':""}${t.stopMovido?' <b title="Stop movido por el agente" style="background:rgba(205,234,29,.15);color:#cdea1d;border:1px solid rgba(205,234,29,.5);padding:0 4px;border-radius:3px;font-size:10px">agente</b>':""}${t.granja===false?' <b style="background:#555;color:#fff;padding:0 4px;border-radius:3px;font-size:10px">MANUAL</b>':""}</span><b style="color:${(t.pnl||0)>=0?"#cdea1d":"#ff4d5e"}">${t.pnl==null&&!t.motivo?"en curso":$u(t.pnl)}${t.aprox&&t.pnl!=null?"*":""}${t.motivo||t.__dur?`<small style="display:block;font-weight:500;font-size:10px;opacity:.7">${esc(t.motivo||"")}${t.motivo&&t.__dur?" · ":""}${t.__dur||""}</small>`:""}</b><b style="color:${pts==null?"rgba(255,255,255,.45)":pts>=0?"#cdea1d":"#ff4d5e"}">${fmtPuntos(pts)}</b><span style="white-space:nowrap;font-size:11px;opacity:.85">${esc(mk(t.cuenta))||"—"}</span></div>`}).join("");
  v.innerHTML=`<button class=close>×</button><h2>📈 Historial de trades</h2><div style="font-size:12px;opacity:.75">Día <select>${dias.map(x=>`<option ${x===d.dia?"selected":""}>${x}</option>`).join("")}</select> · horas ET</div>
  <div class=tot><div title="Saldo real de TradingView menos el saldo con que empezó el día (incluye comisiones)">P&L del día${d.totalNeto?" (neto)":_nt!=null?" (saldo)":""}<b style="color:${_tn>=0?"#cdea1d":"#ff4d5e"}">${$u(_tn)}</b>${_nt!=null?_sb:""}</div><div>Nº trades<b>${d.n}</b></div><div>Ganados<b>${d.ganados}/${d.n}</b></div></div><div style="font-size:11px;opacity:.65;margin:4px 0">Fuente: ${esc(d.fuente||"granja")}${d.cuenta?" · "+esc(mk(d.cuenta)):""}</div>
- <div class="tr th"><span>Hora</span><span>Dirección</span><span>Contratos</span><span>Resultado</span><span>Cuenta</span></div>${rows||'<div style="opacity:.7;padding:10px 0">No hay trades este día.</div>'}<div style="font-size:11px;opacity:.55;margin-top:8px">Toca un trade para ver su informe.</div>`;
- v.querySelector(".close").onclick=()=>v.classList.remove("open");v.querySelector("select").onchange=e=>{dia=e.target.value;list()};
- v.querySelectorAll(".tr[data-i]").forEach(r=>r.onclick=()=>informe(d.trades[+r.dataset.i]))}
+ <div class="tr th"><span>Hora</span><span>Dirección</span><span>Contratos</span><span>Resultado</span><span>Puntos</span><span>Cuenta</span></div>${rows||'<div style="opacity:.7;padding:10px 0">No hay trades este día.</div>'}<div style="font-size:11px;opacity:.55;margin-top:8px">Toca un trade para ver su informe.</div>`;
+ v.querySelector(".close").onclick=()=>v.classList.remove("open");v.querySelector("select").onchange=e=>{dia=e.target.value;diaElegido=true;list()};
+ v.querySelectorAll(".tr[data-i]").forEach(r=>r.onclick=()=>{if(cacheLista)cacheLista.scroll=v.scrollTop;informe(d.trades[+r.dataset.i])});
+ cacheLista={clave:diaElegido&&dia?"dia:"+dia:"24h",d:d,firma:firmaLista(d),scroll:scroll||0};
+ v.scrollTop=scroll||0}
+async function list(){v.classList.remove("det");let d;try{d=await pedirTrades()}catch(e){v.innerHTML='<button class=close>×</button><h2>📈 Historial de trades</h2><p>No pude leer los trades.</p>';v.querySelector(".close").onclick=()=>v.classList.remove("open");return}
+ d=await prepararLista(d);pintarLista(d,0)}
+function volver(){v.classList.remove("det");if(!cacheLista||!cacheLista.d){list();return}pintarLista(cacheLista.d,cacheLista.scroll||0);refrescarLista()}
+async function refrescarLista(){const gen=++refN,clave=diaElegido&&dia?"dia:"+dia:"24h";let d;try{d=await pedirTrades()}catch(e){return}try{d=await prepararLista(d)}catch(e){return}if(gen!==refN||v.classList.contains("det"))return;if(cacheLista&&cacheLista.firma===firmaLista(d)&&cacheLista.clave===clave)return;pintarLista(d,v.scrollTop)}
 async function informe(t){const my=informe.n=(informe.n||0)+1;v.classList.add("det");
  const H=x=>esc(String(x??"")),dr=t.direccion==="COMPRA"?1:-1,L=(x,o)=>(+x).toLocaleString("en-US",o),
   N=x=>x==null||isNaN(x)?"—":L(x,{minimumFractionDigits:2,maximumFractionDigits:2}),
@@ -6026,7 +6036,7 @@ async function informe(t){const my=informe.n=(informe.n||0)+1;v.classList.add("d
   TT=x=>x?new Date(x).toLocaleString("es",{timeZone:"America/New_York",day:"numeric",month:"short",hour:"numeric",minute:"2-digit",second:"2-digit"})+" ET":"—",
   AC=c=>{c=String(c??"");const m=c.match(/^(.{4})[.…](.{3})$/);return m?m[1]+"…"+m[2]:mk(c)},
   WHY={"Stop loss":"Salió por el stop","Take profit":"Llegó al objetivo (take profit)","Detenido manualmente":"Lo detuviste a mano","Posición cerrada":"Se cerró la posición","Cierre 4:45 PM ET":"Cierre por hora de una versión anterior. La granja ya no cierra sola.","Error":"Terminó por un error"};
- const bindTop=()=>{v.querySelector(".close").onclick=()=>{v.classList.remove("open");v.classList.remove("det")};v.querySelector(".back").onclick=list};
+ const bindTop=()=>{v.querySelector(".close").onclick=()=>{v.classList.remove("open");v.classList.remove("det")};v.querySelector(".back").onclick=volver};
  const draw=D=>{const ok=!!(D&&D.ok),f=ok?D.fin:null,aj=f&&f.ajusteFill||null,movs=ok?(D.movs||[]).filter(x=>x.ok!==false):[],pasos=f&&f.pasos||[],lt=f&&f.latencia||{};
   const en=t.entrada??(f&&f.entrada),sa=t.salida,op=t.abierta||(f&&f.abiertaEn),cl=t.at||(f&&f.cerradaEn),sg=op&&cl?(Date.parse(cl)-Date.parse(op))/1e3:(f&&f.duracionSeg);
   const win=(t.pnl||0)>=0,col=win?"#cdea1d":"#ff8a9a",mot=t.motivo?(WHY[t.motivo]||t.motivo):(t.pnl==null?"En curso":"Trade cerrado");
@@ -6103,7 +6113,7 @@ function pintarMet(d){const wins=d.ganados||0,loss=d.perdidos||0,infPF=d.profitF
  mv.querySelectorAll(".rg button").forEach(b=>b.onclick=()=>{rango=b.dataset.r;met()});
  mv.scrollTop=0}
 async function met(){const my=++metN;mv.innerHTML='<button class=close>×</button><h2>📊 Métrica</h2><p class=sub>Cargando…</p>';mv.querySelector(".close").onclick=()=>mv.classList.remove("open");
- let d=null;try{d=await (await fetch("/api/colchon/metricas?rango="+encodeURIComponent(rango),{cache:"no-store"})).json()}catch(e){d=null}
+ let d=null;try{d=await (await fetch("/api/colchon/metricas?rango="+encodeURIComponent(rango)+(rango==="hoy"?"&horas=24":""),{cache:"no-store"})).json()}catch(e){d=null}
  if(my!==metN)return;
  if(!d||d.ok===false){mv.innerHTML='<button class=close>×</button><h2>📊 Métrica</h2><p class=empty>No pude leer las métricas.</p>';mv.querySelector(".close").onclick=()=>mv.classList.remove("open");return}
  pintarMet(d)}
@@ -6510,7 +6520,13 @@ setTimeout(hook,600);})();</script>
     var prev = r ? '<div class=prev><div class=row><span>Agrega</span><b>' + addQty + " " + sym + " @ " + px(s.price) + " · mercado</b></div><div class=row><span>Promedio nuevo</span><b class=gold>" + px(r.avgExact) + "</b></div><div class=row><span>SL nuevo</span><b class=red>" + px(r.sl) + "</b></div><div class=row><span>Riesgo</span><b>" + riesgo + "</b></div><div class=row><span>TP nuevo</span><b class=lime>" + px(r.tp) + "</b></div><div class=row><span>Objetivo</span><b class=lime>" + money(r.realTarget) + "</b></div></div>" : '<div class=prev>Esperando entrada, SL y TP…</div>';
     var badges = r ? '<div class=badges>' + (r.against ? '<i class=warn>En contra</i>' : (r.favor ? '<i class=ok>A favor</i>' : '<i>Mismo precio</i>')) + '<i class="' + (r.Q > r.maxQty ? "bad" : "ok") + '">' + r.Q + " / " + r.maxQty + " " + sym + "</i>" + '<i class="' + ((r.realRisk || 0) > lim.ddlLeft ? "warn" : "ok") + '">DDL ' + money(lim.ddlLeft) + "</i>" + '<i class="' + ((r.realRisk || 0) > lim.ddLeft ? "warn" : "ok") + '">DD ' + money(lim.ddLeft) + "</i></div>" : "";
     var aviso = r && r.warnings ? r.warnings.filter(function (w) { return w === "Este SL se pasa de tu daily loss" || w === "Este SL se pasa de tu drawdown"; }) : [];
-    var warn = aviso.length ? '<div class="addWarn show">' + aviso.join("<br>") + "</div>" : "";
+    function fmtDist(n){if(n==null||!isFinite(n))return "—";var x=Math.round(n*100)/100;return Math.abs(x-Math.round(x))<1e-9?String(Math.round(x)):String(x)}
+    var distAhora = (s.price!=null&&s.sl!=null&&isFinite(+s.price)&&isFinite(+s.sl))?Math.abs(+s.price-+s.sl):null;
+    var distNueva = (r&&r.sl!=null&&s.price!=null&&isFinite(+s.price)&&isFinite(+r.sl))?Math.abs(+s.price-+r.sl):null;
+    var lineas = [];
+    if(distAhora!=null&&distNueva!=null){lineas.push("SL: "+fmtDist(distAhora)+" → "+fmtDist(distNueva)+" pts del precio");lineas.push("La pérdida abierta ya usa parte del riesgo.")}
+    lineas = lineas.concat(aviso);
+    var warn = lineas.length ? '<div class="addWarn show">' + lineas.join("<br>") + "</div>" : "";
     var err = r && r.errors && r.errors[0] ? '<div class="addErr show">' + r.errors[0] + "</div>" : '<div class="addErr" data-adderr></div>';
     card.innerHTML = '<div class=blk><p class=lb>Agregar contratos ' + sym + '</p><div class=addQty>' + opts.map(function (n) { return '<button type=button data-q="' + n + '" class="' + (n === addQty ? "on" : "") + '">+' + n + "</button>"; }).join("") + "</div></div><div class=blk><p class=lb>Vista previa · mercado</p>" + prev + badges + warn + err + '</div><div class=addActs><button type=button class=cancel data-addx>Cancelar</button><button type=button class=go data-addgo ' + (r && r.ok ? "" : "disabled") + ">Confirmar</button></div>";
     card.querySelectorAll("[data-q]").forEach(function (b) { b.onclick = function (ev) { ev.preventDefault(); addQty = +b.getAttribute("data-q"); window.__tlAgregarMontar(live, s); }; });
@@ -6528,7 +6544,7 @@ setTimeout(hook,600);})();</script>
   };
 })();
 </script>
-<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.60</div>
+<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.61</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/api/version",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
 <script>/* 0.7.0: Profito duerme al abrir (granja en pausa), riega con laptop durante un trade, y etiquetas de cuentas con saldo y etapa. Solo visual: no toca el motor de trading. */
 (function(){

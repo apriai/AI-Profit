@@ -6,9 +6,20 @@ const PV = s => { const r = String(s || '').replace(/^.*:/, ''); return /^MNQ/.t
 // La misma ida y vuelta que arma el historial: precios de las ejecuciones del bróker.
 export function roundTrips(ex) {
   const by = {}; for (const x of [...(ex || [])].sort((a, b) => a.time - b.time)) (by[x.symbol] ||= []).push(x);
-  const out = []; for (const [sym, l] of Object.entries(by)) { const pv = PV(sym); let pos = 0, cash = 0, t0 = null, q = 0, first = null, comm = 0, commOk = true, entry = 0;
-    for (const x of l) { if (!pos) { t0 = x.time; first = x.side; q = 0; cash = 0; comm = 0; commOk = true; entry = x.price; } pos += x.side * x.qty; cash -= x.side * x.qty * x.price; if (x.side === first) q += x.qty; if (x.comm == null) commOk = false; else comm += x.comm;
-      if (pos === 0 && pv) { const g = Math.round(cash * pv * 100) / 100; out.push({ abierta: new Date(t0).toISOString(), at: new Date(x.time).toISOString(), direccion: first > 0 ? 'COMPRA' : 'VENTA', tamano: `${q} ${String(sym).replace(/^.*:/, '').replace(/Z?\d{4}$|[FGHJKMNQUVXZ]\d$/, '')}`, entrada: entry, salida: x.price, pnl: commOk ? Math.round((g - comm) * 100) / 100 : g, pnlBruto: g, neto: commOk, fuente: 'broker' }); } } }
+  const out = []; for (const [sym, l] of Object.entries(by)) { const pv = PV(sym); let pos = 0, cash = 0, t0 = null, q = 0, first = null, comm = 0, commOk = true, entry = 0, entNot = 0, entQty = 0, salNot = 0, salQty = 0;
+    for (const x of l) {
+      if (!pos) { t0 = x.time; first = x.side; q = 0; cash = 0; comm = 0; commOk = true; entry = x.price; entNot = 0; entQty = 0; salNot = 0; salQty = 0; }
+      const qx = Math.abs(+x.qty) || 0;
+      if (x.side === first) { entNot += qx * +x.price; entQty += qx; q += x.qty; }
+      else { salNot += qx * +x.price; salQty += qx; }
+      pos += x.side * x.qty; cash -= x.side * x.qty * x.price; if (x.comm == null) commOk = false; else comm += x.comm;
+      if (pos === 0 && pv) {
+        const g = Math.round(cash * pv * 100) / 100;
+        const entradaProm = entQty ? entNot / entQty : null, salidaProm = salQty ? salNot / salQty : null;
+        const puntos = entradaProm != null && salidaProm != null ? Math.round((first > 0 ? salidaProm - entradaProm : entradaProm - salidaProm) * 100) / 100 : null;
+        out.push({ abierta: new Date(t0).toISOString(), at: new Date(x.time).toISOString(), direccion: first > 0 ? 'COMPRA' : 'VENTA', tamano: `${q} ${String(sym).replace(/^.*:/, '').replace(/Z?\d{4}$|[FGHJKMNQUVXZ]\d$/, '')}`, entrada: entry, salida: x.price, entradaProm, salidaProm, puntos, pnl: commOk ? Math.round((g - comm) * 100) / 100 : g, pnlBruto: g, neto: commOk, fuente: 'broker' });
+      }
+    } }
   return out;
 }
 // El P&L que muestra la fila del historial (después de cerrarSesion) y el precio de salida.

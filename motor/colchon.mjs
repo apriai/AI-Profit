@@ -413,15 +413,15 @@ export const js = {
     var T=performance.now(),p2=null;while(performance.now()-T<4000){p2=await tvPos(ab,R);if(p2&&Math.abs(+p2.qty)>=antes+ADD-1e-9)break;await new Promise(function(z){setTimeout(z,120)})}
     if(!p2||Math.abs(+p2.qty)<antes+ADD-1e-9)return {ok:false,err:'no vi el fill de los contratos nuevos',qty:p2?Math.abs(+p2.qty):antes,viejos:viejos};
     return {ok:true,qty:Math.abs(+p2.qty),avg:+p2.avgPrice,price:p2.lastPrice!=null?+p2.lastPrice:null,viejos:viejos,sl:SL,tp:TP}})()`,
-  // Solo el PRECIO del bracket que ya estaba. Nunca la cantidad, nunca cancela, nunca coloca salidas sueltas.
+  // Solo el PRECIO de cada SL y cada TP (el que ya estaba y el que nació con el agregar). Nunca la cantidad, nunca cancela, nunca coloca salidas sueltas.
   // ver(): puede haber varios SL y varios TP; sus cantidades suman la posición y todos están al mismo precio.
   alinearBracket: ({ root, sl, tp, viejos }) => `(async function(){${PAGE}var R=${JSON.stringify(root)},SL=${Number(sl)},TP=${Number(tp)},VIEJOS=${JSON.stringify((viejos || []).map(String))};
     var t=tvTrading(),ab=tvBroker(t);if(!tvBrokerId(ab))return {ok:false,err:'No active broker'};
     function hijas(list,pos){return (list||[]).filter(function(o){return o&&tvRoot(o.symbol)===tvRoot(pos.symbol)&&(o.status===6||o.status===4)&&(o.type===1||o.type===3||o.type===4)&&o.side===-pos.side})}
     async function leer(){var p=await tvPos(ab,R);if(!p)return null;var list=[];try{list=await tvAllOrders(t,ab)}catch(e){}return {p:p,h:hijas(list,p),qty:Math.abs(+p.qty)||0}}
     async function precios(){var s=await leer();if(!s)return {ok:false,err:'sin posicion'};
-      var want={};for(var i=0;i<VIEJOS.length;i++)want[VIEJOS[i]]=1;var n=0;
-      for(var j=0;j<s.h.length;j++){var o=s.h[j];if(!want[String(o.id)])continue;
+      var n=0;
+      for(var j=0;j<s.h.length;j++){var o=s.h[j];
         var ch=Object.assign({},o),cambia=false;
         if(o.type===1){if(o.limitPrice!==TP){ch.limitPrice=TP;cambia=true}}
         else if(o.stopPrice!==SL){ch.stopPrice=SL;cambia=true}
@@ -817,13 +817,25 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
       if (S.salidaBroker != null && S.reason !== 'stop') clasificarSalida(S.salidaBroker);
     } catch {}
   }
+  function aproxAgregado() {
+    const qty = Number(S.qtyProm), avg = Number(S.promedio);
+    if (!(qty >= 1) || !(avg > 0)) return null;
+    const dir = S.side === 'long' ? 1 : -1, pt = PT_USD[S.symbol] || 0;
+    if (!pt) return null;
+    const exit = Number(S.reason === 'sl' ? (S.lockTarget ?? S.sl) : S.reason === 'tp' ? S.tpPrice : S.price);
+    if (!Number.isFinite(exit)) return null;
+    const comm = (S.symbol === 'NQ' ? 3.5 : 1) * qty;
+    return Math.round(((exit - avg) * dir * pt * qty - comm) * 100) / 100;
+  }
   function summarize(forzarAprox) {
     if (S.reason === 'sl' && S.lockTarget != null && !S.locked) { S.locked = true; S.lockPrice = S.lockTarget; S.sl = S.lockTarget; S.lockPending = false; } // salió por stop en el precio del colchón
     if (S.reason === 'sl' && S.lockTarget != null) S.sl = S.lockTarget;
+    const qtyRes = Number.isFinite(+S.qtyProm) && +S.qtyProm >= 1 ? +S.qtyProm : S.qty;
+    const entradaRes = Number.isFinite(+S.promedio) && +S.promedio > 0 ? +S.promedio : S.entry;
     const pnlSL = S.sl != null && S.entry != null ? Math.round((S.sl - S.entry) * (S.side === 'long' ? 1 : -1) * PT_USD[S.symbol] * S.qty * 100) / 100 : null;
-    const SP = S.P || (S.strategy && getStrategy(S.strategy.id) || getStrategy()).params; const pnlFinal0 = S.reason === 'tp' ? SP.TP_USD : S.reason === 'sl' ? pnlSL : S.pnl; const usaBroker = !forzarAprox && typeof S.pnlBroker === 'number' && Number.isFinite(S.pnlBroker); const pnlFinal = usaBroker ? S.pnlBroker : pnlFinal0;
-    last = { fin: new Date().toISOString(), cuenta: S.account && S.account.name, modo: S.mode, direccion: S.side === 'long' ? 'COMPRA' : 'VENTA', tamano: `${S.qty} ${S.symbol}`, motivo: { tp: 'Take profit', sl: 'Stop loss', stop: 'Detenido manualmente', flat: 'Posición cerrada', error: 'Error' }[S.reason] || S.reason || '—',
-      ajusteFill: S.ajuste || null, estrategia: S.strategy ? S.strategy.name : null, estrategiaId: S.strategy ? S.strategy.id : null, ...tiempos(), entrada: S.entry, pnlFinalUSD: pnlFinal, pnlFinalAprox: usaBroker ? false : (forzarAprox ? true : !(S.reason === 'tp' || S.reason === 'sl')), colchonMovido: S.locked, slColchon: S.lockPrice, pasos: (S.pasos || []).map(p => ({ paso: p.paso, disparoUSD: p.disparoUSD, protegeUSD: p.protegeUSD, precio: p.precio, enSeg: p.enSeg, confirmado: p.confirmado, saltados: p.saltados, latenciaSeg: p.latencia ? Math.round(p.latencia.totalDesdeLecturaMs / 10) / 100 : null })), probabilidadNecesaria: S.qty ? breakEvenFor(S.symbol, S.qty, SP) : null, pasosTotal: S.steps ? S.steps.length : null, colchonUSD: S.qty ? ((S.pasos && S.pasos.length) ? S.pasos[S.pasos.length - 1].protegeUSD : (SP.STEPS ? null : lockUsdFor(S.symbol, S.qty, SP))) : null, disparoUSD: S.qty && !SP.STEPS ? triggerUsdFor(S.symbol, S.qty, SP) : null, latencia: S.latency || null, fuenteModo: S.fuenteModo || null, fuenteLider: S.fuenteLider || null, fuentes: S.fuentesStats || null, alerta: S.alerta || null, inicio: S.startedAt, error: S.error };
+    const SP = S.P || (S.strategy && getStrategy(S.strategy.id) || getStrategy()).params; const aproxAdd = aproxAgregado(); const pnlFinal0 = aproxAdd != null ? aproxAdd : (S.reason === 'tp' ? SP.TP_USD : S.reason === 'sl' ? pnlSL : S.pnl); const usaBroker = !forzarAprox && typeof S.pnlBroker === 'number' && Number.isFinite(S.pnlBroker); const pnlFinal = usaBroker ? S.pnlBroker : pnlFinal0;
+    last = { fin: new Date().toISOString(), cuenta: S.account && S.account.name, modo: S.mode, direccion: S.side === 'long' ? 'COMPRA' : 'VENTA', tamano: `${qtyRes} ${S.symbol}`, motivo: { tp: 'Take profit', sl: 'Stop loss', stop: 'Detenido manualmente', flat: 'Posición cerrada', error: 'Error' }[S.reason] || S.reason || '—',
+      ajusteFill: S.ajuste || null, estrategia: S.strategy ? S.strategy.name : null, estrategiaId: S.strategy ? S.strategy.id : null, ...tiempos(), entrada: entradaRes, pnlFinalUSD: pnlFinal, pnlFinalAprox: usaBroker ? false : (forzarAprox ? true : !(S.reason === 'tp' || S.reason === 'sl')), colchonMovido: S.locked, slColchon: S.lockPrice, pasos: (S.pasos || []).map(p => ({ paso: p.paso, disparoUSD: p.disparoUSD, protegeUSD: p.protegeUSD, precio: p.precio, enSeg: p.enSeg, confirmado: p.confirmado, saltados: p.saltados, latenciaSeg: p.latencia ? Math.round(p.latencia.totalDesdeLecturaMs / 10) / 100 : null })), probabilidadNecesaria: qtyRes ? breakEvenFor(S.symbol, qtyRes, SP) : null, pasosTotal: S.steps ? S.steps.length : null, colchonUSD: qtyRes ? ((S.pasos && S.pasos.length) ? S.pasos[S.pasos.length - 1].protegeUSD : (SP.STEPS ? null : lockUsdFor(S.symbol, qtyRes, SP))) : null, disparoUSD: qtyRes && !SP.STEPS ? triggerUsdFor(S.symbol, qtyRes, SP) : null, latencia: S.latency || null, fuenteModo: S.fuenteModo || null, fuenteLider: S.fuenteLider || null, fuentes: S.fuentesStats || null, alerta: S.alerta || null, inicio: S.startedAt, error: S.error };
     S.summary = last; try { fs.writeFileSync(path.join(path.dirname(logFile), 'colchon-resumen.json'), JSON.stringify(last, null, 2)); } catch {}
     ev('fin_trade', last); try { const dd = path.dirname(logFile), rd = path.join(dd, 'reportes'); fs.mkdirSync(rd, { recursive: true }); fs.writeFileSync(path.join(rd, diaFarm() + '.md'), buildReport(dd, diaFarm())); } catch {}
     log(`DURACIÓN ${last.duracionSeg == null ? '?' : sg(last.duracionSeg * 1000)} (${last.abiertaET ?? '?'} → ${last.cerradaET ?? '?'}, ±${sg(poll)})${last.colchonTrasSeg != null ? ` · colchón a los ${sg(last.colchonTrasSeg * 1000)}` : ''}`);
@@ -992,9 +1004,12 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
       S.agregando = true;
       const aviso = 'Revisa SL/TP en Tradovate';
       const slN = previo.sl, tpN = previo.tp;
-      const aplicarTam = (qty, avg, alineado) => {
-        trade.qty = qty; S.qty = qty; S.entry = avg; S.sl = slN; S.slVisto = slN; S.tpPrice = tpN; S.tpVisto = tpN;
-        trade.steps = stepsFor(trade.symbol, qty, trade.P); S.steps = trade.steps;
+      const aplicarTam = (qty, avg, alineado, slU, tpU) => {
+        const qN = Number.isFinite(+qty) && +qty >= 1 ? +qty : pos.qty + q;
+        const aN = Number.isFinite(+avg) && +avg > 0 ? +avg : pos.entry;
+        trade.qty = qN; S.qty = qN; S.entry = aN; S.sl = slU; S.slVisto = slU; S.tpPrice = tpU; S.tpVisto = tpU;
+        if (Number.isFinite(+avg) && +avg > 0 && Number.isFinite(+qty) && +qty >= 1) { S.promedio = +avg; S.qtyProm = +qty; }
+        trade.steps = stepsFor(trade.symbol, qN, trade.P); S.steps = trade.steps;
         if (!alineado) S.alerta = aviso;
         else {
           S.sinProteccion = false; S.alerta = null;
@@ -1006,20 +1021,36 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
         const mercado = await drv.agregarMercado({ root: trade.symbol, tradeSymbol: S.tradeSymbol || trade.symbol, side: trade.side, addQty: q, sl: slN, tp: tpN });
         if (!mercado || mercado.ok === false) return { ok: false, err: (mercado && (mercado.err || mercado.error)) || 'No se pudo agregar', status: S };
         const qty = mercado.qty, avg = mercado.avg, viejos = mercado.viejos || [];
-        let puesto = await drv.alinearBracket({ root: trade.symbol, sl: slN, tp: tpN, viejos });
+        let slFin = slN, tpFin = tpN;
+        const avgOk = Number.isFinite(+avg) && +avg > 0, qtyOk = Number.isFinite(+qty) && +qty >= pos.qty;
+        if (avgOk && qtyOk) {
+          const q2 = +qty - pos.qty;
+          const addPx = q2 > 0 ? (+avg * +qty - pos.entry * pos.qty) / q2 : px;
+          const livePx = Number.isFinite(+mercado.price) && +mercado.price > 0 ? +mercado.price : px;
+          const real = calcularAgregar({
+            symbol: trade.symbol, plan: rules.size, side: trade.side, qty: pos.qty, avg: pos.entry, sl, tp,
+            addQty: q2 > 0 ? q2 : q, addPrice: addPx, live: livePx, riskMode: 'keep', tpMode: 'keep',
+            comm: trade.symbol === 'NQ' ? 3.5 : 1, ddlLeft, ddLeft,
+          });
+          if (real && Number.isFinite(real.sl) && real.sl > 0 && Number.isFinite(real.tp) && real.tp > 0) { slFin = real.sl; tpFin = real.tp; }
+          log(`AGREGAR recálculo · antes SL ${slN} TP ${tpN} · después SL ${slFin} TP ${tpFin} · promedio ${avg} · qty ${qty}${real && real.ok === false ? ' · ' + ((real.errors && real.errors[0]) || 'aviso') : ''}`);
+        } else {
+          log(`AGREGAR recálculo · sin fill real, se quedan SL ${slN} TP ${tpN}`);
+        }
+        let puesto = await drv.alinearBracket({ root: trade.symbol, sl: slFin, tp: tpFin, viejos });
         if (!puesto || puesto.ok === false) {
           log('AGREGAR: el precio del bracket viejo no quedó, un reintento');
-          puesto = await drv.alinearBracket({ root: trade.symbol, sl: slN, tp: tpN, viejos });
+          puesto = await drv.alinearBracket({ root: trade.symbol, sl: slFin, tp: tpFin, viejos });
         }
         if (!puesto || puesto.ok === false) {
-          aplicarTam(qty, avg, false);
+          aplicarTam(qty, avg, false, slFin, tpFin);
           log('AGREGAR ' + aviso);
-          ev('agregar_revisar', { qty, avg, sl: slN, tp: tpN });
+          ev('agregar_revisar', { qty, avg, sl: slFin, tp: tpFin });
           return { ok: false, err: aviso, agregado: true, status: S };
         }
-        aplicarTam(qty, avg, true);
-        log(`AGREGAR +${q} ${trade.symbol} @ mercado · promedio ${avg} · SL ${slN} · TP ${tpN} · qty ${qty}`);
-        return { ok: true, qty, avg, sl: slN, tp: tpN, status: S };
+        aplicarTam(qty, avg, true, slFin, tpFin);
+        log(`AGREGAR +${q} ${trade.symbol} @ mercado · promedio ${avg} · SL ${slFin} · TP ${tpFin} · qty ${qty}`);
+        return { ok: true, qty, avg, sl: slFin, tp: tpFin, status: S };
       } catch (e) { return { ok: false, err: String(e.message || e) }; }
       finally { S.agregando = false; }
     },
