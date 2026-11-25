@@ -5772,9 +5772,10 @@ function liveRun(s){const st=s.steps||[],k=s.step||0,nm=(s.strategy&&s.strategy.
  let tl=`<div><small>Entrada</small><b>${s.entry??"—"}</b></div><div><small>Precio</small><b>${s.price??"—"}</b></div><div><small>SL actual</small><b>${s.sl??"—"}</b></div>`;
  if(s.steps&&!st.length)tl+=`<div><small>Stop</small><b>fijo · sin movimientos</b></div>`;
  else{const nx=st[k];tl+=`<div><small>Paso ${k}/${st.length||1}</small><b class="${k?"ok":""}">${k?"Movido ✓":"Sin mover"}</b></div><div class=w><small>Siguiente</small><b>${nx?"+"+fm(nx.triggerUsd)+" → protege +"+fm(nx.lockUsd)+(nx.lockPts>0&&nx.lockPts<=1?" ("+lt(nx.lockPts)+" ticks)":nx.lockPts===0?" (entrada)":""):"— (último)"}</b></div>`}
- return `<div class=hd><div class=t><b>Estrategia: ${nm}</b><span class="sd ${s.side==="long"?"l":"s"}">${s.side==="long"?"COMPRA":"VENTA"} ${s.qty} ${s.symbol}</span></div>${acct?`<div class=ac>${acct}</div>`:""}</div>
-${window.__tlViz?window.__tlViz(s):""}<div class=kv>${tl}</div>${s.alerta?`<div class=al>${s.alerta}</div>`:""}<button class=act data-stop>Detener y cerrar posición</button>${window.__tlLogs?window.__tlLogs((s.fuenteLider?`<div class=src>fuente <b>${s.fuenteLider}</b> (${s.fuenteModo||""})</div>`:"")+latHTML(s.latency)+`<div class=lg>${(s.log||[]).slice(-5).join("\n")}</div>`):latHTML(s.latency)}`}
-async function poll(){clearTimeout(pollT);if(!on)return;let sigue=phase==="running";try{const s=await J("/api/colchon/status");if(!s||s.state==null)return;if(s.state==="running"){esperaResumen=0;live.style.display="block";live.innerHTML=liveRun(s);const stop=live.querySelector("[data-stop]");if(stop)stop.onclick=async()=>{try{await J("/api/colchon/stop",{flatten:true})}catch(e){}poll()};sigue=true;return}if(phase!=="running"){sigue=false;return}let sm=null;try{sm=await J("/api/colchon/summary")}catch(e){}const propio=s.summary&&s.summary.direccion?s.summary:(sm&&sm.direccion&&s.startedAt&&sm.inicio===s.startedAt?sm:null);if(propio){esperaResumen=0;sigue=false;const celebrar=propio.fin!==lastSum&&(!window.__tlSumNew||!!window.__tlSumNew(propio));if(propio.fin)lastSum=propio.fin;showSummary(propio);if(celebrar){try{window.__tlCelebrate&&window.__tlCelebrate(propio)}catch(e){}}}else if(s.summary==null){if(!esperaResumen)esperaResumen=Date.now();if(Date.now()-esperaResumen<15000){sigue=true;return}esperaResumen=0;sigue=false;live.style.display="none";setPhase("off")}else{esperaResumen=0;sigue=false;live.style.display="none";setPhase("off")}}catch(e){sigue=phase==="running"}finally{if(sigue&&phase==="running"&&on)pollT=setTimeout(poll,1000)}}
+ const nomCta=(s.account&&s.account.name)||"";
+ return `<div class=hd><div class=t><b>Estrategia: ${nm}</b><span class="sd ${s.side==="long"?"l":"s"}">${s.side==="long"?"COMPRA":"VENTA"} de ${s.qty} contratos</span></div><div class=ac>${acct||""}${nomCta?` <span class=tlAT>${nomCta}</span>`:""}</div></div>
+${window.__tlViz?window.__tlViz(s):""}<button type=button class="act addBtn" data-add aria-expanded="${window.__tlAddOpen?"true":"false"}">Agregar/Promediar</button><div class="addWrap${window.__tlAddOpen?" open":""}" data-addwrap><div class=addInner><div class=addCard data-addcard></div></div></div><button type=button class="act" data-stop>Detener y cerrar posición</button><div class=kv>${tl}</div>${s.alerta?`<div class=al>${s.alerta}</div>`:""}${window.__tlLogs?window.__tlLogs((s.fuenteLider?`<div class=src>fuente <b>${s.fuenteLider}</b> (${s.fuenteModo||""})</div>`:"")+latHTML(s.latency)+`<div class=lg>${(s.log||[]).slice(-5).join("\n")}</div>`):latHTML(s.latency)}`}
+async function poll(){clearTimeout(pollT);if(!on)return;let sigue=phase==="running";try{const s=await J("/api/colchon/status");if(!s||s.state==null)return;if(s.state==="running"){esperaResumen=0;live.style.display="block";live.innerHTML=liveRun(s);const stop=live.querySelector("[data-stop]");if(stop)stop.onclick=async()=>{try{await J("/api/colchon/stop",{flatten:true})}catch(e){}poll()};if(window.__tlAgregarMontar)window.__tlAgregarMontar(live,s);sigue=true;return}if(phase!=="running"){sigue=false;return}let sm=null;try{sm=await J("/api/colchon/summary")}catch(e){}const propio=s.summary&&s.summary.direccion?s.summary:(sm&&sm.direccion&&s.startedAt&&sm.inicio===s.startedAt?sm:null);if(propio){esperaResumen=0;sigue=false;const celebrar=propio.fin!==lastSum&&(!window.__tlSumNew||!!window.__tlSumNew(propio));if(propio.fin)lastSum=propio.fin;showSummary(propio);if(celebrar){try{window.__tlCelebrate&&window.__tlCelebrate(propio)}catch(e){}}}else if(s.summary==null){if(!esperaResumen)esperaResumen=Date.now();if(Date.now()-esperaResumen<15000){sigue=true;return}esperaResumen=0;sigue=false;live.style.display="none";setPhase("off")}else{esperaResumen=0;sigue=false;live.style.display="none";setPhase("off")}}catch(e){sigue=phase==="running"}finally{if(sigue&&phase==="running"&&on)pollT=setTimeout(poll,1000)}}
 function showSummary(m){setPhase("summary");const l=m.latencia;live.style.display="block";live.innerHTML=`<div class=h><span>Resumen · ${m.estrategia||"Prueba"}</span><span>${window.__tlAcctT?window.__tlAcctT(m.modo||""):(m.modo||"")}</span></div>
 <div style="font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:rgba(255,255,255,.42)">P&L final${m.pnlFinalAprox?" (aprox.)":""}</div><div class=big style="color:${((p)=>p>0?"#86ffa0":p<0?"#ff9b8a":"rgba(236,236,243,.75)")(+(m.pnlFinalUSD||0))}">${usd(m.pnlFinalUSD)}</div>
 <div class=kv><div>Dirección<b>${m.direccion}</b></div><div>Tamaño<b>${m.tamano}</b></div><div>Motivo<b>${m.motivo}</b></div>${m.pasosTotal===0?`<div>Stop<b>fijo · sin movimientos</b></div>`:`<div>Colchón ${m.colchonUSD!=null?"+"+fm(m.colchonUSD):""}<b>${m.colchonMovido?"Movido ✓ "+(m.slColchon??""):"No se activó"}</b></div>`}<div>Duración<b>${dur(m.duracionSeg)}</b></div><div>Colchón a los<b>${m.colchonTrasSeg!=null?dur(m.colchonTrasSeg):"—"}</b></div></div>${(m.pasos&&m.pasos.length)?`<div class=lat style="background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.08)">${m.pasos.map(p=>`Paso <b>${p.paso}/${m.pasosTotal}</b> · protege <b>+${fm(p.protegeUSD)}</b> (SL ${p.precio}) a los <b>${dur(p.enSeg)}</b>${p.saltados?` · saltó ${p.saltados}`:""}`).join("<br>")}</div>`:""}<div class=lat style="background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.08)">Abierta <b>${m.abiertaET||"—"}</b> · Cerrada <b>${m.cerradaET||"—"}</b><br><span style="opacity:.55">precisión ±${ms(Math.abs(parseFloat(String(m.precisionMs||"").replace("±",""))||0))}</span></div>${latHTML(l)}${beHTML(m.probabilidadNecesaria&&m.probabilidadNecesaria.pct)}
@@ -6378,7 +6379,96 @@ function hook(){const G=window.__granja&&window.__granja.pet;if(!G||!G.renderer|
  if(cfg.kind!=="perro"||cfg.body!==A.perro.b||cfg.accent!==A.perro.a){try{applyPet(G,cfg)}catch(err){console.warn("mascota",err)}}
  (function lab(){const p=window.__pet.screen();if(p&&cfg.name){tag.textContent=cfg.name;tag.style.left=p.x+"px";tag.style.top=(p.y-8)+"px";tag.style.display="block"}else tag.style.display="none";requestAnimationFrame(lab)})()}
 setTimeout(hook,600);})();</script>
-<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.47</div>
+<style id="tl-agregar">
+#prLive .act.addBtn{margin-top:10px;background:linear-gradient(180deg,rgba(205,234,29,.18),rgba(205,234,29,.07));border:1px solid rgba(205,234,29,.42);color:#cdea1d}
+#prLive .act[data-stop]{margin-top:8px;padding:13px 10px;font:700 13.5px/1.2 Inter,system-ui;background:linear-gradient(180deg,#e5484d,#c92a30);color:#fff;border:1px solid rgba(255,255,255,.14)}
+#prLive .addWrap{display:grid;grid-template-rows:0fr;opacity:0;margin:0}
+#prLive .addWrap.open{grid-template-rows:1fr;opacity:1;margin-top:8px}
+#prLive .addInner{overflow:hidden;min-height:0}
+#prLive .addCard{margin:1px;padding:12px 11px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(205,234,29,.16)}
+#prLive .addCard .lb{font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:rgba(255,255,255,.42);margin:0 0 6px}
+#prLive .addQty{display:flex;gap:6px}
+#prLive .addQty button{flex:1;padding:8px 0;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#fff;font:700 12px Inter,system-ui;cursor:pointer}
+#prLive .addQty button.on{background:linear-gradient(180deg,#e8f86a,#cdea1d);color:#161408;border-color:transparent}
+#prLive .prev{border-radius:12px;padding:8px 10px;background:rgba(8,5,16,.45);border:1px solid rgba(255,255,255,.07)}
+#prLive .prev .row{display:flex;justify-content:space-between;gap:8px;padding:3px 0}
+#prLive .prev .row span{color:rgba(255,255,255,.5)}
+#prLive .prev .row b.gold{color:#ffe7a3}#prLive .prev .row b.lime{color:#cdea1d}#prLive .prev .row b.red{color:#ff8a9a}
+#prLive .badges{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+#prLive .badges i{font-style:normal;font-size:10px;font-weight:700;padding:3px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.12)}
+#prLive .badges i.ok{color:#d8f44a;border-color:rgba(205,234,29,.35)}
+#prLive .badges i.warn{color:#ffe7a3;border-color:rgba(255,216,107,.35)}
+#prLive .badges i.bad{color:#ffd0d8;border-color:rgba(255,77,109,.4)}
+#prLive .addErr{display:none;margin-top:8px;padding:7px 9px;border-radius:10px;background:rgba(255,77,109,.12);border:1px solid rgba(255,77,109,.35);color:#ffd0d8;font-size:11px}
+#prLive .addErr.show{display:block}
+#prLive .addActs{display:flex;gap:7px;margin-top:10px}
+#prLive .addActs button{flex:1;border-radius:11px;padding:9px 8px;font:700 12px Inter,system-ui;cursor:pointer}
+#prLive .addActs .cancel{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#fff}
+#prLive .addActs .go{border:0;background:linear-gradient(180deg,#e8f86a,#cdea1d);color:#161408}
+#prLive .addActs .go:disabled{opacity:.38;cursor:not-allowed}
+</style>
+<script type="module">import { compute } from '/agregar-promediar.mjs'; window.__tlAgregarCalc = compute;</script>
+<script>
+(function () {
+  var addQty = 2;
+  function money(n) { if (n == null || !isFinite(+n)) return "—"; var r = Math.round(+n * 100) / 100; return "$" + r.toLocaleString("en-US", { maximumFractionDigits: Number.isInteger(r) ? 0 : 2 }); }
+  function px(n) { return n == null || !isFinite(+n) ? "—" : (+n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function limites(s) {
+    var plan = "25K", ddlLeft = 600, ddLeft = 1000;
+    try {
+      var st = window.granjaStore && window.granjaStore.get && window.granjaStore.get();
+      var name = s.account && s.account.name;
+      var a = ((st && st.accounts) || []).find(function (x) { return x && name && x.name === name; });
+      var nums = a ? [a.balance, a.bal, a.peak, a.start].map(Number).filter(function (n) { return n > 0; }) : [];
+      if (a && (a.planSaldo === "50K" || nums.some(function (n) { return n >= 37500; }))) plan = "50K";
+      var start = plan === "50K" ? 50000 : ((a && a.start) || 25000);
+      var peak = Math.max((a && a.peak) || start, start);
+      var ddn = (a && a.dd) || (plan === "50K" ? 2000 : 1000);
+      var bal = a && (a.bal != null ? a.bal : a.balance);
+      if (typeof bal === "number") ddLeft = Math.max(0, bal - (peak - ddn));
+      var ddl = (a && a.dailyLoss) || (plan === "50K" ? 1200 : 600);
+      var pnl = 0;
+      if (a && window.__tlSesion && window.__tlSesion.pnlFila) pnl = Number(window.__tlSesion.pnlFila(a)) || 0;
+      else if (a) pnl = Number(a.pnlToday) || 0;
+      ddlLeft = Math.max(0, ddl + Math.min(0, pnl));
+    } catch (e) {}
+    return { plan: plan, ddlLeft: ddlLeft, ddLeft: ddLeft };
+  }
+  window.__tlAgregarMontar = function (live, s) {
+    var card = live.querySelector("[data-addcard]"), btn = live.querySelector("[data-add]"), wrap = live.querySelector("[data-addwrap]");
+    if (!card || !btn || !wrap) return;
+    btn.onclick = function (ev) { ev.preventDefault(); window.__tlAddOpen = !window.__tlAddOpen; window.__tlAgregarMontar(live, s); };
+    if (!window.__tlAddOpen) { wrap.classList.remove("open"); btn.setAttribute("aria-expanded", "false"); card.innerHTML = ""; return; }
+    wrap.classList.add("open"); btn.setAttribute("aria-expanded", "true");
+    var sym = s.symbol === "NQ" ? "NQ" : "MNQ", lim = limites(s);
+    var opts = sym === "NQ" ? (lim.plan === "50K" ? [1, 2] : [1]) : [1, 2, 5, 10];
+    if (opts.indexOf(addQty) < 0) addQty = opts[0];
+    var tp = s.tpPrice != null ? s.tpPrice : s.tpVisto;
+    var r = null;
+    if (window.__tlAgregarCalc && s.entry != null && s.sl != null && tp != null && s.price != null) {
+      r = window.__tlAgregarCalc({ symbol: sym, plan: lim.plan, side: s.side, qty: s.qty, avg: s.entry, sl: s.sl, tp: tp, addQty: addQty, addPrice: s.price, live: s.price, riskMode: "keep", tpMode: "keep", comm: sym === "NQ" ? 3.5 : 1, ddlLeft: lim.ddlLeft, ddLeft: lim.ddLeft });
+    }
+    var riesgo = !r ? "—" : (r.slKind === "lock" ? ("protege " + money(r.realLock)) : money(r.realRisk));
+    var prev = r ? '<div class=prev><div class=row><span>Agrega</span><b>' + addQty + " " + sym + " @ " + px(s.price) + " · mercado</b></div><div class=row><span>Promedio nuevo</span><b class=gold>" + px(r.avgExact) + "</b></div><div class=row><span>SL nuevo</span><b class=red>" + px(r.sl) + "</b></div><div class=row><span>Riesgo</span><b>" + riesgo + "</b></div><div class=row><span>TP nuevo</span><b class=lime>" + px(r.tp) + "</b></div><div class=row><span>Objetivo</span><b class=lime>" + money(r.realTarget) + "</b></div></div>" : '<div class=prev>Esperando entrada, SL y TP…</div>';
+    var badges = r ? '<div class=badges>' + (r.against ? '<i class=warn>En contra</i>' : (r.favor ? '<i class=ok>A favor</i>' : '<i>Mismo precio</i>')) + '<i class="' + (r.Q > r.maxQty ? "bad" : "ok") + '">' + r.Q + " / " + r.maxQty + " " + sym + "</i>" + '<i class="' + ((r.realRisk || 0) > lim.ddlLeft ? "bad" : "ok") + '">DDL ' + money(lim.ddlLeft) + "</i>" + '<i class="' + ((r.realRisk || 0) > lim.ddLeft ? "bad" : "ok") + '">DD ' + money(lim.ddLeft) + "</i></div>" : "";
+    var err = r && r.errors && r.errors[0] ? '<div class="addErr show">' + r.errors[0] + "</div>" : '<div class="addErr" data-adderr></div>';
+    card.innerHTML = '<div class=blk><p class=lb>Agregar contratos ' + sym + '</p><div class=addQty>' + opts.map(function (n) { return '<button type=button data-q="' + n + '" class="' + (n === addQty ? "on" : "") + '">+' + n + "</button>"; }).join("") + "</div></div><div class=blk><p class=lb>Vista previa · mercado</p>" + prev + badges + err + '</div><div class=addActs><button type=button class=cancel data-addx>Cancelar</button><button type=button class=go data-addgo ' + (r && r.ok ? "" : "disabled") + ">Confirmar</button></div>";
+    card.querySelectorAll("[data-q]").forEach(function (b) { b.onclick = function (ev) { ev.preventDefault(); addQty = +b.getAttribute("data-q"); window.__tlAgregarMontar(live, s); }; });
+    card.querySelector("[data-addx]").onclick = function (ev) { ev.preventDefault(); window.__tlAddOpen = false; window.__tlAgregarMontar(live, s); };
+    var go = card.querySelector("[data-addgo]");
+    if (go && r && r.ok) go.onclick = async function (ev) {
+      ev.preventDefault(); go.disabled = true;
+      try {
+        var res = await fetch("/api/colchon/add", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ addQty: addQty }) }).then(function (x) { return x.json(); });
+        var box = card.querySelector("[data-adderr]");
+        if (!res || res.ok === false) { if (box) { box.textContent = (res && res.err) || "No se pudo agregar"; box.classList.add("show"); } go.disabled = false; }
+        else window.__tlAddOpen = false;
+      } catch (e) { go.disabled = false; }
+    };
+  };
+})();
+</script>
+<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.50</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/api/version",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
 <script>/* 0.7.0: Profito duerme al abrir (granja en pausa), riega con laptop durante un trade, y etiquetas de cuentas con saldo y etapa. Solo visual: no toca el motor de trading. */
 (function(){

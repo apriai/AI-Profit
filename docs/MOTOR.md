@@ -54,10 +54,19 @@ El arranque de un clic es el acceso **AI Profit**. En Windows lo crea `instalar-
 | GET | `/api/colchon/check` | Cuenta activa y si se puede operar: paper, real permitida o bloqueada. |
 | POST | `/api/colchon/start` | `{side:'long'\|'short', symbol:'MNQ'\|'NQ', qty, strategyId, accountId?, confirmReal?}`. |
 | POST | `/api/colchon/stop` | `{flatten?:bool}`: deja de vigilar y, opcionalmente, cierra. |
+| POST | `/api/colchon/add` | `{addQty}` con una operación abierta, solo en cuenta de práctica. Suma contratos a mercado y deja un solo SL y un solo TP. |
 | GET | `/api/colchon/reporte?dia=AAAA-MM-DD` | Informe en Markdown (también se guarda en `reportes\<día>.md`). |
 | GET/POST | `/api/colchon/lectura` | Consulta o cambia la pausa de la lectura en segundo plano (`{pause:bool}`). |
 | GET/POST | `/bot` | Interruptor del bot de órdenes manuales. Devuelve `simulated` = DRY_RUN. |
 | POST | `/order`, `/confirm`, `/cancel` | Flujo de órdenes manuales con confirmación. **No pertenece al motor colchón.** |
+
+## 4.1 Agregar/Promediar
+
+Con el trade abierto, el panel manda `POST /api/colchon/add`. El promedio nuevo es el promedio ponderado. El SL conserva el riesgo en dólares (o la ganancia neta si el colchón ya se movió) y se redondea al tick hacia el precio, para que el riesgo real no pase del objetivo. El TP se aleja al tick para que el neto no baje de la meta.
+
+Protección: la orden que agrega va a mercado **sin** bracket propio. Antes del envío se ensancha la cantidad del SL y del TP que ya existen (mismos precios), así el fill no queda descubierto. Al ver el promedio real se mueven esos mismos precios. En Tradovate (`supportPositionBrackets: false`) eso es `modifyOrder` sobre la hija stop y la hija límite. En el otro camino (paper, con brackets de posición) además se llama `editPositionBrackets` una vez, con el SL y el TP nuevos. Cualquier hija nueva que haya nacido con la orden de agregar se cancela. Queda un SL y un TP para toda la posición.
+
+El bucle del colchón usa la cantidad y el promedio nuevos: el disparo en dólares se recalcula. Si el colchón ya se había movido, no vuelve a bajar el stop.
 
 ## 5. Estrategias (`strategies.mjs`)
 Parámetros comunes: `SL_USD`, `TP_USD` (bracket en $), `STEPS` (escalones `{trigger, lock}` en $ brutos), `NET_USD`, `COMM_RT`, `SLIP_TICKS`, `TRIGGER_EXTRA_USD`, `DEFAULT_QTY`, `PROB`.

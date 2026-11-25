@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.50] — 2026-11-25
+### Añadido
+- **Agregar/Promediar** en el panel del trade abierto. Suma contratos a mercado a la posición que ya está abierta y deja un solo SL y un solo TP para toda la posición. El riesgo en dólares se conserva (o la ganancia neta, si el colchón ya se movió) y el objetivo neto no baja. Primero se prueba en una cuenta de práctica.
+### Notas
+- No cambia cómo abren las estrategias que ya estaban. La mascota del panel no cambia.
+
 ## [0.10.47] — 2026-11-23
 ### Cambiado
 - **El P&L de sesión de la flor es el saldo del bróker menos el saldo al empezar la sesión** (16:00 ET). Ya no suma trades aproximados. Si no hay foto de esta sesión, usa el primer saldo visto. Solo si no hay saldo se suman los trades.

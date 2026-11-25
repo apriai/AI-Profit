@@ -88,6 +88,7 @@ export function manejar(q, r, deps) {
         }
         else if (q.url.startsWith('/api/colchon/check')) out = await deps.colchon.check();
         else if (q.url.startsWith('/api/colchon/start') && q.method === 'POST') out = await deps.colchon.start(j);
+        else if (q.url.startsWith('/api/colchon/add') && q.method === 'POST') out = await deps.colchon.add(j || {});
         else if (q.url.startsWith('/api/colchon/stop') && q.method === 'POST') out = await deps.colchon.stop(j);
         else out = { ok: false, err: 'ruta desconocida' };
       } catch (e) { out = { ok: false, err: String(e.message || e) }; }
@@ -162,7 +163,7 @@ export function manejar(q, r, deps) {
       }
     }
   }
-  if (q.method === 'GET' && (q.url === '/granja-flores.mjs' || q.url.startsWith('/granja-flores.mjs?') || q.url === '/cuentas.mjs' || q.url.startsWith('/cuentas.mjs?'))) {
+  if (q.method === 'GET' && (q.url === '/granja-flores.mjs' || q.url.startsWith('/granja-flores.mjs?') || q.url === '/cuentas.mjs' || q.url.startsWith('/cuentas.mjs?') || q.url === '/agregar-promediar.mjs' || q.url.startsWith('/agregar-promediar.mjs?'))) {
     const archivo = path.join(deps.ROOT, 'motor', path.basename(q.url.split('?')[0]));
     if (fs.existsSync(archivo)) {
       r.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
