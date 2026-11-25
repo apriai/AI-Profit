@@ -46,5 +46,8 @@ assert.match(falta.avisoEstrategia, /Evaluación/);
 const nada = correr('');
 assert.equal(nada.stratId, 'evaluacion-simple');
 assert.equal(nada.avisoEstrategia, '', 'sin guardada no avisa');
+const vieja = correr('evaluacion');
+assert.equal(vieja.stratId, 'evaluacion-simple', 'Evaluación con rascacielos guardada cae en Evaluación');
+assert.match(vieja.avisoEstrategia, /ya no está/);
 
 console.log('estrategia-recordada ok');

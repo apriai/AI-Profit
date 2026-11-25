@@ -60,7 +60,7 @@ assert(DEFAULT_STRATEGY === 'evaluacion-simple', 'default sigue Evaluación');
 assert(getStrategy('evaluacion-simple').params.DEFAULT_QTY.MNQ === 8, 'Evaluación default 8 MNQ');
 assert(STRATEGY_ORDER.includes('dos-disparos'), 'incluye dos-disparos');
 
-const ids = ['evaluacion-simple', 'evaluacion', 'dia-minimo-colchon', 'prueba-be', 'dos-disparos'];
+const ids = ['evaluacion-simple', 'dia-minimo-colchon', 'prueba-be', 'dos-disparos'];
 const rows = {};
 for (const id of ids) {
   const raw = getStrategy(id);
@@ -192,7 +192,7 @@ assert(p50.includes('SL −$800') && p50.includes('TP +$1,600') && p50.includes(
   const ctx = {
     window: {}, accId: 'C', sym: 'MNQ', qty: 8, PV: { MNQ: 2, NQ: 20 }, CR: { MNQ: 1, NQ: 3.5 },
     accs: { ok: true, accounts: [cuenta50] },
-    strs: [getStrategy('evaluacion-simple'), getStrategy('dos-disparos'), getStrategy('evaluacion'), getStrategy('dia-minimo-mas-colchon')],
+    strs: [getStrategy('evaluacion-simple'), getStrategy('dos-disparos'), getStrategy('dia-minimo-mas-colchon')],
     stratId: 'evaluacion-simple',
     avisoEstrategia: '',
   };
@@ -201,10 +201,6 @@ assert(p50.includes('SL −$800') && p50.includes('TP +$1,600') && p50.includes(
   const txt = String(ctx.out).replace(/<[^>]+>/g, ' ');
   assert(ctx.sc === 2 && ctx.mx === 40, 'un saldo de 51.000 pone escala 2 aunque scale venga en 1');
   assert(txt.includes('SL −$1,260') && txt.includes('TP +$1,260') && !txt.includes('$630'), 'el texto de Evaluación usa los dólares de 50K');
-  ctx.stratId = 'evaluacion';
-  vm.runInContext('out2=textoCuentaHtml();', ctx);
-  const trail = String(ctx.out2).replace(/<[^>]+>/g, ' ');
-  assert(trail.includes('SL −$1,260') && trail.includes('TP +$1,260') && trail.includes('protege ~$200') && !trail.includes('+$400'), 'Evaluación con rascacielos en 50K muestra un solo colchón');
   ctx.stratId = 'dia-minimo-mas-colchon';
   vm.runInContext('outDia=textoCuentaHtml();', ctx);
   const diaTxt = String(ctx.outDia).replace(/<[^>]+>/g, ' ');

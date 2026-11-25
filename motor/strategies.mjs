@@ -1,22 +1,17 @@
-// Registro de estrategias. Orden: Evaluación → Evaluación con rascacielos → Rascacielo (Dia Minimo+Colchon) → Dia minimo (+ Colchon) → Fast Breakeven → Dos disparos · 1:2.
+// Registro de estrategias. Orden: Evaluación → Rascacielo (Dia Minimo+Colchon) → Dia minimo (+ Colchon) → Fast Breakeven → Dos disparos · 1:2.
 // Explicaciones al estilo flecha: +$112 → protege ~$100. Todas usan el mismo motor colchon (modifyOrder / Tradovate·Bit).
 // Rascacielo (Dia Minimo+Colchon) / Fast Breakeven: idea de Karol (PR #19), integradas en 0.8.0.
-// El id viejo «rascacielo» (SL −$600 / TP +$104, stop fijo) ya no está: una selección guardada cae en la estrategia por defecto.
+// Los ids viejos «rascacielo» y «evaluacion» (Evaluación con rascacielos) ya no están: una selección guardada cae en la estrategia por defecto.
+// Un trade que ya estaba abierto conserva los parámetros copiados al empezar (S.P y los pasos); no vuelve a buscar el id.
 // Las propias (estrategias-propias.json, solo esta computadora) se agregan al final con propia:true y no pisan un id de serie.
 import { getPropia, listPropias } from './estrategias-propias.mjs';
-export const STRATEGY_ORDER = ['evaluacion-simple', 'evaluacion', 'dia-minimo-colchon', 'dia-minimo-mas-colchon', 'prueba-be', 'dos-disparos'];
+export const STRATEGY_ORDER = ['evaluacion-simple', 'dia-minimo-colchon', 'dia-minimo-mas-colchon', 'prueba-be', 'dos-disparos'];
 export const STRATEGIES = {
   'evaluacion-simple': {
     id: 'evaluacion-simple', name: 'Evaluación',
     short: "Operación: SL −$630 / TP +$630\nAI: el stop no se mueve",
     description: "Operación: entra a mercado con SL −$630 y TP +$630. AI: el stop no se mueve; termina en TP, en SL o si la cierras tú.",
     params: { SL_USD: 630, TP_USD: 630, STEPS: [], DEFAULT_QTY: { MNQ: 8, NQ: 1 } },
-  },
-  'evaluacion': {
-    id: 'evaluacion', name: 'Evaluación con rascacielos',
-    short: "Evaluación con rascacielos. Operación: SL −$630 / TP +$630\n~+$112 → protege ~$100 netos",
-    description: "Evaluación con rascacielos. Operación: entra a mercado con SL −$630 y TP +$630. AI: ~+$112 → el stop sube una sola vez para proteger ~$100 netos y el trade sigue hasta el TP o el SL. Solo sube, nunca baja.",
-    params: { SL_USD: 630, TP_USD: 630, NET_USD: 100, COMM_RT: { MNQ: 1, NQ: 3.5 }, SLIP_TICKS: 1, TRIGGER_EXTRA_USD: 15, DEFAULT_QTY: { MNQ: 8, NQ: 1 } },
   },
   'dia-minimo-colchon': {
     id: 'dia-minimo-colchon', name: 'Rascacielo (Dia Minimo+Colchon)',
@@ -53,7 +48,7 @@ export const STRATEGIES = {
 export const DEFAULT_STRATEGY = 'evaluacion-simple';
 const pubBuilt = s => { const { id, name, short, description, params } = s; return { id, name, short, description, params, default: id === DEFAULT_STRATEGY, propia: false }; };
 export const getStrategy = id => {
-  const key = id == null || id === '' || id === 'rascacielo' ? DEFAULT_STRATEGY : id;
+  const key = id == null || id === '' || id === 'rascacielo' || id === 'evaluacion' ? DEFAULT_STRATEGY : id;
   const built = STRATEGIES[key];
   if (built) return built;
   if (typeof key === 'string' && key.startsWith('propia-')) return getPropia(key);
