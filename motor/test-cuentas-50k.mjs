@@ -155,7 +155,7 @@ function textoEnPagina(strategy, scale) {
   const end = html.indexOf('\nconst QS=', start);
   const PV = { MNQ: 2, NQ: 20 }, CR = { MNQ: 1, NQ: 3.5 };
   const ctx = {
-    strs: [strategy], stratId: strategy.id, sym: 'MNQ', qty: 8,
+    strs: [strategy], stratId: strategy.id, sym: 'MNQ', qty: 8, avisoEstrategia: '',
     accPlan: () => ({ scale }),
     scaleP: (P, sc) => paramsForAccount(P, { plan: sc === 2 ? '50K' : '25K' }),
     lockU: (y, q, P) => { const t = PV[y] * .25 * q; return Math.round(Math.ceil(((P.NET_USD || 0) + ((P.COMM_RT || CR)[y] || 0) * q + (P.SLIP_TICKS || 0) * t) / t - 1e-9) * t * 100) / 100; },
@@ -192,8 +192,9 @@ assert(p50.includes('SL −$800') && p50.includes('TP +$1,600') && p50.includes(
   const ctx = {
     window: {}, accId: 'C', sym: 'MNQ', qty: 8, PV: { MNQ: 2, NQ: 20 }, CR: { MNQ: 1, NQ: 3.5 },
     accs: { ok: true, accounts: [cuenta50] },
-    strs: [getStrategy('evaluacion-simple'), getStrategy('dos-disparos'), getStrategy('evaluacion')],
+    strs: [getStrategy('evaluacion-simple'), getStrategy('dos-disparos'), getStrategy('evaluacion'), getStrategy('dia-minimo-mas-colchon')],
     stratId: 'evaluacion-simple',
+    avisoEstrategia: '',
   };
   vm.createContext(ctx);
   vm.runInContext(code + '\nout=textoCuentaHtml(); sc=accPlan().scale; mx=accPlan().maxMicros;', ctx);
@@ -204,6 +205,10 @@ assert(p50.includes('SL −$800') && p50.includes('TP +$1,600') && p50.includes(
   vm.runInContext('out2=textoCuentaHtml();', ctx);
   const trail = String(ctx.out2).replace(/<[^>]+>/g, ' ');
   assert(trail.includes('SL −$1,260') && trail.includes('TP +$1,260') && trail.includes('protege ~$200') && !trail.includes('+$400'), 'Evaluación con rascacielos en 50K muestra un solo colchón');
+  ctx.stratId = 'dia-minimo-mas-colchon';
+  vm.runInContext('outDia=textoCuentaHtml();', ctx);
+  const diaTxt = String(ctx.outDia).replace(/<[^>]+>/g, ' ');
+  assert(diaTxt.includes('SL −$150') && diaTxt.includes('TP +$3,200') && diaTxt.includes('protege ~$150') && !diaTxt.includes('protege ~$100') && !diaTxt.includes('SL −$200'), 'Dia minimo (+ Colchon) en 50K protege ~$150 netos');
   ctx.accs.accounts[0] = { id: 'C', name: 'CUENTA88421', balance: 25100, scale: 1, plan: '25K', start: 25000, maxMicros: 20, maxMinis: 2, type: 'eval' };
   ctx.stratId = 'evaluacion-simple';
   vm.runInContext('out3=textoCuentaHtml(); sc3=accPlan().scale;', ctx);

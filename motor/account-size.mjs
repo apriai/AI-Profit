@@ -84,7 +84,13 @@ export function attachPlan(account = {}) {
 // lockTicks no se toca: son ticks para cubrir comisión, no una cifra de la cuenta 25K.
 export function paramsForAccount(params, account) {
   if (!params) return params;
-  const scale = rulesFor(account).scale;
+  const plan = rulesFor(account);
+  // Un objeto en SCALE_BY_SIZE fija esos dólares para ese tamaño y no multiplica el resto
+  // (el neto del colchón puede quedarse en 100 aunque el SL y el TP no escalen igual).
+  // Un número, como en dos-disparos, sigue el camino de abajo: todo × escala.
+  const spec = params.SCALE_BY_SIZE && params.SCALE_BY_SIZE[plan.size];
+  if (spec && typeof spec === 'object') return { ...params, ...spec };
+  const scale = plan.scale;
   if (scale === 1) return params;
   const mul = v => {
     const x = numOrNull(v);
