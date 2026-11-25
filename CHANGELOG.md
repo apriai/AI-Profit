@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.53] — 2026-11-25
+### Cambiado
+- **El resumen del cierre sale al momento.** La guarda de flat pide 2 lecturas vacías, unos 450 ms, y sigue exigiendo que no queden SL ni TP activos. El panel muestra enseguida el P&L aproximado, con «(aprox.)». Si en unos 3 s llega el P&L de las ejecuciones, se actualizan el resumen, la granja y `colchon-resumen.json` en el mismo cierre. Si no llega, se queda el aproximado. El sonido y la celebración suenan una sola vez.
+### Notas
+- No cambia el envío de órdenes ni la barra de la mascota.
+
 ## [0.10.52] — 2026-11-25
 ### Cambiado
 - **Agregar/Promediar ya no deja el SL y el TP sueltos.** La suma entra a mercado con su propio bracket (el SL y el TP recalculados, ligados entre sí, del tamaño que se agrega). Después solo se cambia el precio del stop y del objetivo que ya estaban, nunca la cantidad. No se cancela nada y no hay un hueco sin stop. Si ese precio no queda, se reintenta una vez y el panel dice «Revisa SL/TP en Tradovate». No se cierra la posición. Cuando el colchón mueve el stop o el objetivo, cambia todos los de la posición.

@@ -600,9 +600,20 @@ export const diaFarm = (t = Date.now()) => { const p = Object.fromEntries(new In
 // Fuera de sesión: de las 16:00 inclusive a las 18:00 exclusive, hora de Nueva York.
 // Ese hueco es el cierre de la sesión que acaba de terminar. El pico del max loss solo sube con un saldo de aquí, no con un saldo intradía.
 export function fueraDeSesion(t = Date.now()) { const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date(t)).map(x => [x.type, x.value])); const m = (+p.hour % 24) * 60 + +p.minute; return m >= 16 * 60 && m < 18 * 60; }
+// El P&L exacto llega después del resumen aproximado. Sustituye ese cierre, no añade otro.
+export function conPnlExacto(eventos) {
+  const aj = new Map();
+  for (const x of eventos || []) if (x && x.type === 'fin_trade_pnl' && x.fin) aj.set(x.fin, x);
+  if (!aj.size) return eventos || [];
+  return (eventos || []).map(x => {
+    if (!x || x.type !== 'fin_trade' || !aj.has(x.fin)) return x;
+    const u = aj.get(x.fin);
+    return { ...x, pnlFinalUSD: u.pnlFinalUSD ?? x.pnlFinalUSD, pnlFinalAprox: !!u.pnlFinalAprox, motivo: u.motivo || x.motivo };
+  });
+}
 // Informe del día (Markdown) desde colchon-eventos.jsonl
 export function buildReport(dir = DIR, day = diaFarm()) {
-  let L = []; try { L = fs.readFileSync(path.join(dir, 'colchon-eventos.jsonl'), 'utf8').split('\n').filter(Boolean).map(x => { try { return JSON.parse(x); } catch { return null; } }).filter(x => x && x.at && diaFarm(Date.parse(x.at)) === day); } catch {}
+  let L = []; try { L = conPnlExacto(fs.readFileSync(path.join(dir, 'colchon-eventos.jsonl'), 'utf8').split('\n').filter(Boolean).map(x => { try { return JSON.parse(x); } catch { return null; } }).filter(x => x && x.at && diaFarm(Date.parse(x.at)) === day)); } catch {}
   const by = t => L.filter(x => x.type === t), etT = a => new Date(a).toLocaleTimeString('en-US', { timeZone: 'America/New_York' }) + ' ET', o = [`# Informe colchón · ${day}`, ''];
   const fins = by('fin_trade'); o.push(`## Trades (${fins.length})`); for (const f of fins) o.push(`- ${etT(f.at)} · ${f.modo || '?'} · ${f.cuenta || '?'} · ${f.estrategia || '?'} · ${f.direccion} ${f.tamano} · ${f.motivo} · P&L ${f.pnlFinalUSD ?? '?'}${f.alerta ? ' · ⚠ ' + f.alerta : ''}`);
   o.push('', '## Ajuste SL/TP al precio real de fill'); { const aj = by('ajuste_brackets'); if (!aj.length) o.push('- sin ajustes'); for (const x of aj) o.push(`- ${etT(x.at)} ref ${x.ref} · fill ${x.fill} · ${x.nada ? 'sin cambio (fill = referencia)' : `SL ${x.slAntes}→${x.slNuevo} ${x.sl && x.sl.ok ? 'OK' : 'FALLÓ'} · TP ${x.tpAntes}→${x.tpNuevo} ${x.tp && x.tp.ok ? 'OK' : 'FALLÓ'} · ${x.seg ?? '?'} s`}`); }
@@ -688,12 +699,12 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
         if (paper && S.accountId && driver.accountId) { const cur = await driver.accountId(); if (cur && cur !== S.accountId) { S.error = `La cuenta activa cambió (${cur}) en mitad de la prueba: se deja de vigilar SIN cerrar nada. Revisa la cuenta ${S.account && S.account.name} en TradingView.`; log('ERROR', S.error); break; } }
         const tRead = Date.now(); let pos = await driver.position(c.symbol); const sl0 = await driver.stop(); const tSeen = Date.now();
         if (pos && pos.transient) { ev('anomalia', { kind: 'lectura_fallida_transitoria', error: pos.transient }); await sleep(wait); continue; }
-        // guarda de flat: 3 lecturas vacías seguidas, ≥1 s desde la primera y sin órdenes hijas SL/TP activas.
+        // guarda de flat: 2 lecturas vacías seguidas, el tiempo de esas dos lecturas (~450 ms) y sin órdenes hijas SL/TP activas.
         // Varios brackets cuentan igual: mientras quede alguno no se da por cerrado y no se cancela ninguno.
         if (!pos && S.openAt != null) {
           S.emptyN = (S.emptyN || 0) + 1; S.emptySince = S.emptySince || Date.now();
           let kids = []; try { kids = driver.working ? (await driver.working(c.symbol)).filter(o => o && (o.parentId != null || o.type === 3 || o.type === 4 || o.type === 1)) : []; } catch { kids = [{ id: '?' }]; }
-          const need = opts.flatConfirm ?? { reads: 3, ms: 1000 };
+          const need = opts.flatConfirm ?? { reads: 2, ms: 450 };
           if (S.emptyN === 1) ev('flat_contador', { lecturasVacias: S.emptyN, msDesdePrimera: Date.now() - S.emptySince, necesita: need, sltpActivas: kids });
           if (S.emptyN < need.reads || Date.now() - S.emptySince < need.ms || kids.length) {
             if (kids.length && Date.now() - S.emptySince > 30000 && !S.kidsWarned) { S.kidsWarned = true; S.alerta = 'No veo la posición pero siguen activas órdenes SL/TP: revisa TradingView'; log('AVISO', S.alerta); ev('notificacion', { texto: S.alerta }); }
@@ -759,8 +770,11 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
     const fz = Object.fromEntries(Object.entries(SRC).map(([k, x]) => [k, { lecturas: x.n, changes: x.changes, gapMedioMs: x.gaps ? Math.round(x.gapSum / x.gaps) : null, lidera: leadN[k] || 0, ultimo: x.v }]));
     S.fuentesStats = fz; ev('fuentes_fin', { modo: FZ.modo, lider: lead, fuentes: fz }); ev('ticks_fin', { ticks });
     S.state = stopReq ? 'stopped' : (S.error ? 'error' : 'done'); if (stopReq) S.reason = 'stop'; if (S.error) S.reason = 'error'; log('loop terminado:', S.state);
+    const quiereBroker = S.openAt != null && typeof (opts.pnlFinalBroker || colchonHooks.pnlFinalBroker) === 'function';
+    if (quiereBroker) summarize(true);
     await brokerFinal();
-    summarize();
+    if (quiereBroker) { if (typeof S.pnlBroker === 'number' && Number.isFinite(S.pnlBroker)) actualizarPnl(); }
+    else summarize(false);
   }
   let last = null;
   const sg = ms => ms == null ? '?' : (ms < 1000 ? (ms / 1000).toFixed(2) : (ms / 1000).toFixed(1)) + ' s';
@@ -803,13 +817,13 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
       if (S.salidaBroker != null && S.reason !== 'stop') clasificarSalida(S.salidaBroker);
     } catch {}
   }
-  function summarize() {
+  function summarize(forzarAprox) {
     if (S.reason === 'sl' && S.lockTarget != null && !S.locked) { S.locked = true; S.lockPrice = S.lockTarget; S.sl = S.lockTarget; S.lockPending = false; } // salió por stop en el precio del colchón
     if (S.reason === 'sl' && S.lockTarget != null) S.sl = S.lockTarget;
     const pnlSL = S.sl != null && S.entry != null ? Math.round((S.sl - S.entry) * (S.side === 'long' ? 1 : -1) * PT_USD[S.symbol] * S.qty * 100) / 100 : null;
-    const SP = S.P || (S.strategy && getStrategy(S.strategy.id) || getStrategy()).params; const pnlFinal0 = S.reason === 'tp' ? SP.TP_USD : S.reason === 'sl' ? pnlSL : S.pnl; const usaBroker = typeof S.pnlBroker === 'number' && Number.isFinite(S.pnlBroker); const pnlFinal = usaBroker ? S.pnlBroker : pnlFinal0;
+    const SP = S.P || (S.strategy && getStrategy(S.strategy.id) || getStrategy()).params; const pnlFinal0 = S.reason === 'tp' ? SP.TP_USD : S.reason === 'sl' ? pnlSL : S.pnl; const usaBroker = !forzarAprox && typeof S.pnlBroker === 'number' && Number.isFinite(S.pnlBroker); const pnlFinal = usaBroker ? S.pnlBroker : pnlFinal0;
     last = { fin: new Date().toISOString(), cuenta: S.account && S.account.name, modo: S.mode, direccion: S.side === 'long' ? 'COMPRA' : 'VENTA', tamano: `${S.qty} ${S.symbol}`, motivo: { tp: 'Take profit', sl: 'Stop loss', stop: 'Detenido manualmente', flat: 'Posición cerrada', error: 'Error' }[S.reason] || S.reason || '—',
-      ajusteFill: S.ajuste || null, estrategia: S.strategy ? S.strategy.name : null, estrategiaId: S.strategy ? S.strategy.id : null, ...tiempos(), entrada: S.entry, pnlFinalUSD: pnlFinal, pnlFinalAprox: usaBroker ? false : !(S.reason === 'tp' || S.reason === 'sl'), colchonMovido: S.locked, slColchon: S.lockPrice, pasos: (S.pasos || []).map(p => ({ paso: p.paso, disparoUSD: p.disparoUSD, protegeUSD: p.protegeUSD, precio: p.precio, enSeg: p.enSeg, confirmado: p.confirmado, saltados: p.saltados, latenciaSeg: p.latencia ? Math.round(p.latencia.totalDesdeLecturaMs / 10) / 100 : null })), probabilidadNecesaria: S.qty ? breakEvenFor(S.symbol, S.qty, SP) : null, pasosTotal: S.steps ? S.steps.length : null, colchonUSD: S.qty ? ((S.pasos && S.pasos.length) ? S.pasos[S.pasos.length - 1].protegeUSD : (SP.STEPS ? null : lockUsdFor(S.symbol, S.qty, SP))) : null, disparoUSD: S.qty && !SP.STEPS ? triggerUsdFor(S.symbol, S.qty, SP) : null, latencia: S.latency || null, fuenteModo: S.fuenteModo || null, fuenteLider: S.fuenteLider || null, fuentes: S.fuentesStats || null, alerta: S.alerta || null, inicio: S.startedAt, error: S.error };
+      ajusteFill: S.ajuste || null, estrategia: S.strategy ? S.strategy.name : null, estrategiaId: S.strategy ? S.strategy.id : null, ...tiempos(), entrada: S.entry, pnlFinalUSD: pnlFinal, pnlFinalAprox: usaBroker ? false : (forzarAprox ? true : !(S.reason === 'tp' || S.reason === 'sl')), colchonMovido: S.locked, slColchon: S.lockPrice, pasos: (S.pasos || []).map(p => ({ paso: p.paso, disparoUSD: p.disparoUSD, protegeUSD: p.protegeUSD, precio: p.precio, enSeg: p.enSeg, confirmado: p.confirmado, saltados: p.saltados, latenciaSeg: p.latencia ? Math.round(p.latencia.totalDesdeLecturaMs / 10) / 100 : null })), probabilidadNecesaria: S.qty ? breakEvenFor(S.symbol, S.qty, SP) : null, pasosTotal: S.steps ? S.steps.length : null, colchonUSD: S.qty ? ((S.pasos && S.pasos.length) ? S.pasos[S.pasos.length - 1].protegeUSD : (SP.STEPS ? null : lockUsdFor(S.symbol, S.qty, SP))) : null, disparoUSD: S.qty && !SP.STEPS ? triggerUsdFor(S.symbol, S.qty, SP) : null, latencia: S.latency || null, fuenteModo: S.fuenteModo || null, fuenteLider: S.fuenteLider || null, fuentes: S.fuentesStats || null, alerta: S.alerta || null, inicio: S.startedAt, error: S.error };
     S.summary = last; try { fs.writeFileSync(path.join(path.dirname(logFile), 'colchon-resumen.json'), JSON.stringify(last, null, 2)); } catch {}
     ev('fin_trade', last); try { const dd = path.dirname(logFile), rd = path.join(dd, 'reportes'); fs.mkdirSync(rd, { recursive: true }); fs.writeFileSync(path.join(rd, diaFarm() + '.md'), buildReport(dd, diaFarm())); } catch {}
     log(`DURACIÓN ${last.duracionSeg == null ? '?' : sg(last.duracionSeg * 1000)} (${last.abiertaET ?? '?'} → ${last.cerradaET ?? '?'}, ±${sg(poll)})${last.colchonTrasSeg != null ? ` · colchón a los ${sg(last.colchonTrasSeg * 1000)}` : ''}`);
@@ -823,6 +837,23 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
         setImmediate(() => { Promise.resolve(h(aviso)).catch(() => {}); });
       }
     } catch {}
+  }
+  function actualizarPnl() {
+    if (!last || typeof S.pnlBroker !== 'number' || !Number.isFinite(S.pnlBroker)) return;
+    if (S.reason === 'sl' && S.lockTarget != null && !S.locked) { S.locked = true; S.lockPrice = S.lockTarget; S.sl = S.lockTarget; S.lockPending = false; }
+    if (S.reason === 'sl' && S.lockTarget != null) S.sl = S.lockTarget;
+    const fin = last.fin;
+    last.pnlFinalUSD = S.pnlBroker;
+    last.pnlFinalAprox = false;
+    last.motivo = { tp: 'Take profit', sl: 'Stop loss', stop: 'Detenido manualmente', flat: 'Posición cerrada', error: 'Error' }[S.reason] || S.reason || last.motivo;
+    last.colchonMovido = S.locked;
+    last.slColchon = S.lockPrice;
+    last.fin = fin;
+    S.summary = last;
+    try { fs.writeFileSync(path.join(path.dirname(logFile), 'colchon-resumen.json'), JSON.stringify(last, null, 2)); } catch {}
+    ev('fin_trade_pnl', { fin, inicio: last.inicio, pnlFinalUSD: last.pnlFinalUSD, pnlFinalAprox: false, motivo: last.motivo, direccion: last.direccion, tamano: last.tamano });
+    try { const dd = path.dirname(logFile), rd = path.join(dd, 'reportes'); fs.mkdirSync(rd, { recursive: true }); fs.writeFileSync(path.join(rd, diaFarm() + '.md'), buildReport(dd, diaFarm())); } catch {}
+    log('P&L exacto ' + last.pnlFinalUSD + ' · mismo cierre');
   }
   return {
     check,

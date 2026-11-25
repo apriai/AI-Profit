@@ -78,30 +78,45 @@ async function correr(st, hook, extra = {}) {
   st.pl = 14;
   await new Promise(z => setTimeout(z, 200));
   st.vivo = false;
-  for (let i = 0; i < 160 && !k.summary(); i++) await new Promise(z => setTimeout(z, 50));
-  const sm = k.summary();
-  if (!sm) throw new Error(k.status().state + '\n' + fs.readFileSync(logFile, 'utf8'));
-  return sm;
+  const inicio = k.status().startedAt;
+  let sm = null, primero = null;
+  const tope = Date.now() + ((extra.cierreEsperaMs || 3000) + 1500);
+  while (Date.now() < tope) {
+    const ahora = k.summary();
+    sm = ahora && ahora.inicio === inicio ? ahora : sm;
+    if (sm && !primero) primero = { fin: sm.fin, pnl: sm.pnlFinalUSD, aprox: sm.pnlFinalAprox };
+    if (sm && sm.pnlFinalAprox === false) break;
+    await new Promise(z => setTimeout(z, 40));
+  }
+  if (!sm || sm.inicio !== inicio) throw new Error(k.status().state + '\n' + fs.readFileSync(logFile, 'utf8'));
+  return { sm, primero, logFile };
 }
 
 {
-  const sm = await correr({ pl: 20, bar: 26814.25, ask: entrada, vivo: true }, (q, n) => n < 2 ? null : cierreDesdeEjecuciones(ex.map(x => ({ ...x, time: x.time === openAt ? q.openAt : q.openAt + 5000 })), { openAt: q.openAt, side: q.side, cuenta: q.cuenta, cuentaBroker: q.cuenta }));
+  const { sm, primero, logFile } = await correr({ pl: 20, bar: 26814.25, ask: entrada, vivo: true }, (q, n) => n < 2 ? null : cierreDesdeEjecuciones(ex.map(x => ({ ...x, time: x.time === openAt ? q.openAt : q.openAt + 5000 })), { openAt: q.openAt, side: q.side, cuenta: q.cuenta, cuentaBroker: q.cuenta }));
+  assert.equal(primero.aprox, true, 'el panel puede pintar el aproximado antes del exacto');
+  assert.equal(sm.fin, primero.fin, 'el exacto no abre otro cierre');
   assert.equal(sm.pnlFinalUSD, cierre.pnl);
   assert.notEqual(sm.pnlFinalUSD, 14);
   assert.equal(sm.pnlFinalAprox, false);
   assert.equal(sm.motivo, 'Stop loss');
   assert.equal(sm.entrada, entrada);
+  const evs = fs.readFileSync(path.join(path.dirname(logFile), 'colchon-eventos.jsonl'), 'utf8').split('\n').filter(Boolean).map(x => JSON.parse(x));
+  assert.equal(evs.filter(x => x.type === 'fin_trade').length, 1);
+  assert.equal(evs.filter(x => x.type === 'fin_trade_pnl').length, 1);
+  assert.equal(evs.find(x => x.type === 'fin_trade_pnl').fin, sm.fin);
 }
 
 {
-  const sm = await correr({ pl: 20, bar: 26814.25, ask: entrada, vivo: true }, () => null, { cierreEsperaMs: 400 });
+  const { sm } = await correr({ pl: 20, bar: 26814.25, ask: entrada, vivo: true }, () => null, { cierreEsperaMs: 400 });
   assert.equal(sm.pnlFinalUSD, 14);
   assert.equal(sm.pnlFinalAprox, true);
   assert.equal(sm.motivo, 'Posición cerrada');
 }
 
 const html = fs.readFileSync(new URL('./Granja-de-Cuentas-v2.html', import.meta.url), 'utf8');
-const btn = html.slice(html.indexOf('[data-stop]").onclick'), html.indexOf('[data-stop]").onclick') + 160);
+const i = html.indexOf('stop.onclick=async()');
+const btn = html.slice(i, i + 140);
 assert.match(btn, /flatten:true/);
 assert.doesNotMatch(btn, /confirm\(/);
 

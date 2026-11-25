@@ -120,10 +120,10 @@ Parámetros comunes: `SL_USD`, `TP_USD` (bracket en $), `STEPS` (escalones `{tri
    4. Si nada funciona, aviso rojo.
 
    Si el precio ya está puesto (`ya:true`), no envía nada: así es idempotente. Nunca cancela ni recrea.
-10. **Guarda de flat.** Se declara flat con 3 lecturas vacías seguidas, al menos 1 s desde la primera y **sin órdenes hijas SL/TP activas**. Si siguen activas más de 30 s, salta un aviso. Una lectura vacía aislada queda como `anomalia lectura_vacia_transitoria`.
+10. **Guarda de flat.** Se declara flat con 2 lecturas vacías seguidas, unos 450 ms desde la primera (lo que tardan esas dos lecturas) y **sin órdenes hijas SL/TP activas**. Si siguen activas más de 30 s, salta un aviso. Una lectura vacía aislada queda como `anomalia lectura_vacia_transitoria`.
 11. **Cambio de cuenta en medio de la prueba.** Si la cuenta activa cambia, el motor deja de vigilar **sin cerrar nada** y muestra una alerta.
 12. **La hora no cierra el trade.** El bucle no aplana por reloj. La posición se queda con su stop y su objetivo, y el colchón sigue vigilándola. Cerrar a mano es el botón Detener.
-13. **Fin.** `summarize()` escribe `colchon-resumen.json`, el evento `fin_trade` y `reportes\<día>.md`.
+13. **Fin.** En cuanto queda flat, `summarize()` escribe `colchon-resumen.json` y el evento `fin_trade` con el P&L aproximado, y el panel lo muestra. Hasta unos 3 s después, si llegan las ejecuciones, el mismo cierre (`fin` no cambia) pasa al P&L exacto en el JSON, en la granja y en un evento `fin_trade_pnl`. No se añade otra fila ni se vuelve a celebrar. Si no llegan, se queda el aproximado.
 
 ## 7. Paper frente a Tradovate
 | Aspecto | Paper Trading | Tradovate (Lucid) |

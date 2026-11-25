@@ -3,7 +3,7 @@
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
 import * as orders from './orders.mjs';
 import { negocio } from './negocio.mjs';
-import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, diaFarm, fueraDeSesion, cdpEvaluator, PAGE, acctGuard, js, frenaEscaneo, PANEL_PAUSA_MS } from './colchon.mjs';
+import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, conPnlExacto, diaFarm, fueraDeSesion, cdpEvaluator, PAGE, acctGuard, js, frenaEscaneo, PANEL_PAUSA_MS } from './colchon.mjs';
 import { attachReporte } from './tv-reporte.mjs';
 import { createVistaPrevia } from './tv-vista-previa.mjs';
 import { estrategiasPropias } from './estrategias-propias.mjs';
@@ -153,7 +153,7 @@ const maskId = t => String(t ?? '').replace(/\b([A-Za-z][A-Za-z0-9]{3})[A-Za-z0-
 function maxPuntos(W, t1, tam) { const m = /(\d+)\s*(MNQ|NQ)/i.exec(String(tam || '')); if (!m) return null; const pv = (/^MNQ$/i.test(m[2]) ? 2 : 20) * +m[1]; const v = W.filter(x => x.type === 'lectura' && Date.parse(x.at) <= t1 + 1e3).map(x => x.brokerPl ?? x.chartPl).filter(x => typeof x === 'number' && isFinite(x)); if (!v.length) return null; const q = u => Math.round(u / pv / .25) * .25; return { neg: q(Math.min(0, ...v)), pos: q(Math.max(0, ...v)), n: v.length, fuente: 'lecturas del broker (1/s)' }; }
 function detalleTrade(at) {
   const T = Date.parse(at); if (!isFinite(T)) return { ok: false, err: 'Falta la hora del trade' };
-  let L = []; try { L = fs.readFileSync(path.join(DIR, 'colchon-eventos.jsonl'), 'utf8').split('\n').filter(Boolean).map(x => { try { return JSON.parse(x); } catch { return null; } }).filter(x => x && x.at); } catch {}
+  let L = []; try { L = conPnlExacto(fs.readFileSync(path.join(DIR, 'colchon-eventos.jsonl'), 'utf8').split('\n').filter(Boolean).map(x => { try { return JSON.parse(x); } catch { return null; } }).filter(x => x && x.at)); } catch {}
   const ms = x => Date.parse(x), cierre = f => ms(f.cerradaEn || f.fin || f.at);
   let f = null, best = 120e3; for (const x of L) { if (x.type !== 'fin_trade') continue; const d = Math.abs(cierre(x) - T); if (d < best) { best = d; f = x; } }
   if (!f) return { ok: false, err: 'No hay registro detallado de este trade (por ejemplo, un trade manual).' };
@@ -167,7 +167,7 @@ function detalleTrade(at) {
   const fin = { direccion: f.direccion, tamano: f.tamano, motivo: f.motivo, estrategia: f.estrategia, estrategiaId: f.estrategiaId, modo: f.modo, cuenta: maskId(f.cuenta), abiertaEn: f.abiertaEn, cerradaEn: f.cerradaEn || f.fin, abiertaET: f.abiertaET, cerradaET: f.cerradaET, duracionSeg: f.duracionSeg ?? null, colchonTrasSeg: f.colchonTrasSeg ?? null, entrada: f.entrada ?? null, pnlFinalUSD: f.pnlFinalUSD ?? null, pnlFinalAprox: !!f.pnlFinalAprox, colchonMovido: !!f.colchonMovido, slColchon: f.slColchon ?? null, colchonUSD: f.colchonUSD ?? null, pasos: f.pasos || [], pasosTotal: f.pasosTotal ?? null, ajusteFill: aj, latencia: { metodo: lt.metodo || null, via: lt.via || null, modificarMs: lt.modificarMs ?? null, confirmarMs: lt.confirmarMs ?? null, totalMs: lt.totalDesdeLecturaMs ?? null }, fuenteLider: f.fuenteLider || null, fuenteModo: f.fuenteModo || null };
   return { ok: true, fin, movs, disparos, puntos: maxPuntos(W, t1, f.tamano), lecturas: { n: lec.length, difMedia: dif.length ? Math.round(dif.reduce((a, b) => a + b, 0) / dif.length * 100) / 100 : null, difMax: dif.length ? Math.round(Math.max(...dif) * 100) / 100 : null } };
 }
-function tradesFarm(dia) { let L = []; try { L = fs.readFileSync(path.join(DIR, 'colchon-eventos.jsonl'), 'utf8').split('\n').filter(Boolean).map(x => { try { return JSON.parse(x); } catch { return null; } }).filter(x => x && x.at && diaFarm(Date.parse(x.at)) === dia); } catch {}
+function tradesFarm(dia) { let L = []; try { L = conPnlExacto(fs.readFileSync(path.join(DIR, 'colchon-eventos.jsonl'), 'utf8').split('\n').filter(Boolean).map(x => { try { return JSON.parse(x); } catch { return null; } }).filter(x => x && x.at && diaFarm(Date.parse(x.at)) === dia)); } catch {}
   const out = []; let movs = [];
   for (const x of L) { if (x.type === 'mover_stop' && x.ok) movs.push(x); if (x.type !== 'fin_trade') continue;
     const sid = x.estrategiaId || ''; const cand = [sid && `${sid}-${dia}.md`, `${dia}.md`].filter(Boolean).filter(f => fs.existsSync(path.join(DIR, 'reportes', f)));
