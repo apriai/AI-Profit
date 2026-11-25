@@ -72,6 +72,7 @@ function banco(dir, opt = {}) {
       return { ok: true, ids: Array.from({ length: n }, (_, i) => `id${draws.length}-${i}`), save: { method: 'TradingViewApi.saveChartToServer', called: true, layoutId: 'L1' } };
     },
     raizOcupada: opt.raizOcupada,
+    activo: opt.activo,
     log() {},
   });
   return { rep, sleeps, reads, charts, draws, state };
@@ -155,6 +156,11 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'tv-reporte-'));
   const r2 = await b2.rep.alCerrar(s.aviso);
   eq(r2.status, 'ya');
   eq(b2.draws.length, 0, 'reiniciar no recrea un reporte, aunque el usuario lo haya borrado');
+  const apagado = banco(tmp(), { ex: s.ex, activo: () => false });
+  const noDibuja = await apagado.rep.alCerrar(s.aviso);
+  eq(noDibuja.status, 'apagado');
+  eq(apagado.draws.length, 0, 'con el interruptor en No no se dibuja');
+  eq(apagado.reads.length, 0, 'apagado no lee fills');
   const guardado = JSON.parse(fs.readFileSync(path.join(dir, ARCHIVO), 'utf8'));
   eq(guardado.modulo, MODULO);
   ok(!JSON.stringify(guardado).includes(CUENTA), 'el json de estado no guarda la cuenta completa');

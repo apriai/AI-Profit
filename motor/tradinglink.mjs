@@ -5,6 +5,7 @@ import * as orders from './orders.mjs';
 import { negocio } from './negocio.mjs';
 import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, conPnlExacto, diaFarm, fueraDeSesion, cdpEvaluator, PAGE, acctGuard, js, frenaEscaneo, PANEL_PAUSA_MS } from './colchon.mjs';
 import { attachReporte } from './tv-reporte.mjs';
+import { fijarResumenTv, resumenTvActivo } from './resumen-tv.mjs';
 import { createVistaPrevia } from './tv-vista-previa.mjs';
 import { estrategiasPropias } from './estrategias-propias.mjs';
 import { execFile } from 'node:child_process';
@@ -321,8 +322,8 @@ colchonHooks.pnlFinalBroker = async ({ openAt, side, cuenta }) => { try { execCa
 // Reporte de trades en TradingView: solo el cierre que acaba de confirmarse. No barre el historial ni repone dibujos.
 let reporte = null;
 try {
-  reporte = attachReporte({ dir: DIR, raizOcupada: () => colchon.status().state === 'running' ? colchon.status().symbol : null });
-  colchonHooks.onCierre = (s) => { try { reporte.alCerrar(s); } catch (e) { console.log('reporte:', e && e.message); } };
+  reporte = attachReporte({ dir: DIR, raizOcupada: () => colchon.status().state === 'running' ? colchon.status().symbol : null, activo: () => resumenTvActivo(DIR) });
+  colchonHooks.onCierre = (s) => { if (!resumenTvActivo(DIR)) return; try { reporte.alCerrar(s); } catch (e) { console.log('reporte:', e && e.message); } };
   console.log('reporte: Reporte de trades en TradingView listo');
 } catch (e) { console.log('reporte: no arrancó; el motor sigue.', e && e.message); }
 // Vista previa del panel: solo dibuja. No abre, no modifica y no cierra órdenes, y no repone reportes.
@@ -348,6 +349,7 @@ http.createServer((q, r) => manejar(q, r, {
   panelAbierto: () => panelHasta > Date.now(),
   metricasDe, tradesDe, conexion, orders,
   algoTv: () => algoTv, textoVersion, ROOT, HTML,
+  resumenTv: { leer: () => ({ ok: true, on: resumenTvActivo(DIR) }), fijar: (on) => fijarResumenTv(DIR, on) },
 })).listen(PORT, '127.0.0.1', () => console.log(`Granja: http://localhost:${PORT}`));
 let lastFull = 0, lastFunded = 0, lastBusy = Date.now(); const FULL_MS = EVERY_MS, QUIET_MS = 5 * 60 * 1000;
 cycle(); setInterval(cycle, 30 * 1000);

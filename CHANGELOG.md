@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.55] — 2026-11-25
+### Añadido
+- **Interruptor «Resumen de trades en TradingView»** en el ojo de Profito Algoritmo, debajo de «Sonido de la señal». Empieza en Sí. En No, el motor no dibuja el cierre en el gráfico. El P&L, el resumen de la granja y los registros siguen igual. La preferencia queda en el motor y aguanta un reinicio.
+### Notas
+- No cambia las órdenes ni Agregar/Promediar.
+
 ## [0.10.54] — 2026-11-25
 ### Cambiado
 - **Agregar/Promediar ya no bloquea por daily loss ni por drawdown.** Si el SL nuevo se pasa de lo que queda, el cajón muestra un aviso amarillo («Este SL se pasa de tu daily loss» o «Este SL se pasa de tu drawdown») y Confirmar sigue. La persona decide. Siguen bloqueando el tope de contratos, un stop ya tocado, una distancia inválida y el redondeo.

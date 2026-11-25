@@ -5230,7 +5230,7 @@ function qu(){dh.update();const n=Math.min(dh.getDelta(),jx);qo+=n;const e=qo;fo
   <button type="button" id="tlHudDia" title="Trades de la sesión, hasta las 4 PM ET. Clic para el P&amp;L."><span id="tlHudTxt">Hoy <b id="pnlHoy">0</b> trades · <b id="tradesPos" class="pos">0+</b> · <b id="tradesNeg" class="neg">0−</b></span> <small id="pnlEj">(ejemplo)</small></button>
   <span class="algoswrap">
     <button type="button" id="tlAlgosBtn" title="Profito Algoritmo" aria-label="Profito Algoritmo" aria-expanded="false" aria-haspopup="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 12S5.5 4.8 12 4.8 22.5 12 22.5 12 18.5 19.2 12 19.2 1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/></svg></button>
-    <div id="tlAlgosPanel" hidden><div class="tit">Profito Algoritmo</div><div class="fila senal"><span class="nom">Sonido de la señal</span><button type="button" id="tlSenalAlgo" aria-pressed="true">Sí</button></div><div class="lista"></div></div>
+    <div id="tlAlgosPanel" hidden><div class="tit">Profito Algoritmo</div><div class="fila senal"><span class="nom">Sonido de la señal</span><button type="button" id="tlSenalAlgo" aria-pressed="true">Sí</button></div><div class="fila senal"><span class="nom">Resumen de trades en TradingView</span><button type="button" id="tlResumenTV" aria-pressed="true">Sí</button></div><div class="lista"></div></div>
     <div id="tlAlgoAviso" class="glass" hidden role="status" aria-live="polite"><i class="cola" aria-hidden="true"></i><span class="txt"></span></div>
   </span>
   <span class="sep"></span>
@@ -5391,6 +5391,34 @@ function qu(){dh.update();const n=Math.min(dh.getDelta(),jx);qo+=n;const e=qo;fo
     pintarSenal();
   });
   pintarSenal();
+  var btnResumen = document.getElementById('tlResumenTV');
+  var resumenTocado = false;
+  function resumenTvOn() {
+    try { return localStorage.getItem('profito.resumenTV') !== '0'; } catch (e) { return true; }
+  }
+  function pintarResumen() {
+    if (!btnResumen) return;
+    var on = resumenTvOn();
+    btnResumen.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btnResumen.textContent = on ? 'Sí' : 'No';
+  }
+  function guardarResumen(on) {
+    try { localStorage.setItem('profito.resumenTV', on ? '1' : '0'); } catch (err) {}
+    fetch('/api/resumen-tv', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ on: !!on }) }).catch(function () {});
+  }
+  if (btnResumen) btnResumen.addEventListener('click', function (e) {
+    e.stopPropagation();
+    resumenTocado = true;
+    son(e, window.__tlToggle);
+    guardarResumen(!resumenTvOn());
+    pintarResumen();
+  });
+  pintarResumen();
+  fetch('/api/resumen-tv', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+    if (resumenTocado || !j || typeof j.on !== 'boolean') return;
+    try { localStorage.setItem('profito.resumenTV', j.on ? '1' : '0'); } catch (err) {}
+    pintarResumen();
+  }).catch(function () {});
   function leer() {
     fetch('/api/algo-tv', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { pintar(j); talVezSonar(j); }).catch(function () { pintar({ conectado: false, algos: [] }); });
   }
@@ -6473,7 +6501,7 @@ setTimeout(hook,600);})();</script>
   };
 })();
 </script>
-<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.54</div>
+<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.55</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/api/version",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
 <script>/* 0.7.0: Profito duerme al abrir (granja en pausa), riega con laptop durante un trade, y etiquetas de cuentas con saldo y etapa. Solo visual: no toca el motor de trading. */
 (function(){

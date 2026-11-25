@@ -97,6 +97,23 @@ export function manejar(q, r, deps) {
     });
     return;
   }
+  if (q.url === '/api/resumen-tv' || q.url.startsWith('/api/resumen-tv?')) {
+    const api = deps.resumenTv;
+    if (q.method === 'GET') {
+      const on = api && api.leer ? api.leer().on !== false : true;
+      r.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      return r.end(JSON.stringify({ ok: true, on }));
+    }
+    if (q.method === 'POST') {
+      let b = ''; q.on('data', c => b += c); q.on('end', () => {
+        let j = {}; try { j = JSON.parse(b || '{}'); } catch {}
+        const out = api && api.fijar ? api.fijar(j.on !== false) : { ok: true, on: j.on !== false };
+        r.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+        r.end(JSON.stringify(out));
+      });
+      return;
+    }
+  }
   if (q.url === '/api/algo-tv' || q.url.startsWith('/api/algo-tv?')) {
     const algoTv = deps.algoTv();
     if (q.method === 'GET') {
