@@ -208,7 +208,7 @@ assert(p50.includes('SL −$800') && p50.includes('TP +$1,600') && p50.includes(
   ctx.stratId = 'dia-minimo-mas-colchon';
   vm.runInContext('outDia=textoCuentaHtml();', ctx);
   const diaTxt = String(ctx.outDia).replace(/<[^>]+>/g, ' ');
-  assert(diaTxt.includes('SL −$150') && diaTxt.includes('TP +$3,200') && diaTxt.includes('protege ~$100') && !diaTxt.includes('SL −$200'), 'Dia minimo (+ Colchon) en 50K no dobla el SL ni el neto');
+  assert(diaTxt.includes('SL −$150') && diaTxt.includes('TP +$3,200') && diaTxt.includes('protege ~$150') && !diaTxt.includes('protege ~$100') && !diaTxt.includes('SL −$200'), 'Dia minimo (+ Colchon) en 50K protege ~$150 netos');
   ctx.accs.accounts[0] = { id: 'C', name: 'CUENTA88421', balance: 25100, scale: 1, plan: '25K', start: 25000, maxMicros: 20, maxMinis: 2, type: 'eval' };
   ctx.stratId = 'evaluacion-simple';
   vm.runInContext('out3=textoCuentaHtml(); sc3=accPlan().scale;', ctx);

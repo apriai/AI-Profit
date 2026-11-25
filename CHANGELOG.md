@@ -12,7 +12,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 
 ## [0.10.49] — 2026-11-25
 ### Añadido
-- **Estrategia «Dia minimo (+ Colchon)»** (`dia-minimo-mas-colchon`), justo después de Rascacielo (Dia Minimo+Colchon). En 25K: SL −$100 / TP +$1,600. En 50K: SL −$150 / TP +$3,200. El stop sube una sola vez para proteger ~$100 netos (el mismo colchón que el día mínimo: $100 + comisión + 1 tick) y el trade sigue hasta el TP o el SL. Solo sube, nunca baja. Las demás estrategias no cambian.
+- **Estrategia «Dia minimo (+ Colchon)»** (`dia-minimo-mas-colchon`), justo después de Rascacielo (Dia Minimo+Colchon). En 25K: SL −$100 / TP +$1,600 y el stop protege ~$100 netos. En 50K: SL −$150 / TP +$3,200 y el stop protege ~$150 netos. El disparo es ese neto más la comisión, 1 tick y el mismo extra, también según el tamaño ($15 en 25K, $22.50 en 50K). Sube una sola vez y el trade sigue hasta el TP o el SL. Solo sube, nunca baja. Las demás estrategias no cambian.
 ### Notas
 - No cambia el envío de órdenes de las estrategias que ya estaban.
 

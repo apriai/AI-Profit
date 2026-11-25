@@ -65,7 +65,7 @@ Parámetros comunes: `SL_USD`, `TP_USD` (bracket en $), `STEPS` (escalones `{tri
 | id | Nombre | Parámetros |
 |---|---|---|
 | `dia-minimo-colchon` (por defecto) | Día mínimo + colchón | SL 600 / TP 1600; colchón = NET 100 + comisión + 1 tick, redondeado a tick hacia arriba; disparo = colchón + 15. DEFAULT_QTY MNQ 5 / NQ 2. |
-| `dia-minimo-mas-colchon` | Dia minimo (+ Colchon) | 25K: SL 100 / TP 1600. 50K: SL 150 / TP 3200 (`SCALE_BY_SIZE` por tamaño, no ×2 en todo). Colchón = NET 100 + comisión + 1 tick; disparo = colchón + 15. Una sola subida del stop. |
+| `dia-minimo-mas-colchon` | Dia minimo (+ Colchon) | 25K: SL 100 / TP 1600, NET 100, extra 15. 50K: SL 150 / TP 3200, NET 150, extra 22.50. Colchón = neto + comisión + 1 tick; disparo = colchón + extra. Una sola subida del stop. |
 | `evaluacion` | Trailing stop loss - Evaluación | SL 630 / TP 630; escalones +150→+100, +250→+200, +350→+300. |
 | `evaluacion-simple` | Evaluación | SL 630 / TP 630; STEPS vacío (el stop nunca se mueve). |
 | `prueba-be` | PRUEBA BE | SL 630 / TP 630; un solo paso: a +15, stop a la entrada (lock 0). `PROB:'tp'`, así que la probabilidad mostrada es 50 %. DEFAULT_QTY MNQ 5 / NQ 1. |

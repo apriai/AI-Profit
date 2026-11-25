@@ -1,4 +1,4 @@
-// Dia minimo (+ Colchon): SL y TP por tamaño, colchón de ~$100 netos una sola vez.
+// Dia minimo (+ Colchon): SL y TP por tamaño. Colchón +$100 netos en 25K y +$150 en 50K.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -33,8 +33,8 @@ assert.equal(p25.NET_USD, 100);
 assert.equal(p25.TRIGGER_EXTRA_USD, 15);
 assert.equal(p50.SL_USD, 150);
 assert.equal(p50.TP_USD, 3200);
-assert.equal(p50.NET_USD, 100, 'el neto protegido no se dobla en 50K');
-assert.equal(p50.TRIGGER_EXTRA_USD, 15);
+assert.equal(p50.NET_USD, 150, 'en 50K el colchón protege +$150 netos');
+assert.equal(p50.TRIGGER_EXTRA_USD, 22.5, 'el extra del disparo escala igual que el neto (15 × 1.5)');
 assert.deepEqual(p50.COMM_RT, { MNQ: 1, NQ: 3.5 });
 assert.equal(p50.SLIP_TICKS, 1);
 
@@ -48,9 +48,10 @@ assert.equal(dia50.NET_USD, 200);
 
 assert.equal(lockUsdFor('MNQ', 8, p25), lockUsdFor('MNQ', 8, dia.params));
 assert.equal(triggerUsdFor('MNQ', 8, p25), triggerUsdFor('MNQ', 8, dia.params));
-assert.equal(lockUsdFor('MNQ', 8, p50), lockUsdFor('MNQ', 8, p25));
 assert.equal(lockUsdFor('MNQ', 8, p25), 112);
 assert.equal(triggerUsdFor('MNQ', 8, p25), 128);
+assert.equal(lockUsdFor('MNQ', 8, p50), 164, '50K: 150 + comisión + 1 tick');
+assert.equal(triggerUsdFor('MNQ', 8, p50), 188, 'disparo = colchón + el extra de 22.5, arriba al tick');
 
 const pasos = stepsFor('MNQ', 8, p25);
 assert.equal(pasos.length, 1);
@@ -65,9 +66,9 @@ const noBaja = decide({ side: 'long', entry: 20000, price: 20040, pnl: 400 }, 20
 assert.equal(noBaja.action, 'skip');
 
 const c50 = { symbol: 'MNQ', qty: 8, P: p50, steps: stepsFor('MNQ', 8, p50) };
-const sube50 = decide({ side: 'long', entry: 20000, price: 20020, pnl: 128 }, 19800, { step: 0 }, c50);
+const sube50 = decide({ side: 'long', entry: 20000, price: 20030, pnl: triggerUsdFor('MNQ', 8, p50) }, 19800, { step: 0 }, c50);
 assert.equal(sube50.action, 'modify');
-assert.equal(sube50.price, sube.price, 'el colchón de 50K protege los mismos ~$100');
+assert.ok(sube50.price > sube.price, 'en 50K el stop queda más arriba: protege ~$150');
 
 const html = fs.readFileSync(new URL('./Granja-de-Cuentas-v2.html', import.meta.url), 'utf8');
 const i = html.indexOf('scaleP=');
@@ -80,7 +81,8 @@ assert.equal(ctx.out25.TP_USD, 1600);
 assert.equal(ctx.out25.NET_USD, 100);
 assert.equal(ctx.out50.SL_USD, 150);
 assert.equal(ctx.out50.TP_USD, 3200);
-assert.equal(ctx.out50.NET_USD, 100);
+assert.equal(ctx.out50.NET_USD, 150);
+assert.equal(ctx.out50.TRIGGER_EXTRA_USD, 22.5);
 const dosCtx = { P: dos.params };
 vm.createContext(dosCtx);
 vm.runInContext('const ' + html.slice(i, j) + 'out50=scaleP(P,2);', dosCtx);

@@ -26,11 +26,14 @@ export const STRATEGIES = {
   },
   'dia-minimo-mas-colchon': {
     id: 'dia-minimo-mas-colchon', name: 'Dia minimo (+ Colchon)',
-    short: "Dia minimo (+ Colchon). Operación: SL −$100 / TP +$1,600 (25K) · 50K: −$150 / +$3,200\n~+$112 → protege ~$100 netos",
-    description: "Dia minimo (+ Colchon). Operación: entra a mercado con SL −$100 y TP +$1,600 en una cuenta de 25K (en 50K, SL −$150 y TP +$3,200). AI: ~+$112 → el stop sube una sola vez para proteger ~$100 netos y el trade sigue hasta el TP o el SL. Solo sube, nunca baja.",
+    short: "Dia minimo (+ Colchon). Operación: SL −$100 / TP +$1,600 (25K) · 50K: −$150 / +$3,200\n25K: protege ~$100 netos · 50K: protege ~$150 netos",
+    description: "Dia minimo (+ Colchon). Operación: entra a mercado con SL −$100 y TP +$1,600 en una cuenta de 25K (en 50K, SL −$150 y TP +$3,200). AI: el stop sube una sola vez para proteger ~$100 netos en 25K y ~$150 netos en 50K (neto + comisión + 1 tick; el disparo suma el mismo extra, también según el tamaño) y el trade sigue hasta el TP o el SL. Solo sube, nunca baja.",
     params: {
       SL_USD: 100, TP_USD: 1600, NET_USD: 100, COMM_RT: { MNQ: 1, NQ: 3.5 }, SLIP_TICKS: 1, TRIGGER_EXTRA_USD: 15,
-      SCALE_BY_SIZE: { '25K': { SL_USD: 100, TP_USD: 1600 }, '50K': { SL_USD: 150, TP_USD: 3200 } },
+      SCALE_BY_SIZE: {
+        '25K': { SL_USD: 100, TP_USD: 1600, NET_USD: 100, TRIGGER_EXTRA_USD: 15 },
+        '50K': { SL_USD: 150, TP_USD: 3200, NET_USD: 150, TRIGGER_EXTRA_USD: 22.5 },
+      },
       DEFAULT_QTY: { MNQ: 8, NQ: 2 },
     },
   },
