@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.56] — 2026-11-25
+### Corregido
+- El instalador ahora copia `motor/resumen-tv.mjs`. Sin ese archivo el motor no arrancaba (`ERR_MODULE_NOT_FOUND`) y la ventana decía que localhost no respondía.
+### Notas
+- No cambia las órdenes ni la mascota.
+
 ## [0.10.55] — 2026-11-25
 ### Añadido
 - **Interruptor «Resumen de trades en TradingView»** en el ojo de Profito Algoritmo, debajo de «Sonido de la señal». Empieza en Sí. En No, el motor no dibuja el cierre en el gráfico. El P&L, el resumen de la granja y los registros siguen igual. La preferencia queda en el motor y aguanta un reinicio.
