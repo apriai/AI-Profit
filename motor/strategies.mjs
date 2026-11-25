@@ -1,10 +1,10 @@
-// Registro de estrategias. Orden: Evaluación → Evaluación con rascacielos → Rascacielo (Dia Minimo+Colchon) → Fast Breakeven → Dos disparos · 1:2.
+// Registro de estrategias. Orden: Evaluación → Evaluación con rascacielos → Rascacielo (Dia Minimo+Colchon) → Dia minimo (+ Colchon) → Fast Breakeven → Dos disparos · 1:2.
 // Explicaciones al estilo flecha: +$112 → protege ~$100. Todas usan el mismo motor colchon (modifyOrder / Tradovate·Bit).
 // Rascacielo (Dia Minimo+Colchon) / Fast Breakeven: idea de Karol (PR #19), integradas en 0.8.0.
 // El id viejo «rascacielo» (SL −$600 / TP +$104, stop fijo) ya no está: una selección guardada cae en la estrategia por defecto.
 // Las propias (estrategias-propias.json, solo esta computadora) se agregan al final con propia:true y no pisan un id de serie.
 import { getPropia, listPropias } from './estrategias-propias.mjs';
-export const STRATEGY_ORDER = ['evaluacion-simple', 'evaluacion', 'dia-minimo-colchon', 'prueba-be', 'dos-disparos'];
+export const STRATEGY_ORDER = ['evaluacion-simple', 'evaluacion', 'dia-minimo-colchon', 'dia-minimo-mas-colchon', 'prueba-be', 'dos-disparos'];
 export const STRATEGIES = {
   'evaluacion-simple': {
     id: 'evaluacion-simple', name: 'Evaluación',
@@ -23,6 +23,16 @@ export const STRATEGIES = {
     short: "Rascacielo (Dia Minimo+Colchon). Operación: SL −$600 / TP +$1,600\n~+$115 → protege ~$100",
     description: "Rascacielo (Dia Minimo+Colchon). Operación: entra a mercado con SL −$600 y TP +$1,600. AI: ~+$115 → el stop sube para proteger ~$100 netos. Solo sube, nunca baja.",
     params: { SL_USD: 600, TP_USD: 1600, NET_USD: 100, COMM_RT: { MNQ: 1, NQ: 3.5 }, SLIP_TICKS: 1, TRIGGER_EXTRA_USD: 15, DEFAULT_QTY: { MNQ: 8, NQ: 2 } },
+  },
+  'dia-minimo-mas-colchon': {
+    id: 'dia-minimo-mas-colchon', name: 'Dia minimo (+ Colchon)',
+    short: "Dia minimo (+ Colchon). Operación: SL −$100 / TP +$1,600 (25K) · 50K: −$150 / +$3,200\n~+$112 → protege ~$100 netos",
+    description: "Dia minimo (+ Colchon). Operación: entra a mercado con SL −$100 y TP +$1,600 en una cuenta de 25K (en 50K, SL −$150 y TP +$3,200). AI: ~+$112 → el stop sube una sola vez para proteger ~$100 netos y el trade sigue hasta el TP o el SL. Solo sube, nunca baja.",
+    params: {
+      SL_USD: 100, TP_USD: 1600, NET_USD: 100, COMM_RT: { MNQ: 1, NQ: 3.5 }, SLIP_TICKS: 1, TRIGGER_EXTRA_USD: 15,
+      SCALE_BY_SIZE: { '25K': { SL_USD: 100, TP_USD: 1600 }, '50K': { SL_USD: 150, TP_USD: 3200 } },
+      DEFAULT_QTY: { MNQ: 8, NQ: 2 },
+    },
   },
   'prueba-be': {
     id: 'prueba-be', name: 'Fast Breakeven',

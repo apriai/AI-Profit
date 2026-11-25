@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.49] — 2026-11-25
+### Añadido
+- **Estrategia «Dia minimo (+ Colchon)»** (`dia-minimo-mas-colchon`), justo después de Rascacielo (Dia Minimo+Colchon). En 25K: SL −$100 / TP +$1,600. En 50K: SL −$150 / TP +$3,200. El stop sube una sola vez para proteger ~$100 netos (el mismo colchón que el día mínimo: $100 + comisión + 1 tick) y el trade sigue hasta el TP o el SL. Solo sube, nunca baja. Las demás estrategias no cambian.
+### Notas
+- No cambia el envío de órdenes de las estrategias que ya estaban.
+
 ## [0.10.47] — 2026-11-23
 ### Cambiado
 - **El P&L de sesión de la flor es el saldo del bróker menos el saldo al empezar la sesión** (16:00 ET). Ya no suma trades aproximados. Si no hay foto de esta sesión, usa el primer saldo visto. Solo si no hay saldo se suman los trades.

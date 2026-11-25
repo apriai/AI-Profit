@@ -21,7 +21,7 @@ assert.equal(dia.params.SL_USD, 600);
 assert.equal(dia.params.TP_USD, 1600);
 
 const orden = listStrategies().map(s => s.id);
-assert.deepEqual(STRATEGY_ORDER, ['evaluacion-simple', 'evaluacion', 'dia-minimo-colchon', 'prueba-be', 'dos-disparos']);
+assert.deepEqual(STRATEGY_ORDER, ['evaluacion-simple', 'evaluacion', 'dia-minimo-colchon', 'dia-minimo-mas-colchon', 'prueba-be', 'dos-disparos']);
 assert.deepEqual(orden.filter(id => !String(id).startsWith('propia-')), STRATEGY_ORDER);
 assert.equal(orden.includes('rascacielo'), false);
 assert.equal(getStrategy('rascacielo').id, DEFAULT_STRATEGY);
@@ -54,7 +54,7 @@ const end = html.indexOf('\nconst QS=', start);
 const PV = { MNQ: 2, NQ: 20 }, CR = { MNQ: 1, NQ: 3.5 };
 function texto(scale) {
   const ctx = {
-    strs: [ev], stratId: 'evaluacion', sym: 'MNQ', qty: 8,
+    strs: [ev], stratId: 'evaluacion', sym: 'MNQ', qty: 8, avisoEstrategia: '',
     accPlan: () => ({ scale }),
     scaleP: (params, sc) => paramsForAccount(params, { balance: sc === 2 ? 50000 : 25000 }),
     lockU: (y, q, params) => lockUsdFor(y, q, params),
