@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.65] — 2026-11-25
+### Eliminado
+- **Evaluación con rascacielos** ya no está en el selector. El id `evaluacion` cae en Evaluación, igual que una selección guardada que ya no existe. Un trade que ya estaba abierto sigue con las reglas que tenía al empezar.
+### Notas
+- Las demás estrategias no cambian. No cambia las órdenes ni la mascota.
+
 ## [0.10.64] — 2026-11-25
 ### Corregido
 - **Las estrategias propias se reparan solas.** Si `estrategias-propias.json` está vacío, trae una marca de texto, es una sola estrategia, usa `estrategias` o trae las estrategias como objeto, se lee igual. Si el archivo está cortado o el formato no se reconoce, se copia tal cual a `estrategias-propias.corrupto-AAAAMMDD-HHMMSS.json` (se quedan las últimas 5), se escribe uno nuevo con lo que se pudo rescatar y ya se puede listar, guardar y borrar. La granja avisa una vez, sin bloquear.

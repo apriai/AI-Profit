@@ -1070,7 +1070,7 @@ export const colchon = createColchon();
 
 // ---- CLI ----
 if (process.argv.includes('--selftest')) {
-  for (const [sy, q] of [['MNQ', 20], ['NQ', 2]]) console.log(`evaluacion ${sy}x${q}`, JSON.stringify(stepsFor(sy, q, getStrategy('evaluacion').params)));
+  for (const [sy, q] of [['MNQ', 20], ['NQ', 2]]) console.log(`evaluacion-simple ${sy}x${q}`, JSON.stringify(stepsFor(sy, q, getStrategy('evaluacion-simple').params)));
   for (const [sy, q] of [['MNQ', 10], ['MNQ', 1], ['MNQ', 20], ['MNQ', 3], ['NQ', 1], ['NQ', 2]]) console.log(`${sy}x${q} SL ${ptsFor(600, sy, q)} TP ${ptsFor(1600, sy, q)} colchón $${lockUsdFor(sy, q)} disparo $${triggerUsdFor(sy, q)} | pts disparo ${triggerPtsFor(sy, q)} lock ${lockPtsFor(sy, q)}`);
   console.log('NQx2 SL', ptsFor(600, 'NQ', 2), 'TP', ptsFor(1600, 'NQ', 2), 'lock', ptsFor(150, 'NQ', 2), '| MNQx20 lock', ptsFor(150, 'MNQ', 20));
   const c = { symbol: 'NQ', qty: 2 };
