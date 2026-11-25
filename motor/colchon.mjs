@@ -256,9 +256,11 @@ function tvBrokerId(ab){try{return ab&&ab._brokerMetainfo&&ab._brokerMetainfo.id
 function tvRoot(s){var x=String(s||'').replace(/^.*:/,'');return /^MNQ/.test(x)?'MNQ':/^NQ/.test(x)?'NQ':x}
 async function tvPos(ab,root){var l=[];tvPos.lastErr=null;try{l=await ab.positions()}catch(e){tvPos.lastErr=String(e&&e.message||e)}l=(l||[]).filter(function(p){return p&&Number(p.qty)!==0&&tvRoot(p.symbol)===root});return l[0]||null}
 async function tvAllOrders(t,ab){var l=[];try{l=(tvWv(t._ordersService.activeOrders())||[]).slice()}catch(e){}try{(await ab.orders()||[]).forEach(function(o){if(o&&!l.some(function(x){return x&&String(x.id)===String(o.id)}))l.push(o)})}catch(e){}return l}
-function tvStopOrder(t,pos,extra){var l=[];try{l=(tvWv(t&&t._ordersService&&t._ordersService.activeOrders())||[]).slice()}catch(e){}(extra||[]).forEach(function(o){if(o&&!l.some(function(x){return x&&String(x.id)===String(o.id)}))l.push(o)});
- var sc=function(o){return (pos&&Math.abs(Number(o.qty))===Math.abs(Number(pos.qty))?2:0)+(o.parentId!=null?1:0)};
- var c=l.filter(function(o){return o&&(o.type===3||o.type===4)&&(o.status===6||o.status===4)&&(!pos||(tvRoot(o.symbol)===tvRoot(pos.symbol)&&o.side===-pos.side))});c.sort(function(a,b){return sc(b)-sc(a)});return c[0]||null}
+function tvMergeOrders(t,extra){var l=[];try{l=(tvWv(t&&t._ordersService&&t._ordersService.activeOrders())||[]).slice()}catch(e){}(extra||[]).forEach(function(o){if(o&&!l.some(function(x){return x&&String(x.id)===String(o.id)}))l.push(o)});return l}
+function tvStopOrders(t,pos,extra){var sc=function(o){return (pos&&Math.abs(Number(o.qty))===Math.abs(Number(pos.qty))?2:0)+(o.parentId!=null?1:0)};
+ var c=tvMergeOrders(t,extra).filter(function(o){return o&&(o.type===3||o.type===4)&&(o.status===6||o.status===4)&&(!pos||(tvRoot(o.symbol)===tvRoot(pos.symbol)&&o.side===-pos.side))});c.sort(function(a,b){return sc(b)-sc(a)});return c}
+function tvStopOrder(t,pos,extra){return tvStopOrders(t,pos,extra)[0]||null}
+function tvLimitOrders(t,pos,extra){return tvMergeOrders(t,extra).filter(function(o){return o&&o.type===1&&(o.status===6||o.status===4)&&(!pos||(tvRoot(o.symbol)===tvRoot(pos.symbol)&&o.side===-pos.side))})}
 function tvNoPosBrackets(ab){try{var f=ab._brokerMetainfo&&ab._brokerMetainfo.configFlags;if(f&&f.supportPositionBrackets===false)return true}catch(e){}try{var m=ab.accountMetainfo&&ab.accountMetainfo();m=tvWv(m);if(m&&m.config&&m.config.supportPositionBrackets===false)return true}catch(e){}return false}
 function tvChartPx(){try{return window.TradingViewApi._activeChartWidgetWV.value()._chartWidget.model().mainSeries().bars().last().value[4]}catch(e){return null}}
 `;
@@ -343,8 +345,18 @@ export const js = {
     ${rellenoVisto(root, side, qty, since, prevExec, prevOrd, parcial)}})()`,
   accountId: `(function(){${PAGE}var ab=tvBroker(tvTrading());try{return String(tvWv(ab.currentAccount()))}catch(e){return null}})()`,
   modify: (root, price, waitMs = 3000) => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t);if(!tvBrokerId(ab))return {error:'No active broker'};var R=${JSON.stringify(root)},PX=${Number(price)};var p=await tvPos(ab,R);if(!p)return {error:'sin posicion'};
-    // Paper: editPositionBrackets (reenviando el TP). Tradovate (supportPositionBrackets:false): modifyOrder sobre la orden stop hija, con tope de 3 s. Siempre la MISMA orden; nunca cancela ni recrea.
-    var xo=[];try{xo=(await ab.orders())||[]}catch(e){}var noPB=tvNoPosBrackets(ab),so=tvStopOrder(t,p,xo),T0=performance.now(),tries=[];
+    // Paper con un solo stop: editPositionBrackets (reenviando el TP). Tradovate: modifyOrder del precio, con tope de 3 s. Si hay varios stops, se cambia el precio de todos. Nunca la cantidad. Nunca cancela ni recrea.
+    var xo=[];try{xo=(await ab.orders())||[]}catch(e){}var noPB=tvNoPosBrackets(ab),stopsAll=tvStopOrders(t,p,xo),so=stopsAll[0]||null,T0=performance.now(),tries=[];
+    if(stopsAll.length>1){var triesM=[],Tm=performance.now();
+      for(var si=0;si<stopsAll.length;si++){var uno=stopsAll[si];
+        if(uno.stopPrice===PX){triesM.push({via:'modifyOrder',orderId:String(uno.id),ya:true,qty:Math.abs(+uno.qty)||0});continue}
+        var foto=Object.assign({},uno);foto.stopPrice=PX;var rm,em=null;
+        try{rm=await Promise.race([Promise.resolve(foto).then(function(o){return ab.modifyOrder(o)}),new Promise(function(z){setTimeout(function(){z('pendiente-3s')},${Number(waitMs)})})])}catch(e){em=e&&e.message||String(e)}
+        triesM.push({via:'modifyOrder',orderId:String(uno.id),qty:Math.abs(+uno.qty)||0,ret:rm===undefined?'undefined':rm,err:em})}
+      var Tv=performance.now(),vall=null;
+      var readAll=async function(){var p2=await tvPos(ab,R);if(!p2)return null;var x2=[];try{x2=(await ab.orders())||[]}catch(e){}var ss=tvStopOrders(t,p2,x2);if(!ss.length)return null;for(var i=0;i<ss.length;i++){if(ss[i].stopPrice!==PX)return null}return PX};
+      do{vall=await readAll();if(vall===PX)break;await new Promise(function(z){setTimeout(z,100)})}while(performance.now()-Tv<1500);
+      return {ok:vall===PX,via:'modifyOrder',verified:vall,n:stopsAll.length,tries:triesM,modifyMs:Math.round(Tv-Tm),confirmMs:Math.round(performance.now()-Tv)}}
     var tpPx=p.takeProfit!=null?p.takeProfit:null;if(tpPx==null){try{var lo=(await tvAllOrders(t,ab)).find(function(o){return o&&o.type===1&&(o.status===6||o.status===4)&&o.side===-p.side&&tvRoot(o.symbol)===tvRoot(p.symbol)});if(lo)tpPx=lo.limitPrice}catch(e){}}
     var readSL=async function(){var p2=await tvPos(ab,R);if(!p2)return null;var x2=[];try{x2=(await ab.orders())||[]}catch(e){}var s2=tvStopOrder(t,p2,x2);return s2&&s2.stopPrice!=null?s2.stopPrice:(p2.stopLoss!=null?p2.stopLoss:null)};
     if(!noPB&&ab.editPositionBrackets&&(p.stopLoss!=null||(so&&(so.parentId!=null||so.parentType!=null)))){var b={stopLoss:PX};if(tpPx!=null)b.takeProfit=tpPx;var r1,e1=null;try{r1=await ab.editPositionBrackets(String(p.id),b)}catch(e){e1=e&&e.message||String(e)}
@@ -361,8 +373,19 @@ export const js = {
     return tries.length?{ok:false,error:'no verificado: '+JSON.stringify(tries),tries:tries}:{error:'no-stop-found'}})()`,
   // TP tras el fill: MISMA orden límite hija (type 1). Paper: editPositionBrackets reenviando el SL actual. Tradovate: modifyOrder limitPrice (tope 3 s). Nunca cancela ni recrea.
   modifyTp: (root, price, waitMs = 3000) => `(async function(){${PAGE}var t=tvTrading(),ab=tvBroker(t);if(!tvBrokerId(ab))return {error:'No active broker'};var R=${JSON.stringify(root)},PX=${Number(price)};var p=await tvPos(ab,R);if(!p)return {error:'sin posicion'};
-    var findTp=async function(p2){var l=[];try{l=(await tvAllOrders(t,ab))||[]}catch(e){}return l.find(function(o){return o&&o.type===1&&(o.status===6||o.status===4)&&o.side===-p2.side&&tvRoot(o.symbol)===tvRoot(p2.symbol)})};
-    var lo=await findTp(p),cur=lo&&lo.limitPrice!=null?lo.limitPrice:(p.takeProfit!=null?p.takeProfit:null),tries=[],T0=performance.now();
+    var findTps=async function(p2){var l=[];try{l=(await tvAllOrders(t,ab))||[]}catch(e){}return l.filter(function(o){return o&&o.type===1&&(o.status===6||o.status===4)&&o.side===-p2.side&&tvRoot(o.symbol)===tvRoot(p2.symbol)})};
+    var findTp=async function(p2){var l=await findTps(p2);return l[0]||null};
+    var todas=await findTps(p),tries=[],T0=performance.now();
+    if(todas.length>1){for(var ti=0;ti<todas.length;ti++){var uno=todas[ti];
+        if(uno.limitPrice===PX){tries.push({via:'modifyOrder',orderId:String(uno.id),ya:true,qty:Math.abs(+uno.qty)||0});continue}
+        var foto=Object.assign({},uno);foto.limitPrice=PX;var rm,em=null;
+        try{rm=await Promise.race([Promise.resolve(foto).then(function(o){return ab.modifyOrder(o)}),new Promise(function(z){setTimeout(function(){z('pendiente-3s')},${Number(waitMs)})})])}catch(e){em=e&&e.message||String(e)}
+        tries.push({via:'modifyOrder',orderId:String(uno.id),qty:Math.abs(+uno.qty)||0,ret:rm===undefined?'undefined':rm,err:em})}
+      var Tv=performance.now(),vall=null;
+      var readAllTp=async function(){var p2=await tvPos(ab,R);if(!p2)return null;var ss=await findTps(p2);if(!ss.length)return null;for(var i=0;i<ss.length;i++){if(ss[i].limitPrice!==PX)return null}return PX};
+      do{vall=await readAllTp();if(vall===PX)break;await new Promise(function(z){setTimeout(z,100)})}while(performance.now()-Tv<1500);
+      return {ok:vall===PX,via:'modifyOrder',verified:vall,n:todas.length,orderId:todas[0]?String(todas[0].id):null,tries:tries,ms:Math.round(performance.now()-T0)}}
+    var lo=todas[0]||null,cur=lo&&lo.limitPrice!=null?lo.limitPrice:(p.takeProfit!=null?p.takeProfit:null);
     if(cur===PX)return {ok:true,ya:true,verified:PX,orderId:lo?String(lo.id):null,tries:[]};
     var readTp=async function(){var p2=await tvPos(ab,R);if(!p2)return null;var o2=await findTp(p2);return o2&&o2.limitPrice!=null?o2.limitPrice:(p2.takeProfit!=null?p2.takeProfit:null)};
     var poll=async function(){var T=performance.now(),v=null;do{v=await readTp();if(v===PX)break;await new Promise(function(z){setTimeout(z,100)})}while(performance.now()-T<1500);return v};
@@ -375,36 +398,45 @@ export const js = {
       if(v2===PX)return {ok:true,via:'modifyOrder',verified:v2,orderId:String(lo.id),tries:tries,ms:Math.round(performance.now()-T0)}}
     return tries.length?{ok:false,error:'no verificado',orderId:lo?String(lo.id):null,tries:tries}:{error:'no-tp-found'}})()`,
   flatten: root => `(async function(){${PAGE}var ab=tvBroker(tvTrading());if(!tvBrokerId(ab))return {error:'No active broker'};var p=await tvPos(ab,${JSON.stringify(root)});if(!p)return {ok:true,flat:true};var r=await ab.closePosition(String(p.id));return {ok:r!==false}})()`,
-  // 1) Mercado sin bracket. No toca la cantidad de las hijas (Tradovate lo rechaza y un stop más grande puede voltear la posición).
-  agregarMercado: ({ root, tradeSymbol, side, addQty }) => `(async function(){${PAGE}var R=${JSON.stringify(root)},SYM=${JSON.stringify(tradeSymbol)},SIDE=${side === 'long' ? 1 : -1},ADD=${Number(addQty) || 0};
+  // Mercado CON bracket, igual que la entrada: Tradovate crea un OSO con hijas OCO del tamaño que se agrega.
+  // No cancela nada y no manda órdenes de salida sueltas.
+  agregarMercado: ({ root, tradeSymbol, side, addQty, sl, tp }) => `(async function(){${PAGE}var R=${JSON.stringify(root)},SYM=${JSON.stringify(tradeSymbol)},SIDE=${side === 'long' ? 1 : -1},ADD=${Number(addQty) || 0},SL=${Number(sl)},TP=${Number(tp)};
     var t=tvTrading(),ab=tvBroker(t);if(!tvBrokerId(ab))return {ok:false,err:'No active broker'};
     var p=await tvPos(ab,R);if(!p)return {ok:false,err:'sin posicion'};
     var antes=Math.abs(+p.qty)||0;if(!(ADD>=1))return {ok:false,err:'cantidad'};
-    var pr;try{pr=await ab.placeOrder({symbol:SYM,side:SIDE,type:2,qty:ADD})}catch(e){return {ok:false,err:String(e&&e.message||e)}}
-    if(pr===false)return {ok:false,err:'la orden de agregar no se envió'};
+    if(!(isFinite(SL)&&isFinite(TP)))return {ok:false,err:'sin precios'};
+    function hijas(list,pos){return (list||[]).filter(function(o){return o&&tvRoot(o.symbol)===tvRoot(pos.symbol)&&(o.status===6||o.status===4)&&(o.type===1||o.type===3||o.type===4)&&o.side===-pos.side})}
+    var prev=[];try{prev=await tvAllOrders(t,ab)}catch(e){}
+    var viejos=hijas(prev,p).map(function(o){return String(o.id)});
+    var pr;try{pr=await ab.placeOrder({symbol:SYM,side:SIDE,type:2,qty:ADD,stopLoss:SL,takeProfit:TP})}catch(e){return {ok:false,err:String(e&&e.message||e),viejos:viejos}}
+    if(pr===false)return {ok:false,err:'la orden de agregar no se envió',viejos:viejos};
     var T=performance.now(),p2=null;while(performance.now()-T<4000){p2=await tvPos(ab,R);if(p2&&Math.abs(+p2.qty)>=antes+ADD-1e-9)break;await new Promise(function(z){setTimeout(z,120)})}
-    if(!p2||Math.abs(+p2.qty)<antes+ADD-1e-9)return {ok:false,err:'no vi el fill de los contratos nuevos',qty:p2?Math.abs(+p2.qty):antes};
-    return {ok:true,qty:Math.abs(+p2.qty),avg:+p2.avgPrice,price:p2.lastPrice!=null?+p2.lastPrice:null}})()`,
-  // 2) Cancela el SL y el TP viejos. 3) Pone un SL y un TP nuevos, cantidad = posición, ligados a la posición.
-  // 4) Durante ~3 s comprueba que hay exactamente uno de cada uno y que ninguno es más grande que la posición.
-  reemplazarBracket: ({ root, tradeSymbol, sl, tp }) => `(async function(){${PAGE}var R=${JSON.stringify(root)},SYM=${JSON.stringify(tradeSymbol)},SL=${Number(sl)},TP=${Number(tp)};
+    if(!p2||Math.abs(+p2.qty)<antes+ADD-1e-9)return {ok:false,err:'no vi el fill de los contratos nuevos',qty:p2?Math.abs(+p2.qty):antes,viejos:viejos};
+    return {ok:true,qty:Math.abs(+p2.qty),avg:+p2.avgPrice,price:p2.lastPrice!=null?+p2.lastPrice:null,viejos:viejos,sl:SL,tp:TP}})()`,
+  // Solo el PRECIO del bracket que ya estaba. Nunca la cantidad, nunca cancela, nunca coloca salidas sueltas.
+  // ver(): puede haber varios SL y varios TP; sus cantidades suman la posición y todos están al mismo precio.
+  alinearBracket: ({ root, sl, tp, viejos }) => `(async function(){${PAGE}var R=${JSON.stringify(root)},SL=${Number(sl)},TP=${Number(tp)},VIEJOS=${JSON.stringify((viejos || []).map(String))};
     var t=tvTrading(),ab=tvBroker(t);if(!tvBrokerId(ab))return {ok:false,err:'No active broker'};
     function hijas(list,pos){return (list||[]).filter(function(o){return o&&tvRoot(o.symbol)===tvRoot(pos.symbol)&&(o.status===6||o.status===4)&&(o.type===1||o.type===3||o.type===4)&&o.side===-pos.side})}
     async function leer(){var p=await tvPos(ab,R);if(!p)return null;var list=[];try{list=await tvAllOrders(t,ab)}catch(e){}return {p:p,h:hijas(list,p),qty:Math.abs(+p.qty)||0}}
-    async function poner(){var s=await leer();if(!s)return {ok:false,err:'sin posicion'};
-      for(var i=0;i<s.h.length;i++){try{await ab.cancelOrder(String(s.h[i].id))}catch(e){}}
-      var p=await tvPos(ab,R);if(!p)return {ok:false,err:'sin posicion'};var qty=Math.abs(+p.qty)||0;if(!(qty>=1))return {ok:false,err:'sin cantidad'};
-      var noPB=tvNoPosBrackets(ab),exit=-p.side;
-      if(!noPB&&ab.editPositionBrackets){try{await ab.editPositionBrackets(String(p.id),{stopLoss:SL,takeProfit:TP})}catch(e){}}
-      else{var base={symbol:SYM,side:exit,qty:qty,parentId:String(p.id),parentType:2};
-        try{await ab.placeOrder(Object.assign({type:3,stopPrice:SL},base))}catch(e){}
-        try{await ab.placeOrder(Object.assign({type:1,limitPrice:TP},base))}catch(e){}}
-      return {ok:true,qty:qty}}
-    async function ver(){var T=performance.now();while(performance.now()-T<3000){var s=await leer();if(s){var stops=s.h.filter(function(o){return o.type===3||o.type===4}),tps=s.h.filter(function(o){return o.type===1});
-        var qOk=stops.length===1&&tps.length===1&&Math.abs(+stops[0].qty)===s.qty&&Math.abs(+tps[0].qty)===s.qty&&Math.abs(+stops[0].qty)<=s.qty&&stops[0].stopPrice===SL&&tps[0].limitPrice===TP;
-        if(qOk)return {ok:true,qty:s.qty,stops:1,tps:1}}await new Promise(function(z){setTimeout(z,150)})}
+    async function precios(){var s=await leer();if(!s)return {ok:false,err:'sin posicion'};
+      var want={};for(var i=0;i<VIEJOS.length;i++)want[VIEJOS[i]]=1;var n=0;
+      for(var j=0;j<s.h.length;j++){var o=s.h[j];if(!want[String(o.id)])continue;
+        var ch=Object.assign({},o),cambia=false;
+        if(o.type===1){if(o.limitPrice!==TP){ch.limitPrice=TP;cambia=true}}
+        else if(o.stopPrice!==SL){ch.stopPrice=SL;cambia=true}
+        if(!cambia)continue;n++;
+        try{await ab.modifyOrder(ch)}catch(e){}}
+      return {ok:true,tocados:n}}
+    async function ver(){var T=performance.now();while(performance.now()-T<3000){var s=await leer();if(s){
+        var stops=s.h.filter(function(o){return o.type===3||o.type===4}),tps=s.h.filter(function(o){return o.type===1});
+        var qs=0,qt=0,okP=stops.length>=1&&tps.length>=1;
+        for(var i=0;i<stops.length;i++){var q=Math.abs(+stops[i].qty)||0;qs+=q;if(stops[i].stopPrice!==SL||q>s.qty)okP=false}
+        for(var k=0;k<tps.length;k++){var q2=Math.abs(+tps[k].qty)||0;qt+=q2;if(tps[k].limitPrice!==TP||q2>s.qty)okP=false}
+        if(okP&&Math.abs(qs-s.qty)<1e-6&&Math.abs(qt-s.qty)<1e-6)return {ok:true,qty:s.qty,stops:stops.length,tps:tps.length}}
+      await new Promise(function(z){setTimeout(z,150)})}
       var s2=await leer();return {ok:false,err:'verificacion',stops:s2?s2.h.filter(function(o){return o.type===3||o.type===4}).length:0,tps:s2?s2.h.filter(function(o){return o.type===1}).length:0,qty:s2?s2.qty:null}}
-    await poner();return await ver()})()`,
+    await precios();return await ver()})()`,
 };
 
 // Fuentes de P&L empujadas por CDP (Runtime.addBinding('__colchonTick')): eventos del bróker, summary, DOM, barra del chart, bid/ask. Solo lectura.
@@ -506,6 +538,7 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
       const tl = ((r && r.tries) || []).slice(-1)[0] || {}, id = (r && r.orderId) || tl.orderId || null;
       intentos.push({ metodo: 'api', via: (r && r.via) || tl.via || null, ms: Date.now() - a0, ok: !!(r && r.ok), verificado: r ? (r.verified ?? tl.verified ?? null) : null, error: err || (r && !r.ok ? r.error : null), tpId: id });
       if (r && r.ok) return { ok: true, ya: !!r.ya, via: r.via || 'ya', verified: r.verified, tpId: id, intentos };
+      if (r && r.n > 1) return { ok: false, err: err || (r && r.error) || 'no verificado', tpId: id, intentos };
       if (id) { const t0 = Date.now(); let v = null; do { try { const x = await evaluate(js.stopById(id)); v = x ? x.limitPrice : null; } catch {} if (v === price) break; await sleep(100); } while (Date.now() - t0 < rereadMs);
         intentos.push({ metodo: 'relectura', via: 'stopById', ms: Date.now() - t0, ok: v === price, verificado: v, tpId: id });
         if (v === price) return { ok: true, via: 'modifyOrder (confirmado tarde)', verified: v, tpId: id, intentos }; }
@@ -519,6 +552,7 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
       intentos.push({ metodo: 'api', via: (r && r.via) || tl.via || null, ms: apiMs, ok: !!(r && r.ok), verificado: r ? (r.verified ?? tl.verified ?? null) : null, ret: tl.ret ?? null, error: apiErr || (r && !r.ok ? (r.error || null) : null), stopId: tl.orderId || (last.pos && last.pos.stopId) || null });
       if (r && !r.error && (r.ok || r.accepted)) return { ok: r.verified === price, accepted: !!r.accepted, method: 'api', via: r.via, verified: r.verified, modifyMs: r.modifyMs, confirmMs: r.confirmMs, apiMs, intentos };
       apiErr = apiErr || (r && r.error) || 'modify false';
+      if (r && r.n > 1) return { ok: false, method: 'api', via: r.via || 'modifyOrder', verified: r.verified ?? null, err: apiErr, apiMs, intentos };
       const stopId = (tries.find(t => t.orderId) || {}).orderId || (last.pos && last.pos.stopId) || null;
       if (stopId) { const t0 = Date.now(); let v = null; do { try { const x = await evaluate(js.stopById(stopId)); v = x ? x.stopPrice : null; } catch {} if (v === price) break; await sleep(100); } while (Date.now() - t0 < rereadMs);
         intentos.push({ metodo: 'relectura', via: 'stopById', ms: Date.now() - t0, ok: v === price, verificado: v, error: v === price ? null : 'sin cambio', stopId });
@@ -534,7 +568,7 @@ export function apiDriver(evaluate, ui = null, ticker = null, o = {}) {
     },
     async flatten(symbol) { const r = await evaluate(js.flatten(symbol)); return r.error ? 'error: ' + r.error : 'ok'; },
     async agregarMercado(req) { const r = await evaluate(js.agregarMercado(req)); if (!r) throw new Error('agregar'); return r; },
-    async reemplazarBracket(req) { const r = await evaluate(js.reemplazarBracket(req)); if (!r) throw new Error('bracket'); return r; },
+    async alinearBracket(req) { const r = await evaluate(js.alinearBracket(req)); if (!r) throw new Error('bracket'); return r; },
   };
 }
 
@@ -654,10 +688,11 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
         if (paper && S.accountId && driver.accountId) { const cur = await driver.accountId(); if (cur && cur !== S.accountId) { S.error = `La cuenta activa cambió (${cur}) en mitad de la prueba: se deja de vigilar SIN cerrar nada. Revisa la cuenta ${S.account && S.account.name} en TradingView.`; log('ERROR', S.error); break; } }
         const tRead = Date.now(); let pos = await driver.position(c.symbol); const sl0 = await driver.stop(); const tSeen = Date.now();
         if (pos && pos.transient) { ev('anomalia', { kind: 'lectura_fallida_transitoria', error: pos.transient }); await sleep(wait); continue; }
-        // guarda de flat: 3 lecturas vacías seguidas, ≥1 s desde la primera y sin órdenes hijas SL/TP activas
+        // guarda de flat: 3 lecturas vacías seguidas, ≥1 s desde la primera y sin órdenes hijas SL/TP activas.
+        // Varios brackets cuentan igual: mientras quede alguno no se da por cerrado y no se cancela ninguno.
         if (!pos && S.openAt != null) {
           S.emptyN = (S.emptyN || 0) + 1; S.emptySince = S.emptySince || Date.now();
-          let kids = []; try { kids = driver.working ? (await driver.working(c.symbol)).filter(o => o.parentId != null || o.type === 3 || o.type === 1) : []; } catch { kids = [{ id: '?' }]; }
+          let kids = []; try { kids = driver.working ? (await driver.working(c.symbol)).filter(o => o && (o.parentId != null || o.type === 3 || o.type === 4 || o.type === 1)) : []; } catch { kids = [{ id: '?' }]; }
           const need = opts.flatConfirm ?? { reads: 3, ms: 1000 };
           if (S.emptyN === 1) ev('flat_contador', { lecturasVacias: S.emptyN, msDesdePrimera: Date.now() - S.emptySince, necesita: need, sltpActivas: kids });
           if (S.emptyN < need.reads || Date.now() - S.emptySince < need.ms || kids.length) {
@@ -924,48 +959,34 @@ export function createColchon(driverOrFactory = defaultDriver, opts = {}) {
       });
       if (!previo.ok) return { ok: false, err: (previo.errors && previo.errors[0]) || 'No se puede agregar', errors: previo.errors };
       S.agregando = true;
-      const aviso = 'Sin SL/TP, ponlos a mano';
-      const aplicarTam = (qty, avg, slN, tpN, protegido) => {
+      const aviso = 'Revisa SL/TP en Tradovate';
+      const slN = previo.sl, tpN = previo.tp;
+      const aplicarTam = (qty, avg, alineado) => {
         trade.qty = qty; S.qty = qty; S.entry = avg; S.sl = slN; S.slVisto = slN; S.tpPrice = tpN; S.tpVisto = tpN;
         trade.steps = stepsFor(trade.symbol, qty, trade.P); S.steps = trade.steps;
-        if (!protegido) { S.sinProteccion = true; S.alerta = aviso; if (trade.st) trade.st.locked = true; }
+        if (!alineado) S.alerta = aviso;
         else {
-          S.sinProteccion = false;
+          S.sinProteccion = false; S.alerta = null;
           if (previo.slKind === 'lock' || S.locked) { if (trade.st) trade.st.step = trade.steps.length; S.step = trade.steps.length; S.locked = true; }
           else { if (trade.st) trade.st.step = 0; S.step = 0; S.locked = false; }
         }
       };
       try {
-        const mercado = await drv.agregarMercado({ root: trade.symbol, tradeSymbol: S.tradeSymbol || trade.symbol, side: trade.side, addQty: q });
+        const mercado = await drv.agregarMercado({ root: trade.symbol, tradeSymbol: S.tradeSymbol || trade.symbol, side: trade.side, addQty: q, sl: slN, tp: tpN });
         if (!mercado || mercado.ok === false) return { ok: false, err: (mercado && (mercado.err || mercado.error)) || 'No se pudo agregar', status: S };
-        const qty = mercado.qty;
-        const avg = mercado.avg;
-        const added = qty - pos.qty;
-        const addPx = added > 0 ? (avg * qty - pos.entry * pos.qty) / added : px;
-        const real = calcularAgregar({
-          symbol: trade.symbol, plan: rules.size, side: trade.side, qty: pos.qty, avg: pos.entry, sl, tp,
-          addQty: added, addPrice: addPx, live: mercado.price ?? px, riskMode: 'keep', tpMode: 'keep',
-          comm: trade.symbol === 'NQ' ? 3.5 : 1, ddlLeft, ddLeft,
-        });
-        if (!real.ok) {
-          aplicarTam(qty, avg, sl, tp, false);
-          log('AGREGAR ' + aviso + ' · ' + ((real.errors && real.errors[0]) || 'cálculo'));
-          ev('agregar_sin_bracket', { qty, avg, motivo: (real.errors && real.errors[0]) || null });
-          return { ok: false, err: aviso, agregado: true, status: S };
-        }
-        const slN = real.sl, tpN = real.tp;
-        let puesto = await drv.reemplazarBracket({ root: trade.symbol, tradeSymbol: S.tradeSymbol || trade.symbol, sl: slN, tp: tpN });
+        const qty = mercado.qty, avg = mercado.avg, viejos = mercado.viejos || [];
+        let puesto = await drv.alinearBracket({ root: trade.symbol, sl: slN, tp: tpN, viejos });
         if (!puesto || puesto.ok === false) {
-          log('AGREGAR: el bracket nuevo no se verificó, un reintento');
-          puesto = await drv.reemplazarBracket({ root: trade.symbol, tradeSymbol: S.tradeSymbol || trade.symbol, sl: slN, tp: tpN });
+          log('AGREGAR: el precio del bracket viejo no quedó, un reintento');
+          puesto = await drv.alinearBracket({ root: trade.symbol, sl: slN, tp: tpN, viejos });
         }
         if (!puesto || puesto.ok === false) {
-          aplicarTam(qty, avg, slN, tpN, false);
+          aplicarTam(qty, avg, false);
           log('AGREGAR ' + aviso);
-          ev('agregar_sin_bracket', { qty, avg, sl: slN, tp: tpN });
+          ev('agregar_revisar', { qty, avg, sl: slN, tp: tpN });
           return { ok: false, err: aviso, agregado: true, status: S };
         }
-        aplicarTam(qty, avg, slN, tpN, true);
+        aplicarTam(qty, avg, true);
         log(`AGREGAR +${q} ${trade.symbol} @ mercado · promedio ${avg} · SL ${slN} · TP ${tpN} · qty ${qty}`);
         return { ok: true, qty, avg, sl: slN, tp: tpN, status: S };
       } catch (e) { return { ok: false, err: String(e.message || e) }; }

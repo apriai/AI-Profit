@@ -54,7 +54,7 @@ El arranque de un clic es el acceso **AI Profit**. En Windows lo crea `instalar-
 | GET | `/api/colchon/check` | Cuenta activa y si se puede operar: paper, real permitida o bloqueada. |
 | POST | `/api/colchon/start` | `{side:'long'\|'short', symbol:'MNQ'\|'NQ', qty, strategyId, accountId?, confirmReal?}`. |
 | POST | `/api/colchon/stop` | `{flatten?:bool}`: deja de vigilar y, opcionalmente, cierra. |
-| POST | `/api/colchon/add` | `{addQty}` con una operación abierta, en la cuenta que ya está operando. Suma contratos a mercado y deja un solo SL y un solo TP. |
+| POST | `/api/colchon/add` | `{addQty}` con una operación abierta, en la cuenta que ya está operando. Suma contratos a mercado con su propio bracket y deja todos los SL y TP al mismo precio. |
 | GET | `/api/colchon/reporte?dia=AAAA-MM-DD` | Informe en Markdown (también se guarda en `reportes\<día>.md`). |
 | GET/POST | `/api/colchon/lectura` | Consulta o cambia la pausa de la lectura en segundo plano (`{pause:bool}`). |
 | GET/POST | `/bot` | Interruptor del bot de órdenes manuales. Devuelve `simulated` = DRY_RUN. |
@@ -64,16 +64,16 @@ El arranque de un clic es el acceso **AI Profit**. En Windows lo crea `instalar-
 
 Con el trade abierto, el panel manda `POST /api/colchon/add`. El promedio nuevo es el promedio ponderado. El SL conserva el riesgo en dólares (o la ganancia neta si el colchón ya se movió) y se redondea al tick hacia el precio, para que el riesgo real no pase del objetivo. El TP se aleja al tick para que el neto no baje de la meta.
 
-Protección, en este orden (`js.agregarMercado` y `js.reemplazarBracket`):
+Protección, en este orden (`js.agregarMercado` y `js.alinearBracket`):
 
-1. La orden que agrega va a mercado **sin** SL ni TP. Se espera el fill y se lee la cantidad y el promedio reales.
-2. Se cancelan el SL y el TP viejos de esa posición.
-3. Se pone **un** SL y **un** TP nuevos para toda la cantidad. En Tradovate (`supportPositionBrackets: false`) son dos `placeOrder` ligados a la posición (`parentType` 2), con `qty` igual a la posición. En paper, `editPositionBrackets` una vez con ambos precios.
-4. Durante unos 3 s se comprueba que hay exactamente un SL y un TP, y que ninguno es más grande que la posición. Si no, se reintenta el paso 3 una vez.
+1. La orden que agrega va a mercado **con** `stopLoss` y `takeProfit`, igual que la entrada. Los precios son los recalculados para toda la posición (promedio ponderado). Tradovate crea un OSO cuyas hijas OCO son del tamaño que se agrega. No se mandan `parentId` ni `parentType`: no son campos de la orden y se perderían.
+2. Se espera el fill y se leen la cantidad y el promedio reales.
+3. `modifyOrder` cambia **solo el precio** del stop y del límite que ya estaban, a esos mismos SL y TP. No cambia la cantidad. No cancela. No coloca órdenes de salida sueltas. No hay un momento sin stop.
+4. Durante unos 3 s, `ver()` acepta varios SL y varios TP si las cantidades de los stops suman la posición, las de los límites también, y todos están a ese SL y a ese TP. Ninguno puede ser más grande que la posición. Si no cuadra, se reintenta el paso 3 una vez.
 
-No se cambia la cantidad de una hija que ya existe: Tradovate lo rechaza, y un stop más grande que la posición puede voltearla. Si el bracket nuevo no queda verificado, el panel dice «Sin SL/TP, ponlos a mano» y no se cierra la posición.
+No se cambia la cantidad de una hija que ya existe: Tradovate lo rechaza, y un stop más grande que la posición puede voltearla. Si el precio del bracket viejo no queda, el panel dice «Revisa SL/TP en Tradovate» y no se cierra la posición. No hay un limpiador que cancele órdenes huérfanas.
 
-El bucle del colchón usa la cantidad y el promedio nuevos: el disparo en dólares se recalcula. Si el colchón ya se había movido, no vuelve a bajar el stop. Si no hay bracket, ese bucle no intenta mover el stop.
+El bucle del colchón usa la cantidad y el promedio nuevos: el disparo en dólares se recalcula. Si el colchón ya se había movido, no vuelve a bajar el stop. Cuando mueve el stop (`js.modify` / `tvStopOrders`) o el objetivo (`js.modifyTp`), cambia el precio de **todos** los de la posición, no solo el primero. La guarda de flat sigue: con varios brackets activos no da la operación por cerrada y no cancela esas órdenes.
 
 ## 5. Estrategias (`strategies.mjs`)
 Parámetros comunes: `SL_USD`, `TP_USD` (bracket en $), `STEPS` (escalones `{trigger, lock}` en $ brutos), `NET_USD`, `COMM_RT`, `SLIP_TICKS`, `TRIGGER_EXTRA_USD`, `DEFAULT_QTY`, `PROB`.

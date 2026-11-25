@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.52] — 2026-11-25
+### Cambiado
+- **Agregar/Promediar ya no deja el SL y el TP sueltos.** La suma entra a mercado con su propio bracket (el SL y el TP recalculados, ligados entre sí, del tamaño que se agrega). Después solo se cambia el precio del stop y del objetivo que ya estaban, nunca la cantidad. No se cancela nada y no hay un hueco sin stop. Si ese precio no queda, se reintenta una vez y el panel dice «Revisa SL/TP en Tradovate». No se cierra la posición. Cuando el colchón mueve el stop o el objetivo, cambia todos los de la posición.
+### Notas
+- Vale en la cuenta que ya está operando. No cambia la barra de la mascota ni el aspecto del panel.
+
 ## [0.10.51] — 2026-11-25
 ### Cambiado
 - **Agregar/Promediar cancela el bracket viejo y pone uno nuevo.** Primero entra a mercado sin SL ni TP y lee el promedio real. Después cancela el stop y el objetivo anteriores y coloca uno de cada uno para toda la posición. Si eso no se verifica, lo reintenta una vez. Si sigue fallando, el panel dice «Sin SL/TP, ponlos a mano» y no cierra la posición. Ya no se agranda la cantidad de las órdenes viejas.
