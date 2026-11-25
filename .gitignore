@@ -23,6 +23,7 @@ negocio.json
 negocio.json.tmp-*
 # Estrategias propias de esta computadora (nunca se suben)
 estrategias-propias.json
+estrategias-propias.corrupto-*.json
 # Cierres ya atendidos por el reporte en TradingView (personal; no es una cola)
 tv-reporte.json
 # Versión del indicador ya instalada en el TradingView de esta PC

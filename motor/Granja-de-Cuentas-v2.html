@@ -6545,7 +6545,7 @@ setTimeout(hook,600);})();</script>
   };
 })();
 </script>
-<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.63</div>
+<div id="tl-version" style="position:fixed;left:8px;bottom:4px;z-index:9;font:10px/1 system-ui,-apple-system,Segoe UI,sans-serif;color:#9aa3b2;opacity:.38;pointer-events:none;user-select:none">v0.10.64</div>
 <script>(function(){var e=document.getElementById("tl-version");if(!e)return;try{fetch("/api/version",{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){t=(t||"").trim();if(/^\d+\.\d+\.\d+$/.test(t))e.textContent="v"+t}).catch(function(){})}catch(x){}})();</script>
 <script>/* 0.7.0: Profito duerme al abrir (granja en pausa), riega con laptop durante un trade, y etiquetas de cuentas con saldo y etapa. Solo visual: no toca el motor de trading. */
 (function(){
@@ -7106,13 +7106,25 @@ async function api(method,body,id){
     return j;
   }catch(e){return {ok:false,err:String(e&&e.message||e)}}
 }
+function avisoReparo(j){
+  if(!j||!j.reparado||avisoReparo.ya)return;
+  avisoReparo.ya=true;
+  const n=+j.reparado.recuperadas||0;
+  const el=document.createElement("div");
+  el.textContent="El archivo de estrategias propias estaba dañado. Lo respaldé y recuperé "+n+".";
+  el.style.cssText="position:fixed;left:16px;bottom:16px;z-index:2147483001;max-width:340px;padding:10px 12px;border-radius:12px;background:#1a1230;color:#ffe7a3;font:600 12px/1.4 Inter,system-ui;border:1px solid rgba(255,216,107,.45);pointer-events:none";
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),8000);
+}
 async function refresh(){
   const j=await api("GET");
   if(j&&j.ok&&Array.isArray(j.strategies))saved=j.strategies;
   else if(j&&j.err)setMsg(j.err,true);
+  avisoReparo(j);
   drawList();
   return j;
 }
+refresh();
 function loadSaved(s){
   const p=s.params||{};
   model={id:s.id,name:s.name||"",sl:+p.SL_USD||630,tp:+p.TP_USD||630,steps:(Array.isArray(p.STEPS)?p.STEPS:[]).slice(0,3).map(x=>({trigger:+x.trigger,lock:+x.lock}))};

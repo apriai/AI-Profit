@@ -13,8 +13,9 @@ const MAX_NAME = 40;
 const USD_MAX = 20000;
 const ID_RX = /^propia-[a-z0-9]{6,32}$/;
 
-let FILE = process.env.ESTRATEGIAS_PROPIAS_FILE || path.join(ROOT, 'estrategias-propias.json');
-let warned = false;
+function archivo() { return process.env.ESTRATEGIAS_PROPIAS_FILE || path.join(ROOT, 'estrategias-propias.json'); }
+const fallosAvisados = new Set();
+let ultimoReparo = null;
 
 function money(n) {
   if (typeof n === 'string' && n.trim() === '') return null;
@@ -71,23 +72,104 @@ export function validatePropia(body, { names = [], id = null } = {}) {
   return { ok: true, value: { name, sl, tp, steps } };
 }
 
-function load() {
-  if (!fs.existsSync(FILE)) return { ok: true, list: [] };
-  try {
-    const j = JSON.parse(fs.readFileSync(FILE, 'utf8'));
-    const raw = Array.isArray(j) ? j : (j && Array.isArray(j.strategies) ? j.strategies : null);
-    if (!raw) throw new Error('formato');
-    return { ok: true, list: raw.filter(x => x && typeof x === 'object') };
-  } catch (e) {
-    if (!warned) { warned = true; console.log('estrategias-propias: no pude leer el archivo (' + (e && e.message || e) + '). No lo sobrescribo.'); }
-    return { ok: false, list: [] };
+function pareceEstrategia(j) {
+  if (!j || typeof j !== 'object' || Array.isArray(j)) return false;
+  const p = j.params;
+  return typeof j.id === 'string' && !!j.name && p && typeof p === 'object' && !Array.isArray(p) && ('SL_USD' in p || 'TP_USD' in p || 'STEPS' in p);
+}
+
+function normalizar(j) {
+  const objs = xs => (Array.isArray(xs) ? xs : []).filter(x => x && typeof x === 'object' && !Array.isArray(x));
+  if (Array.isArray(j)) return { known: true, list: objs(j) };
+  if (!j || typeof j !== 'object') return { known: false, list: [] };
+  if (Array.isArray(j.strategies)) return { known: true, list: objs(j.strategies) };
+  if (Array.isArray(j.estrategias)) return { known: true, list: objs(j.estrategias) };
+  if (j.strategies && typeof j.strategies === 'object') {
+    const list = [];
+    for (const [k, v] of Object.entries(j.strategies)) {
+      if (!v || typeof v !== 'object' || Array.isArray(v)) continue;
+      const id = typeof v.id === 'string' && ID_RX.test(v.id) ? v.id : k;
+      list.push({ ...v, id });
+    }
+    return { known: true, list };
   }
+  if (pareceEstrategia(j)) return { known: true, list: [j] };
+  return { known: false, list: [] };
+}
+
+function logFallo(reason, buf) {
+  const key = String(reason || 'lectura');
+  if (fallosAvisados.has(key)) return;
+  fallosAvisados.add(key);
+  const size = buf ? buf.length : 0;
+  const b0 = buf && buf.length ? '0x' + buf[0].toString(16) : '—';
+  console.log(`estrategias-propias: no pude leer el archivo (${key}), ${size} bytes, primer byte ${b0}`);
+}
+
+function sello(d = new Date()) {
+  const p = (n, w = 2) => String(n).padStart(w, '0');
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+}
+
+function respaldar(buf) {
+  const dir = path.dirname(archivo());
+  fs.mkdirSync(dir, { recursive: true });
+  const stamp = sello();
+  let nombre = `estrategias-propias.corrupto-${stamp}.json`;
+  let n = 2;
+  while (fs.existsSync(path.join(dir, nombre))) nombre = `estrategias-propias.corrupto-${stamp}-${n++}.json`;
+  const dest = path.join(dir, nombre);
+  fs.writeFileSync(dest, buf);
+  const rx = /^estrategias-propias\.corrupto-(\d{8})-(\d{6})(?:-(\d+))?\.json$/;
+  const clave = f => { const m = rx.exec(f); return m ? m[1] + m[2] + String(m[3] || 1).padStart(4, '0') : f; };
+  const todos = fs.readdirSync(dir).filter(f => rx.test(f)).sort((a, b) => clave(a) < clave(b) ? -1 : clave(a) > clave(b) ? 1 : 0);
+  while (todos.length > 5) fs.unlinkSync(path.join(dir, todos.shift()));
+  return dest;
+}
+
+function reparar(buf, raw, reason) {
+  logFallo(reason, buf);
+  const valid = raw.map(asStrategy).filter(Boolean);
+  let dest;
+  try {
+    dest = respaldar(buf);
+    const copia = fs.readFileSync(dest);
+    if (copia.length !== buf.length || !copia.equals(buf)) throw new Error('el respaldo no coincide');
+  } catch (e) {
+    return { ok: false, reason, list: [] };
+  }
+  try { writeList(valid); } catch (e) { return { ok: false, reason, list: [] }; }
+  ultimoReparo = { archivo: dest, recuperadas: valid.length, reason };
+  console.log(`estrategias-propias: respaldé el archivo dañado en ${dest} y empecé uno nuevo (recuperé ${valid.length})`);
+  return { ok: true, list: valid, reparado: ultimoReparo };
+}
+
+function load() {
+  const file = archivo();
+  if (!fs.existsSync(file)) return { ok: true, list: [] };
+  let buf;
+  try { buf = fs.readFileSync(file); } catch (e) {
+    logFallo('lectura', null);
+    return { ok: false, reason: 'lectura', list: [] };
+  }
+  let text = buf.toString('utf8');
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  if (text.trim() === '') return { ok: true, list: [] };
+  let j;
+  try { j = JSON.parse(text); } catch {
+    return reparar(buf, [], 'json');
+  }
+  const norm = normalizar(j);
+  if (!norm.known) return reparar(buf, [], 'formato');
+  return { ok: true, list: norm.list };
 }
 
 function writeList(list) {
-  const tmp = FILE + '.tmp-' + process.pid;
+  const file = archivo();
+  const tmp = file + '.tmp-' + process.pid;
+  fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(tmp, JSON.stringify({ version: 1, strategies: list }, null, 2) + '\n', 'utf8');
-  fs.renameSync(tmp, FILE);
+  fs.renameSync(tmp, file);
 }
 
 function asStrategy(row) {
@@ -105,6 +187,8 @@ function pub(s) { return { id: s.id, name: s.name, short: s.short, description: 
 export function listPropias() {
   return load().list.map(asStrategy).filter(Boolean).map(pub);
 }
+
+export function reparacionPropia() { return ultimoReparo; }
 
 export function getPropia(id) {
   if (typeof id !== 'string' || !id.startsWith('propia-')) return null;
@@ -168,11 +252,17 @@ export function estrategiasPropias({ port = 8787 } = {}) {
     return q.headers['sec-fetch-site'] !== 'cross-site';
   };
   const send = (r, code, o) => { r.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); r.end(JSON.stringify(o)); };
+  try { load(); } catch { /* un disco lleno no debe tumbar el servidor */ }
   return (q, r) => {
     let u; try { u = new URL(q.url, 'http://127.0.0.1'); } catch { return false; }
     if (u.pathname !== '/api/estrategias-propias') return false;
     if (!local(q)) { send(r, 403, { ok: false, err: 'solo localhost' }); return true; }
-    if (q.method === 'GET' || q.method === 'HEAD') { send(r, 200, { ok: true, strategies: listPropias() }); return true; }
+    if (q.method === 'GET' || q.method === 'HEAD') {
+      const strategies = listPropias();
+      const reparado = reparacionPropia();
+      send(r, 200, reparado ? { ok: true, strategies, reparado: { recuperadas: reparado.recuperadas, archivo: path.basename(reparado.archivo) } } : { ok: true, strategies });
+      return true;
+    }
     if (q.method !== 'POST' && q.method !== 'DELETE') { send(r, 405, { ok: false, err: 'método no permitido' }); return true; }
     readBody(q, (e, j) => {
       if (e) return send(r, e.status || 400, { ok: false, err: e.message });

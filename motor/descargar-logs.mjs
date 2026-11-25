@@ -201,6 +201,10 @@ export async function crearPaqueteLogs(opts = {}) {
       } catch { continue; }
       if (!logs.some(f => path.resolve(f) === path.resolve(legado))) logs.push(legado);
     }
+    const propias = path.join(opts.root, 'estrategias-propias.json');
+    try {
+      if (fs.existsSync(propias) && fs.statSync(propias).isFile() && !logs.some(f => path.resolve(f) === path.resolve(propias))) logs.push(propias);
+    } catch { /* si no se puede leer, el zip sigue sin ese archivo */ }
   }
   const piezas = logs.map(f => ({
     name: rutaEnZip(f, opts.dir),
