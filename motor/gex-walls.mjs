@@ -70,18 +70,17 @@ export function gammaBS(S, K, iv, T, r = R) {
 }
 export function gexDe(gamma, oi, spot) { return gamma * oi * 100 * spot * spot * 0.01; }
 
-// Solo los contratos que vencen hoy (YYMMDD = hoy ET), con OI > 0, antes del vencimiento (1 PM en media sesión).
-export function contratos0dte(json, ahora) {
+// Contratos de un vencimiento (clave YYYY-MM-DD), con OI > 0, antes de que expire (1 PM en media sesión).
+export function contratosDeVencimiento(json, ahora, clave) {
   const data = json && json.data;
   const spot = data && Number(data.current_price);
   const lista = data && Array.isArray(data.options) ? data.options : null;
   if (!(spot > 0) || !lista) throw new Error('JSON inválido');
-  const hoy = hoyET(ahora);
   const out = [];
   let vence = null;
   for (const crudo of lista) {
     const op = parseOpcion(crudo && crudo.option);
-    if (!op || fechaClave(op.year, op.month, op.day) !== hoy) continue;
+    if (!op || fechaClave(op.year, op.month, op.day) !== clave) continue;
     const oi = Number(crudo.open_interest);
     if (!(oi > 0)) continue;
     vence = instanteExpira(op.year, op.month, op.day);
@@ -92,6 +91,28 @@ export function contratos0dte(json, ahora) {
     out.push({ tipo: op.tipo, strike: op.strike, oi, gamma: g > 0 ? g : 0, iv: iv > 0 ? iv : 0, T });
   }
   return { spot, contratos: out, vence };
+}
+
+// Solo los contratos que vencen hoy (YYMMDD = hoy ET).
+export function contratos0dte(json, ahora) {
+  return contratosDeVencimiento(json, ahora, hoyET(ahora));
+}
+
+// El vencimiento más próximo que aún no expiró, con algún contrato de OI > 0.
+export function proximoVencimiento(json, ahora) {
+  const lista = json && json.data && Array.isArray(json.data.options) ? json.data.options : null;
+  if (!lista) throw new Error('JSON inválido');
+  let mejor = null;
+  for (const crudo of lista) {
+    const op = parseOpcion(crudo && crudo.option);
+    if (!op) continue;
+    if (!(Number(crudo.open_interest) > 0)) continue;
+    const vence = instanteExpira(op.year, op.month, op.day);
+    if (!(vence > ahora)) continue;
+    const clave = fechaClave(op.year, op.month, op.day);
+    if (!mejor || vence < mejor.vence) mejor = { clave, vence };
+  }
+  return mejor;
 }
 
 function mejor(mapa, valor) {
@@ -125,8 +146,8 @@ export function zeroGamma(contratos, spot, r = R) {
   return elegido;
 }
 
-export function nivelesEtf(json, ahora, r = R) {
-  const { spot, contratos, vence } = contratos0dte(json, ahora);
+export function nivelesEtf(json, ahora, r = R, claveVence) {
+  const { spot, contratos, vence } = contratosDeVencimiento(json, ahora, claveVence || hoyET(ahora));
   if (!contratos.length) return { spot, contratos: 0, call: null, put: null, top: null, zeroGamma: null, zgMs: 0, vence };
   const porStrike = new Map();
   for (const c of contratos) {
@@ -283,7 +304,7 @@ export function crearGexWalls(opts = {}) {
   let verificado = 0;
   let aplicarFalloHasta = 0;
 
-  async function calcular(turno) {
+  async function calcular(turno, { reserva = false } = {}) {
     const t0 = ahora();
     const at = new Date(t0).toISOString();
     let qqqP, spyP;
@@ -296,10 +317,22 @@ export function crearGexWalls(opts = {}) {
       return { error: String(e && e.message || e), linea };
     }
     const tC = ahora();
-    let qqq, spy, zgMs = 0;
+    let qqq, spy, zgMs = 0, nota = '';
     try {
       qqq = nivelesEtf(qqqP.json, t0);
       spy = nivelesEtf(spyP.json, t0);
+      if (!qqq.contratos && !spy.contratos && reserva) {
+        const candidatos = [];
+        try { const p = proximoVencimiento(qqqP.json, t0); if (p) candidatos.push(p); } catch {}
+        try { const p = proximoVencimiento(spyP.json, t0); if (p) candidatos.push(p); } catch {}
+        candidatos.sort((a, b) => a.vence - b.vence);
+        const elegido = candidatos[0];
+        if (elegido) {
+          qqq = nivelesEtf(qqqP.json, t0, R, elegido.clave);
+          spy = nivelesEtf(spyP.json, t0, R, elegido.clave);
+          nota = `ultimo dato (vencimiento ${elegido.clave})`;
+        }
+      }
       zgMs = (qqq.zgMs || 0) + (spy.zgMs || 0);
     } catch (e) {
       const linea = lineaWalls({ at, turno, qqqMs: qqqP.ms, spyMs: spyP.ms, calculoMs: ahora() - tC, zgMs: 0, totalMs: ahora() - t0, error: String(e && e.message || e) });
@@ -307,7 +340,7 @@ export function crearGexWalls(opts = {}) {
       return { error: String(e && e.message || e), linea };
     }
     const calculoMs = ahora() - tC;
-    return { at, turno, t0, qqq, spy, qqqMs: qqqP.ms, spyMs: spyP.ms, calculoMs, zgMs, valores: valoresInputs(qqq, spy) };
+    return { at, turno, t0, qqq, spy, qqqMs: qqqP.ms, spyMs: spyP.ms, calculoMs, zgMs, valores: valoresInputs(qqq, spy), nota };
   }
 
   async function correr() {
@@ -316,13 +349,14 @@ export function crearGexWalls(opts = {}) {
     try {
       const t = ahora();
       const turno = turnoActual(t, horas);
-      const toca = turno ? turno !== hecho : (arranque && diaDeMercado(t));
+      // En un feriado o al instalar por primera vez, si no hay niveles guardados, se calculan los del vencimiento más próximo.
+      const toca = turno ? turno !== hecho : (arranque && (diaDeMercado(t) || !ultimo));
       const verificar = ultimo && aplicadoFirma === firma(ultimo) && t - verificado >= (opts.verificarMs || 2 * 60 * 1000);
       if (!toca && !verificar && (!ultimo || aplicadoFirma === firma(ultimo))) return { nada: true };
       if (bloqueado()) { estadoTxt = 'pendiente. Espera a que cierres el panel de operar.'; return { saltado: 'panel' }; }
       if (toca) {
         if (t < falloHasta) return { espera: true };
-        const r = await calcular(turno || 'arranque');
+        const r = await calcular(turno || 'arranque', { reserva: !ultimo });
         if (r.error) { falloHasta = ahora() + (opts.reintentoMs || 2 * 60 * 1000); return r; }
         hecho = turno; arranque = false;
         if (!r.qqq.contratos && !r.spy.contratos) {
@@ -342,7 +376,7 @@ export function crearGexWalls(opts = {}) {
       try { res = await aplicar(ultimo.valores); } catch (e) { res = { ok: false, motivo: String(e && e.message || e) }; }
       const aplicarMs = ahora() - tA;
       const motivo = res && res.ok ? '' : `aplicar: ${(res && res.motivo) || 'error'}`;
-      const nota = [toca ? '' : 'reaplicado', res && res.restaurado ? 'ojo restaurado' : '', res && res.visible === false ? 'oculto' : ''].filter(Boolean).join(' · ');
+      const nota = [toca ? (ultimo.nota || '') : 'reaplicado', res && res.restaurado ? 'ojo restaurado' : '', res && res.visible === false ? 'oculto' : ''].filter(Boolean).join(' · ');
       const linea = lineaWalls({ ...ultimo, aplicarMs, totalMs: toca ? ahora() - ultimo.t0 : aplicarMs, error: motivo, nota });
       const cambio = !!(res && res.ok && res.cambio !== false);
       if (toca || motivo !== ultimoMotivo || cambio) anotar(opts.dir, linea);
