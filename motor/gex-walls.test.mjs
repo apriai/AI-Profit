@@ -270,6 +270,83 @@ assert.match(fs.readFileSync(path.join(dirLimpio, 'gex.log'), 'utf8'), /ultimo d
   assert.equal((await wd.correr()).ok, true, 'reaplica a los pocos segundos, sin esperar 2 min');
   assert.equal(avisos, 1);
 }
+
+// Ojo apagado: no baja ni calcula, ni al arrancar ni en un horario.
+{
+  const dirO = fs.mkdtempSync(path.join(os.tmpdir(), 'gex-ojo-off-'));
+  fs.writeFileSync(path.join(dirO, 'gex-niveles.json'), JSON.stringify({
+    turno: '2026-11-27 09:30', at: 't',
+    valores: { qqqCall: 105, qqqPut: 95, qqqTop: 105, spyCall: 0, spyPut: 0, spyTop: 0, qqqZG: 0, spyZG: 0 },
+  }));
+  let bajoO = 0, aplicadosO = [];
+  let ojo = false;
+  const wo = crearGexWalls({
+    dir: dirO,
+    ahora: () => Date.parse('2026-11-27T14:51:00Z'),
+    visible: () => ojo,
+    bajar: async () => { bajoO++; throw new Error('no debería bajar'); },
+    aplicar: async (v) => { aplicadosO.push(v); return { ok: true, cambio: true }; },
+  });
+  assert.equal((await wo.correr()).saltado, 'ojo');
+  assert.equal(bajoO, 0);
+  assert.equal(aplicadosO.length, 0);
+  assert.match(fs.readFileSync(path.join(dirO, 'gex.log'), 'utf8'), /ojo apagado: no calcula/);
+  assert.equal((await wo.correr()).saltado, 'ojo');
+  assert.equal(fs.readFileSync(path.join(dirO, 'gex.log'), 'utf8').trim().split('\n').length, 1, 'un solo aviso');
+  // Al prender: primero lo guardado (sin bajar), luego un cálculo nuevo que lo sustituye.
+  let fase = 'antes';
+  const dirP = fs.mkdtempSync(path.join(os.tmpdir(), 'gex-ojo-on-'));
+  fs.copyFileSync(path.join(dirO, 'gex-niveles.json'), path.join(dirP, 'gex-niveles.json'));
+  const aplicadosP = [];
+  let bajoP = 0;
+  const wp = crearGexWalls({
+    dir: dirP,
+    ahora: () => Date.parse('2026-11-27T14:51:00Z'),
+    visible: () => true,
+    bajar: async (sym) => {
+      assert.equal(fase, 'calcular', 'no baja hasta haber mostrado lo guardado');
+      assert.ok(aplicadosP.length >= 1, 'ya se escribió lo guardado');
+      assert.equal(aplicadosP[0].qqqCall, 105);
+      bajoP++;
+      return { json: sym === 'QQQ' ? json : zgJson, bytes: 10, ms: 7 };
+    },
+    aplicar: async (v) => { aplicadosP.push({ ...v }); return { ok: true, cambio: true }; },
+  });
+  fase = 'calcular';
+  const pr = await wp.prender();
+  assert.equal(pr.ok, true, JSON.stringify(pr));
+  assert.equal(bajoP, 2);
+  assert.ok(aplicadosP.length >= 2);
+  assert.equal(aplicadosP[0].qqqCall, 105);
+  const logP = fs.readFileSync(path.join(dirP, 'gex.log'), 'utf8');
+  assert.match(logP, /al prender · ultimo guardado/);
+  const lineasP = logP.trim().split('\n');
+  assert.ok(lineasP.length >= 2, 'primero lo guardado, luego el cálculo');
+  assert.match(lineasP[0], /ultimo guardado/);
+  assert.doesNotMatch(lineasP[lineasP.length - 1], /al prender · ultimo guardado/);
+  // Panel o trade abierto al prender: muestra lo guardado, no calcula; al cerrarse calcula una vez.
+  const dirB = fs.mkdtempSync(path.join(os.tmpdir(), 'gex-ojo-panel-'));
+  fs.copyFileSync(path.join(dirO, 'gex-niveles.json'), path.join(dirB, 'gex-niveles.json'));
+  let panelB = true, bajoB = 0, aplicadosB = [];
+  const wb = crearGexWalls({
+    dir: dirB,
+    ahora: () => Date.parse('2026-11-27T14:51:00Z'),
+    visible: () => true,
+    bloqueado: () => panelB,
+    bajar: async (sym) => { bajoB++; return { json: sym === 'QQQ' ? json : zgJson, bytes: 10, ms: 7 }; },
+    aplicar: async (v) => { aplicadosB.push(v); return { ok: true, cambio: true }; },
+  });
+  const pb = await wb.prender();
+  assert.equal(pb.saltado, 'panel');
+  assert.equal(pb.mostrado, true);
+  assert.equal(bajoB, 0);
+  assert.equal(aplicadosB.length, 1);
+  assert.equal(aplicadosB[0].qqqCall, 105);
+  panelB = false;
+  assert.equal((await wb.correr()).ok, true);
+  assert.equal(bajoB, 2);
+}
+
 // Error de CBOE: se anota y espera antes de reintentar.
 let rota = 0;
 const err = crearGexWalls({ dir, ahora: () => reloj, bajar: async () => { rota++; throw new Error('QQQ HTTP 403'); } });
@@ -330,6 +407,10 @@ assert.doesNotMatch(html, /#tlAlgosPanel \.bajar\{[^}]*(?<!max-)width:100%/);
 const server = fs.readFileSync(new URL('./tradinglink.mjs', import.meta.url), 'utf8');
 assert.match(server, /crearGexWalls\(/);
 assert.match(server, /panelHasta > Date\.now\(\) \|\| colchon\.status\(\)\.state === 'running'/);
+assert.match(server, /visible: \(\) =>/);
+assert.match(server, /GEX_WALLS_NOMBRE/);
+assert.match(server, /gexWalls\.prender\(\)/);
+
 assert.doesNotMatch(fs.readFileSync(new URL('./orders.mjs', import.meta.url), 'utf8'), /gex-walls/);
 
 console.log('gex-walls ok');

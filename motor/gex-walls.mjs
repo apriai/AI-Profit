@@ -4,6 +4,7 @@
 // La granja calcula cada 30 minutos de 8:00 a 16:00 ET (HORAS_ET; más una vez al arrancar) y solo escribe los 8 niveles ETF en los
 // inputs del estudio. El estudio convierte a NQ con su «Live ratio» y dibuja. No envía órdenes.
 // Con el panel de operar abierto o un trade abierto no se calcula ni se aplica: queda pendiente y corre al cerrarse.
+// Si el ojo está apagado no se baja ni se calcula. Al prenderlo se muestran antes los últimos niveles guardados y luego se calcula uno nuevo.
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseOpcion, instanteExpira, fechaClave, FERIADOS } from './gex.mjs';
@@ -317,6 +318,7 @@ export function crearGexWalls(opts = {}) {
   if (!opts.dir) throw new Error('gex-walls: falta dir');
   const ahora = opts.ahora || (() => Date.now());
   const bloqueado = opts.bloqueado || (() => false); // panel de operar o trade abierto
+  const visible = opts.visible || (() => true); // el ojo: apagado = no baja ni calcula
   const bajar = opts.bajar || (sym => bajarEtf(sym, opts.fetch));
   const aplicar = opts.aplicar || (async () => ({ ok: false, motivo: 'sin-tv' }));
   const horas = opts.horas || HORAS_ET;
@@ -334,6 +336,11 @@ export function crearGexWalls(opts = {}) {
   let aplicarFalloHasta = 0;
   let rapidos = 0; // reintentos rápidos seguidos con el estudio ausente (tope: después vuelve a la espera de 2 min)
   let reparado = false; // un estudio dañado se quita una sola vez por sesión (no entra en bucle)
+  let forzarCalculo = false; // al prender el ojo: mostrar lo guardado y calcular uno fresco
+  let anoteOjo = false;
+
+  function ojoOn() { try { return visible() !== false; } catch { return true; } }
+
 
   async function calcular(turno, { reserva = false } = {}) {
     const t0 = ahora();
@@ -374,19 +381,58 @@ export function crearGexWalls(opts = {}) {
     return { at, turno, t0, qqq, spy, qqqMs: qqqP.ms, spyMs: spyP.ms, calculoMs, zgMs, valores: valoresInputs(qqq, spy), nota };
   }
 
+  async function escribir(notaBase, { totalMs } = {}) {
+    const tA = ahora();
+    let res;
+    try { res = await aplicar(ultimo.valores, { reparar: !reparado }); } catch (e) { res = { ok: false, motivo: String(e && e.message || e) }; }
+    if (res && res.quitado) { reparado = true; if (opts.alQuitar) { try { opts.alQuitar(); } catch {} } }
+    const aplicarMs = ahora() - tA;
+    const motivo = res && res.ok ? '' : `aplicar: ${(res && res.motivo) || 'error'}`;
+    const nota = [notaBase, res && res.restaurado ? 'ojo restaurado' : '', res && res.visible === false ? 'oculto' : '', res && res.leidos ? `leído ${res.leidos}` : ''].filter(Boolean).join(' · ');
+    const linea = lineaWalls({ ...ultimo, aplicarMs, totalMs: totalMs != null ? totalMs : aplicarMs, error: motivo, nota });
+    const cambio = !!(res && res.ok && res.cambio !== false);
+    if (notaBase || motivo !== ultimoMotivo || cambio) anotar(opts.dir, linea);
+    ultimoMotivo = motivo;
+    verificado = ahora();
+    const sinEstudio = !!(res && (res.quitado || res.motivo === 'no está en el gráfico'));
+    aplicarFalloHasta = res && res.ok ? 0 : ahora() + (sinEstudio && rapidos < 15 ? (opts.reintentoReinstalarMs || 4000) : (opts.reintentoAplicarMs || 2 * 60 * 1000));
+    if (res && res.ok) rapidos = 0; else if (sinEstudio) rapidos++;
+    if (res && res.ok) { aplicadoFirma = firma(ultimo); estadoTxt = 'instalado'; }
+    else {
+      estadoTxt = `pendiente. ${(res && res.motivo) || 'error'}`;
+      if (sinEstudio && rapidos < 15 && timer && opts.pronto !== false) { const t2 = setTimeout(() => { correr().catch(() => {}); }, (opts.reintentoReinstalarMs || 4000) + 200); if (t2.unref) t2.unref(); }
+    }
+    return { res, aplicarMs, linea, cambio, ok: !!(res && res.ok) };
+  }
+
   async function correr() {
     if (ocupado) return { saltado: 'ocupado' };
     ocupado = true;
     try {
       const t = ahora();
+      if (!ojoOn()) {
+        forzarCalculo = false;
+        estadoTxt = 'ojo apagado';
+        if (!anoteOjo) { anotar(opts.dir, `${new Date(t).toISOString()} walls ojo apagado: no calcula`); anoteOjo = true; }
+        return { saltado: 'ojo' };
+      }
+      anoteOjo = false;
       const turno = turnoActual(t, horas);
+      const forzar = forzarCalculo;
       // En un feriado o al instalar por primera vez, si no hay niveles guardados, se calculan los del vencimiento más próximo.
-      const toca = turno ? turno !== hecho : (arranque && (diaDeMercado(t) || !ultimo));
-      const verificar = ultimo && aplicadoFirma === firma(ultimo) && t - verificado >= (opts.verificarMs || 2 * 60 * 1000);
+      const toca = forzar || (turno ? turno !== hecho : (arranque && (diaDeMercado(t) || !ultimo)));
+      const verificar = !forzar && ultimo && aplicadoFirma === firma(ultimo) && t - verificado >= (opts.verificarMs || 2 * 60 * 1000);
       if (!toca && !verificar && (!ultimo || aplicadoFirma === firma(ultimo))) return { nada: true };
+      // Al prender el ojo: se muestran ya los últimos niveles, aunque el panel o un trade esté abierto.
+      if (forzar && ultimo) {
+        const previo = await escribir('al prender · ultimo guardado');
+        if (bloqueado()) { estadoTxt = 'pendiente. Espera a que cierres el panel de operar o el trade.'; return { saltado: 'panel', mostrado: true, linea: previo.linea }; }
+      }
       if (bloqueado()) { estadoTxt = 'pendiente. Espera a que cierres el panel de operar o el trade.'; return { saltado: 'panel' }; }
       if (toca) {
         if (t < falloHasta) return { espera: true };
+        // Antes de bajar, si el estudio aún no tiene lo guardado, se pone para que no se vea vacío mientras calcula.
+        if (ultimo && aplicadoFirma !== firma(ultimo)) await escribir('ultimo guardado');
         const r = await calcular(turno || 'arranque', { reserva: !ultimo });
         if (r.error) { falloHasta = ahora() + (opts.reintentoMs || 2 * 60 * 1000); return r; }
         hecho = turno; arranque = false;
@@ -398,36 +444,21 @@ export function crearGexWalls(opts = {}) {
         }
         ultimo = r;
         guardar(opts.dir, ultimo);
+        forzarCalculo = false;
       }
       if (bloqueado()) { estadoTxt = 'pendiente. Espera a que cierres el panel de operar o el trade.'; return { saltado: 'panel' }; }
       // Si aplicar falló, no se vuelve a escribir en el estudio en cada vuelta de 15 s: se espera (por defecto 2 min).
-      if (!toca && t < aplicarFalloHasta) return { espera: true };
-      const tA = ahora();
-      let res;
-      try { res = await aplicar(ultimo.valores, { reparar: !reparado }); } catch (e) { res = { ok: false, motivo: String(e && e.message || e) }; }
-      if (res && res.quitado) { reparado = true; if (opts.alQuitar) { try { opts.alQuitar(); } catch {} } }
-      const aplicarMs = ahora() - tA;
-      const motivo = res && res.ok ? '' : `aplicar: ${(res && res.motivo) || 'error'}`;
-      const nota = [toca ? (ultimo.nota || '') : 'reaplicado', res && res.restaurado ? 'ojo restaurado' : '', res && res.visible === false ? 'oculto' : '', res && res.leidos ? `leído ${res.leidos}` : ''].filter(Boolean).join(' · ');
-      const linea = lineaWalls({ ...ultimo, aplicarMs, totalMs: toca ? ahora() - ultimo.t0 : aplicarMs, error: motivo, nota });
-      const cambio = !!(res && res.ok && res.cambio !== false);
-      if (toca || motivo !== ultimoMotivo || cambio) anotar(opts.dir, linea);
-      ultimoMotivo = motivo;
-      verificado = ahora();
-      // Si el estudio se quitó para reinstalarlo o aún no está en el gráfico, se reintenta pronto (la reinstalación tarda segundos); si no, espera 2 min.
-      const sinEstudio = !!(res && (res.quitado || res.motivo === 'no está en el gráfico'));
-      aplicarFalloHasta = res && res.ok ? 0 : ahora() + (sinEstudio && rapidos < 15 ? (opts.reintentoReinstalarMs || 4000) : (opts.reintentoAplicarMs || 2 * 60 * 1000));
-      if (res && res.ok) rapidos = 0; else if (sinEstudio) rapidos++;
-      if (res && res.ok) { aplicadoFirma = firma(ultimo); estadoTxt = 'instalado'; return { ok: true, cambio, linea }; }
-      estadoTxt = `pendiente. ${(res && res.motivo) || 'error'}`;
-      // Con el estudio quitado o aún sin instalar se vuelve a probar a los pocos segundos (no a la siguiente vuelta de 15 s).
-      if (sinEstudio && rapidos < 15 && timer && opts.pronto !== false) { const t2 = setTimeout(() => { correr().catch(() => {}); }, (opts.reintentoReinstalarMs || 4000) + 200); if (t2.unref) t2.unref(); }
-      return { error: (res && res.motivo) || 'error', linea };
+      if (!toca && !forzar && t < aplicarFalloHasta) return { espera: true };
+      const out = await escribir(toca ? (ultimo.nota || '') : 'reaplicado', { totalMs: toca && ultimo.t0 ? ahora() - ultimo.t0 : undefined });
+      if (out.ok) return { ok: true, cambio: out.cambio, linea: out.linea };
+      return { error: (out.res && out.res.motivo) || 'error', linea: out.linea };
     } finally { ocupado = false; }
   }
   function firma(u) { return u ? `${u.turno}|${JSON.stringify(u.valores)}` : ''; }
   // Si el estudio se reinstaló o TradingView se reabrió, se vuelve a aplicar lo último.
   function olvidarAplicado() { aplicadoFirma = ''; }
+  // El ojo se acaba de prender: muestra lo guardado ya y calcula uno nuevo (o lo deja pendiente si hay panel o trade abierto).
+  function prender() { forzarCalculo = true; return correr(); }
   function arrancar() {
     correr().catch(() => {});
     timer = setInterval(() => { correr().catch(() => {}); }, opts.cadaMs || 15000);
@@ -435,8 +466,8 @@ export function crearGexWalls(opts = {}) {
   }
   function detener() { if (timer) clearInterval(timer); timer = null; }
   function estado() {
-    return { ok: true, turno: ultimo ? ultimo.turno : null, at: ultimo ? ultimo.at : null, valores: ultimo ? ultimo.valores : null, aplicado: !!aplicadoFirma && aplicadoFirma === firma(ultimo), texto: estadoTxt };
+    return { ok: true, turno: ultimo ? ultimo.turno : null, at: ultimo ? ultimo.at : null, valores: ultimo ? ultimo.valores : null, aplicado: !!aplicadoFirma && aplicadoFirma === firma(ultimo), texto: estadoTxt, ojo: ojoOn() };
   }
-  const api = { correr, arrancar, detener, estado, olvidarAplicado };
+  const api = { correr, arrancar, detener, estado, olvidarAplicado, prender };
   return api;
 }
