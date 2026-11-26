@@ -98,7 +98,13 @@ new vm.Script(expr);
 assert.match(expr, /setInputValues/);
 assert.match(expr, /Live ratio/);
 assert.match(expr, /Gex - Put\/Call Walls/);
-assert.doesNotMatch(expr, /placeOrder|closePosition|activeBroker|setSymbol|createShape|removeEntity/);
+assert.doesNotMatch(expr, /placeOrder|closePosition|activeBroker|setSymbol|createShape/);
+// Solo quita el estudio propio, solo si pide reparar y solo si está dañado (sin sus inputs in_N).
+assert.equal((expr.match(/removeEntity/g) || []).length, 2);
+assert.match(expr, /if\(vistos===0 && danado\(actual\)\)\{\s*if\(J\.reparar && typeof c\.removeEntity==='function'\)\{ try\{ c\.removeEntity\(id\)/);
+// Nunca vuelve a escribir la lista completa de getInputValues (incluye los inputs internos de Pine).
+assert.doesNotMatch(expr, /setInputValues\(actual\)/);
+assert.match(expr, /setInputValues\(cambios\)/);
 
 // Motor: con el panel de operar abierto no baja ni aplica; corre al cerrarse.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gex-walls-'));
@@ -209,6 +215,37 @@ assert.match(fs.readFileSync(path.join(dirLimpio, 'gex.log'), 'utf8'), /ultimo d
   assert.match(lineas[lineas.length - 1], /walls 2026-11-27 09:50/);
   assert.doesNotMatch(lineas[lineas.length - 1], /ultimo dato/);
   assert.equal(aplicadosR[1].v.qqqCall, 105);
+}
+
+// Estudio dañado: se pide quitarlo una sola vez por sesión; después de quitarlo se avisa para reinstalar y se reintenta pasado el plazo.
+{
+  const dirD = fs.mkdtempSync(path.join(os.tmpdir(), 'gex-danado-'));
+  let relojD = Date.parse('2026-11-27T14:51:00Z');
+  const pedidos = [];
+  let avisos = 0;
+  let estadoEstudio = 'danado';
+  const wd = crearGexWalls({
+    dir: dirD,
+    ahora: () => relojD,
+    alQuitar: () => { avisos++; },
+    bajar: async (sym) => ({ json: sym === 'QQQ' ? json : zgJson, bytes: 10, ms: 7 }),
+    aplicar: async (v, op) => {
+      pedidos.push(op && op.reparar);
+      if (estadoEstudio === 'danado') { estadoEstudio = 'quitado'; return { ok: false, motivo: 'estudio dañado: lo quité para reinstalarlo', quitado: true }; }
+      if (estadoEstudio === 'quitado') return { ok: false, motivo: 'no está en el gráfico' };
+      return { ok: true, cambio: true };
+    },
+  });
+  assert.ok((await wd.correr()).error);
+  assert.equal(avisos, 1);
+  assert.deepEqual(pedidos, [true]);
+  relojD += 150000;
+  assert.ok((await wd.correr()).error); // aún no reinstalado
+  assert.deepEqual(pedidos, [true, false], 'después de quitar una vez, ya no pide quitar');
+  estadoEstudio = 'sano';
+  relojD += 150000;
+  assert.equal((await wd.correr()).ok, true);
+  assert.equal(avisos, 1);
 }
 // Error de CBOE: se anota y espera antes de reintentar.
 let rota = 0;

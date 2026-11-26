@@ -398,6 +398,7 @@ const guardarHist = () => { for (const d of new Set([diaFarm(), diaFarm(Date.now
 setInterval(guardarHist, 3 * 60 * 1000);
 setTimeout(guardarHist, 15000);
 
+let reinstalarAlgo = () => {};
 let algoTv = { estado: () => ({ conectado: false, algos: [], texto: '', senal: { seq: 0, barra: null, lado: null } }), intentar: async () => algoTv.estado(), sincronizar: async () => algoTv.estado(), fijar: async () => ({ ok: false, ...algoTv.estado() }), oirSenal: async () => algoTv.estado(), lecturaProfito: () => null, anotarAjuste: () => {} };
 try {
   algoTv = crearAlgoTv({
@@ -431,6 +432,7 @@ try {
   const oirSenal = () => algoTv.oirSenal().catch(() => {});
   setTimeout(pasarAlgo, 20000);
   setInterval(pasarAlgo, 10 * 60 * 1000);
+  reinstalarAlgo = () => setTimeout(pasarAlgo, 3000);
   setTimeout(verOjos, 25000);
   setInterval(verOjos, 30000);
   setTimeout(oirSenal, 5000);
@@ -443,9 +445,11 @@ try {
   gexWalls = crearGexWalls({
     dir: DIR,
     bloqueado: () => panelHasta > Date.now() || colchon.status().state === 'running',
-    aplicar: async (valores) => {
+    // Si el estudio quedó dañado en TradingView, se quita y pasarAlgo lo reinstala limpio.
+    alQuitar: () => { console.log('gex-walls: estudio dañado quitado; se reinstala'); reinstalarAlgo(); },
+    aplicar: async (valores, op = {}) => {
       const E = await cdpEvaluator(9222);
-      try { return await Promise.race([E.evaluate(expresionAplicar(valores)), sleep(20000).then(() => { throw new Error('tiempo agotado'); })]); }
+      try { return await Promise.race([E.evaluate(expresionAplicar(valores, { reparar: !!op.reparar })), sleep(20000).then(() => { throw new Error('tiempo agotado'); })]); }
       finally { try { E.close(); } catch {} }
     },
   });

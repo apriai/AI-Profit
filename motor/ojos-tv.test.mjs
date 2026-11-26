@@ -4,11 +4,14 @@ import vm from 'node:vm';
 import { exprOjos } from './pine-algo.mjs';
 import { expresionAplicar, GEX_WALLS_NOMBRE, INPUTS } from './gex-walls.mjs';
 
+// Inputs internos de un estudio Pine en TradingView: getInputValues los devuelve, pero escribirlos de vuelta (ya sin su envoltorio) daña el estudio.
+const INTERNOS = ['text', 'pineId', 'pineVersion', 'pineFeatures'];
 function falso({ estudios, apiSet = 'pega', apiVisible = true, modeloSet = 'pega', alEscribir = null, float32 = false } = {}) {
-  const ev = { setVisible: 0, modeloSet: 0, escrituras: 0 };
+  const ev = { setVisible: 0, modeloSet: 0, escrituras: 0, escritos: [], quitados: [] };
   const estado = estudios.map(e => ({ visible: true, ...e }));
   const api = {
     activeChart: () => ({
+      removeEntity: (id) => { const i = estado.findIndex(s => s.id === id); if (i >= 0) { estado.splice(i, 1); ev.quitados.push(id); } },
       getAllStudies: () => estado.map(s => ({ id: s.id, name: s.name })),
       getStudyById: (id) => {
         const s = estado.find(x => x.id === id);
@@ -17,8 +20,18 @@ function falso({ estudios, apiSet = 'pega', apiVisible = true, modeloSet = 'pega
           isVisible: apiVisible ? () => s.visible : undefined,
           setVisible: (v) => { ev.setVisible++; if (apiSet === 'pega') s.visible = v; },
           getInputValues: () => s.inputs.map(i => ({ ...i })),
-          setInputValues: (arr) => { ev.escrituras++; s.inputs = arr.map(i => ({ ...i, value: float32 && typeof i.value === 'number' ? Math.fround(i.value) : i.value })); if (alEscribir) alEscribir(s); },
-          getInputsInfo: () => s.inputs.map(i => ({ id: i.id, name: i.name, type: 'float' })),
+          // Igual que TradingView: cada elemento escribe su input por id; los que no existen se ignoran; los internos dañan el estudio.
+          setInputValues: (arr) => {
+            ev.escrituras++;
+            for (const i of arr) {
+              ev.escritos.push(i.id);
+              if (INTERNOS.includes(i.id)) { s.inputs = []; s.danado = true; continue; }
+              const actual = s.inputs.find(x => x.id === i.id);
+              if (actual) actual.value = float32 && typeof i.value === 'number' ? Math.fround(i.value) : i.value;
+            }
+            if (alEscribir) alEscribir(s);
+          },
+          getInputsInfo: () => s.inputs.filter(i => /^in_\d+$/.test(i.id)).map(i => ({ id: i.id, name: i.name, type: 'float' })),
         };
       },
     }),
@@ -36,7 +49,8 @@ function falso({ estudios, apiSet = 'pega', apiVisible = true, modeloSet = 'pega
 const NOMBRES = ['Profito Algoritmo', GEX_WALLS_NOMBRE, 'Session Levels (High/Lows)'];
 const tres = () => [
   { id: 'p1', name: 'Profito Algoritmo' },
-  { id: 'g1', name: 'Gex - Put/Call Walls', inputs: [{ id: 'in_0', name: 'Mode', value: 'Live ratio' }, ...INPUTS.map(([n], i) => ({ id: 'in_' + (i + 1), name: n, value: 0 }))] },
+  { id: 'g1', name: 'Gex - Put/Call Walls', inputs: [{ id: 'in_0', name: 'Mode', value: 'Live ratio' }, ...INPUTS.map(([n], i) => ({ id: 'in_' + (i + 1), name: n, value: 0 })),
+    { id: 'text', value: 'IL…' }, { id: 'pineId', value: 'USER;abc' }, { id: 'pineVersion', value: '1.0' }, { id: 'pineFeatures', value: '{"indicator":1}' }] },
   // Session Levels: título corto distinto del título (getAllStudies dice «NQ Sess Lvls»; metaInfo dice el título largo).
   { id: 's1', name: 'NQ Sess Lvls', desc: 'Session Levels (High/Lows)', short: 'NQ Sess Lvls' },
 ];
@@ -139,5 +153,48 @@ for (const [nombre, id] of [['Profito Algoritmo', 'p1'], ['Gex - Put/Call Walls'
   const lee = await tv.correr(exprOjos({ nombres: NOMBRES, accion: 'leer' }));
   assert.equal(lee.items.find(i => i.nombre === GEX_WALLS_NOMBRE).visible, false);
   assert.equal(lee.items.find(i => i.nombre === GEX_WALLS_NOMBRE).enGrafico, 1);
+}
+// 8. Causa raíz (logs 0.10.69 bf351e7): la granja escribía de vuelta TODA la lista de getInputValues, con los inputs internos de Pine
+//    («text», «pineId», «pineVersion», «pineFeatures»). En TradingView eso deja el estudio dañado (sin inputs, «runtime error»).
+//    Ahora solo se escriben los 9 inputs propios y los internos no se tocan nunca.
+{
+  const valores = { qqqCall: 650, qqqPut: 640, qqqTop: 640, spyCall: 730, spyPut: 700, spyTop: 700, qqqZG: 646.3, spyZG: 719.39 };
+  const tv = falso({ estudios: tres() });
+  const r = await tv.correr(expresionAplicar(valores));
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(tv.estado[1].danado, undefined, 'el estudio no se daña');
+  assert.equal(tv.ev.escritos.some(id => INTERNOS.includes(id)), false, 'no se escribe ningún input interno');
+  assert.deepEqual([...new Set(tv.ev.escritos)].sort(), ['in_1', 'in_2', 'in_3', 'in_4', 'in_5', 'in_6', 'in_7', 'in_8']);
+  assert.equal(tv.estado[1].inputs.find(i => i.id === 'pineId').value, 'USER;abc');
+  assert.equal(tv.estado[1].inputs.find(i => i.id === 'in_1').value, 650);
+  // Una segunda aplicación igual no escribe nada. Cambiar solo un nivel escribe solo ese.
+  assert.equal((await tv.correr(expresionAplicar(valores))).cambio, false);
+  const antes = tv.ev.escritos.length;
+  assert.equal((await tv.correr(expresionAplicar({ ...valores, qqqPut: 641 }))).ok, true);
+  assert.deepEqual(tv.ev.escritos.slice(antes), ['in_2']);
+}
+// 9. Estudio ya dañado por la versión anterior (sin inputs): con `reparar` se quita del gráfico para reinstalarlo; sin `reparar` solo lo dice.
+{
+  const valores = { qqqCall: 650, qqqPut: 640, qqqTop: 640, spyCall: 730, spyPut: 700, spyTop: 700, qqqZG: 646.3, spyZG: 719.39 };
+  const roto = () => tres().map(s => s.id === 'g1' ? { ...s, inputs: [] } : s);
+  const sin = falso({ estudios: roto() });
+  const r0 = await sin.correr(expresionAplicar(valores));
+  assert.equal(r0.ok, false);
+  assert.equal(r0.danado, true);
+  assert.equal(r0.quitado, undefined);
+  assert.equal(sin.estado.length, 3, 'sin reparar no se quita nada');
+  const con = falso({ estudios: roto() });
+  const r1 = await con.correr(expresionAplicar(valores, { reparar: true }));
+  assert.equal(r1.ok, false);
+  assert.equal(r1.quitado, true);
+  assert.deepEqual(con.ev.quitados, ['g1']);
+  assert.deepEqual(con.estado.map(s => s.id), ['p1', 's1'], 'solo se quita el Gex dañado');
+  assert.equal((await con.correr(expresionAplicar(valores, { reparar: true }))).motivo, 'no está en el gráfico');
+  // Un estudio sano cuyos inputs no coinciden NO se quita aunque se pida reparar (tiene sus in_N).
+  const sano = falso({ estudios: tres().map(s => s.id === 'g1' ? { ...s, inputs: [{ id: 'in_0', name: 'Otro', value: 'x' }, { id: 'pineId', value: 'USER;abc' }] } : s) });
+  const r2 = await sano.correr(expresionAplicar(valores, { reparar: true }));
+  assert.equal(r2.ok, false);
+  assert.equal(r2.quitado, undefined);
+  assert.equal(sano.estado.length, 3);
 }
 console.log('ojos-tv ok');

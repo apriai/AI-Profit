@@ -184,8 +184,12 @@ export function valoresInputs(q, s) {
 }
 
 // Escribe los 8 niveles (y Mode = Live ratio) en el estudio «Gex - Put/Call Walls» del gráfico activo.
-export function expresionAplicar(valores, { nombre = GEX_WALLS_NOMBRE, studyId = '' } = {}) {
-  const job = JSON.stringify({ nombre, studyId: String(studyId || ''), valores, inputs: INPUTS });
+// Solo se escriben los inputs que cambian (nunca la lista completa que devuelve getInputValues): esa lista trae también
+// los inputs internos de Pine («text», «pineId», «pineVersion», «pineFeatures») y escribirlos de vuelta, ya sin su envoltorio
+// {v, f, t}, deja el estudio dañado en TradingView («runtime error» / no se puede leer el Pine).
+// Si el estudio ya está dañado (TradingView lo dejó sin inputs) y `reparar` es true, se quita del gráfico para que la granja lo reinstale.
+export function expresionAplicar(valores, { nombre = GEX_WALLS_NOMBRE, studyId = '', reparar = false } = {}) {
+  const job = JSON.stringify({ nombre, studyId: String(studyId || ''), valores, inputs: INPUTS, reparar: !!reparar });
   return `(async function(){
     var J=${job};
     var api=window.TradingViewApi; if(!api||typeof api.activeChart!=='function') return {ok:false,motivo:'sin-tv'};
@@ -208,31 +212,44 @@ export function expresionAplicar(valores, { nombre = GEX_WALLS_NOMBRE, studyId =
     var nombres={}; try{ var info=typeof st.getInputsInfo==='function'?st.getInputsInfo():[]; for(var k=0;k<info.length;k++){ var it=info[k]; if(it&&it.type!=='color'&&it.name&&!nombres[it.name]) nombres[it.name]=it.id; } }catch(e){}
     var ids={}; ids.mode=nombres['Mode']||'in_0';
     for(var m=0;m<J.inputs.length;m++){ ids[J.inputs[m][1]]=nombres[J.inputs[m][0]]||('in_'+(m+1)); }
-    var actual=st.getInputValues()||[]; var quiero={}; quiero[ids.mode]='Live ratio';
+    var quiero={}; quiero[ids.mode]='Live ratio';
     for(var m2=0;m2<J.inputs.length;m2++){ var clave=J.inputs[m2][1]; quiero[ids[clave]]=J.valores[clave]; }
-    var vistos=0;
-    for(var a=0;a<actual.length;a++){ if(Object.prototype.hasOwnProperty.call(quiero,actual[a].id)){ actual[a].value=quiero[actual[a].id]; vistos++; } }
+    function tiene(k){ return Object.prototype.hasOwnProperty.call(quiero,k); }
+    var actual=st.getInputValues()||[];
+    var vistos=0; for(var a=0;a<actual.length;a++){ if(tiene(actual[a].id)) vistos++; }
+    // Estudio dañado: TradingView lo dejó sin sus inputs (ninguno de los in_N). Se quita para que la granja lo reinstale limpio.
+    function danado(lista){ if(!lista.length) return true; for(var d=0;d<lista.length;d++){ if(/^in_\\d+$/.test(String(lista[d].id))) return false; } return true; }
+    if(vistos===0 && danado(actual)){
+      if(J.reparar && typeof c.removeEntity==='function'){ try{ c.removeEntity(id); return {ok:false, motivo:'estudio dañado: lo quité para reinstalarlo', danado:true, quitado:true, studyId:id}; }catch(e){} }
+      return {ok:false, motivo:'estudio dañado', danado:true, studyId:id};
+    }
     if(vistos<J.inputs.length+1) return {ok:false,motivo:'inputs distintos ('+vistos+')'};
-    var antes=st.getInputValues()||[]; var iguales=0;
-    for(var q=0;q<antes.length;q++){ if(Object.prototype.hasOwnProperty.call(quiero,antes[q].id) && igual(antes[q].value,quiero[antes[q].id])) iguales++; }
-    if(iguales===vistos) return {ok:true, studyId:id, aplicados:iguales, cambio:false, visible:lee(st), motivo:''};
+    var cambios=[];
+    for(var a2=0;a2<actual.length;a2++){ if(tiene(actual[a2].id) && !igual(actual[a2].value,quiero[actual[a2].id])) cambios.push({id:actual[a2].id, value:quiero[actual[a2].id]}); }
+    if(!cambios.length) return {ok:true, studyId:id, aplicados:vistos, cambio:false, visible:lee(st), motivo:''};
     // El ojo manda: lo que tenía antes de escribir (visible u oculto) es lo que queda después.
     var vis=lee(st);
-    st.setInputValues(actual);
-    await new Promise(function(r){ setTimeout(r,300); });
-    var id2=buscar()||id; var st2=null; try{ st2=c.getStudyById(id2); }catch(e){}
+    st.setInputValues(cambios);
+    // Cada input reejecuta el Pine: se espera a que TradingView termine (hasta ~6 s) y se confirma leyendo de nuevo.
+    var id2=id, st2=st, bien=0, despues=[];
+    for(var w=0;w<20;w++){
+      await new Promise(function(r){ setTimeout(r,300); });
+      id2=buscar()||id2; try{ st2=c.getStudyById(id2)||st2; }catch(e){}
+      despues=(st2&&st2.getInputValues&&st2.getInputValues())||[]; bien=0;
+      for(var b2=0;b2<despues.length;b2++){ if(tiene(despues[b2].id) && igual(despues[b2].value,quiero[despues[b2].id])) bien++; }
+      if(bien===vistos) break;
+    }
     var restaurado=false;
     if(vis!==null && st2 && lee(st2)!==vis){
       try{ st2.setVisible(vis); restaurado=true; }catch(e){}
       if(lee(st2)!==vis){ try{
-        var w=api._activeChartWidgetWV.value()._chartWidget; var mo=w.model(); var inner=mo.model?mo.model():mo; var all=inner.dataSources?inner.dataSources():[];
+        var w2=api._activeChartWidgetWV.value()._chartWidget; var mo=w2.model(); var inner=mo.model?mo.model():mo; var all=inner.dataSources?inner.dataSources():[];
         for(var z=0;z<all.length;z++){ var sid=''; try{ sid=all[z].id&&(typeof all[z].id==='function'?all[z].id():all[z].id); }catch(e){}
           if(String(sid)===String(id2)){ var pv=all[z].properties&&all[z].properties().visible; if(pv&&typeof pv.setValue==='function'){ pv.setValue(vis); restaurado=true; } } }
       }catch(e){} }
     }
-    var despues=(st2&&st2.getInputValues&&st2.getInputValues())||[]; var bien=0;
-    for(var b=0;b<despues.length;b++){ if(Object.prototype.hasOwnProperty.call(quiero,despues[b].id) && igual(despues[b].value,quiero[despues[b].id])) bien++; }
-    return {ok:bien===vistos, studyId:id2, aplicados:bien, cambio:true, restaurado:restaurado, visible:lee(st2), motivo:bien===vistos?'':'no se confirmaron los inputs'};
+    var roto=bien===0 && danado(despues);
+    return {ok:bien===vistos, studyId:id2, aplicados:bien, cambio:true, restaurado:restaurado, visible:lee(st2), danado:roto||undefined, motivo:bien===vistos?'':(roto?'estudio dañado tras escribir':'no se confirmaron los inputs')};
   })()`;
 }
 
@@ -303,6 +320,7 @@ export function crearGexWalls(opts = {}) {
   let ultimoMotivo = '';
   let verificado = 0;
   let aplicarFalloHasta = 0;
+  let reparado = false; // un estudio dañado se quita una sola vez por sesión (no entra en bucle)
 
   async function calcular(turno, { reserva = false } = {}) {
     const t0 = ahora();
@@ -373,7 +391,8 @@ export function crearGexWalls(opts = {}) {
       if (!toca && t < aplicarFalloHasta) return { espera: true };
       const tA = ahora();
       let res;
-      try { res = await aplicar(ultimo.valores); } catch (e) { res = { ok: false, motivo: String(e && e.message || e) }; }
+      try { res = await aplicar(ultimo.valores, { reparar: !reparado }); } catch (e) { res = { ok: false, motivo: String(e && e.message || e) }; }
+      if (res && res.quitado) { reparado = true; if (opts.alQuitar) { try { opts.alQuitar(); } catch {} } }
       const aplicarMs = ahora() - tA;
       const motivo = res && res.ok ? '' : `aplicar: ${(res && res.motivo) || 'error'}`;
       const nota = [toca ? (ultimo.nota || '') : 'reaplicado', res && res.restaurado ? 'ojo restaurado' : '', res && res.visible === false ? 'oculto' : ''].filter(Boolean).join(' · ');
