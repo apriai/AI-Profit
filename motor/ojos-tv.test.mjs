@@ -123,30 +123,21 @@ for (const [nombre, id] of [['Profito Algoritmo', 'p1'], ['Gex - Put/Call Walls'
   assert.equal(dos.cambio, false);
   assert.equal(tv.ev.escrituras, 1, 'una sola escritura, no una por vuelta');
 }
-// 7. Copia puesta a mano del indicador original («NQ GEX Zones»): el ojo del Gex la muestra y oculta también,
-//    aunque la copia administrada esté vacía y oculta (caso de los logs de Josue).
+// 7. Una copia con otro nombre (p. ej. el indicador original «NQ GEX Zones») no la controla el ojo.
+//    Solo se anota en «cercanos» para el registro.
 {
   const manual = { id: 'm1', name: 'NQ GEX Zones', desc: 'NQ 0DTE GEX Zones (QQQ + SPY)', short: 'NQ GEX Zones', inputs: [] };
-  const alias = { [GEX_WALLS_NOMBRE]: ['NQ 0DTE GEX Zones (QQQ + SPY)', 'NQ GEX Zones'] };
   const tv = falso({ estudios: [...tres(), manual] });
-  tv.estado.find(s => s.id === 'g1').visible = false; // la administrada ya está oculta y vacía
-  const lee = await tv.correr(exprOjos({ nombres: NOMBRES, accion: 'leer', alias }));
-  const g = lee.items.find(i => i.nombre === GEX_WALLS_NOMBRE);
-  assert.equal(g.visible, true, 'la copia manual sigue visible: el ojo debe verse abierto');
-  assert.equal(g.studyId, 'g1');
-  assert.equal(lee.items.find(i => i.nombre === 'Profito Algoritmo').copiasExtra, 0);
-  const off = await tv.correr(exprOjos({ accion: 'fijar', nombre: GEX_WALLS_NOMBRE, visible: false, tambien: alias[GEX_WALLS_NOMBRE] }));
+  const off = await tv.correr(exprOjos({ accion: 'fijar', nombre: GEX_WALLS_NOMBRE, visible: false }));
   assert.equal(off.ok, true);
-  assert.equal(tv.estado.find(s => s.id === 'm1').visible, false, 'la copia manual se oculta');
+  assert.equal(tv.estado.find(s => s.id === 'g1').visible, false, 'la copia administrada se oculta');
+  assert.equal(tv.estado.find(s => s.id === 'm1').visible, true, 'la copia con otro nombre no se toca');
   assert.equal(tv.estado.find(s => s.id === 'p1').visible, true, 'Profito no se toca');
   assert.equal(tv.estado.find(s => s.id === 's1').visible, true, 'Session Levels no se toca');
-  assert.match(off.cercanos, /m1=NQ GEX Zones\(oculto\)/);
-  const on = await tv.correr(exprOjos({ accion: 'fijar', nombre: GEX_WALLS_NOMBRE, visible: true, tambien: alias[GEX_WALLS_NOMBRE] }));
-  assert.equal(on.ok, true);
-  assert.equal(tv.estado.find(s => s.id === 'm1').visible, true);
-  // Sin alias, un estudio con otro nombre no se toca.
-  const tv2 = falso({ estudios: [...tres(), manual] });
-  await tv2.correr(exprOjos({ accion: 'fijar', nombre: GEX_WALLS_NOMBRE, visible: false }));
-  assert.equal(tv2.estado.find(s => s.id === 'm1').visible, true);
+  assert.match(off.cercanos, /m1=NQ GEX Zones\(visible\)/);
+  assert.match(off.cercanos, /g1=Gex - Put\/Call Walls\(oculto\)/);
+  const lee = await tv.correr(exprOjos({ nombres: NOMBRES, accion: 'leer' }));
+  assert.equal(lee.items.find(i => i.nombre === GEX_WALLS_NOMBRE).visible, false);
+  assert.equal(lee.items.find(i => i.nombre === GEX_WALLS_NOMBRE).enGrafico, 1);
 }
 console.log('ojos-tv ok');

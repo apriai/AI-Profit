@@ -8,11 +8,7 @@
   {
     "nombre": "Gex - Put/Call Walls",
     "version": "1",
-    "archivo": "gex-put-call-walls.pine",
-    "tambien": [
-      "NQ 0DTE GEX Zones (QQQ + SPY)",
-      "NQ GEX Zones"
-    ]
+    "archivo": "gex-put-call-walls.pine"
   },
   {
     "nombre": "Session Levels (High/Lows)",
