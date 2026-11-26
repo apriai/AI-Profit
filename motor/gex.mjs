@@ -23,7 +23,26 @@ export function parseOpcion(symbol) {
   return { year, month, day, tipo: m[4], strike: Number(m[5]) / 1000 };
 }
 
+// Días de media sesión (NYSE): las opciones vencen a la 1:00 PM ET, no a las 4:00 PM.
+export const MEDIA_SESION = new Set(['2026-11-27', '2026-12-24', '2027-11-26', '2027-12-23']);
+// Feriados NYSE (día completo cerrado). Sábado y domingo se ven aparte.
+export const FERIADOS = new Set([
+  '2026-01-01', '2026-01-19', '2026-02-16', '2026-04-03', '2026-05-25',
+  '2026-06-19', '2026-07-03', '2026-09-07', '2026-11-26', '2026-12-25',
+  '2027-01-01', '2027-01-18', '2027-02-15', '2027-03-26', '2027-05-31',
+  '2027-06-18', '2027-07-05', '2027-09-06', '2027-11-25', '2027-12-24',
+]);
+
+export function fechaClave(year, month, day) {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+export function horaVence(year, month, day) {
+  return MEDIA_SESION.has(fechaClave(year, month, day)) ? 13 : 16;
+}
+
 export function instanteExpira(year, month, day) {
+  const hora = horaVence(year, month, day);
   let utc = Date.UTC(year, month - 1, day, 21, 0, 0);
   const fmt = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -32,7 +51,7 @@ export function instanteExpira(year, month, day) {
   for (let i = 0; i < 4; i++) {
     const partes = Object.fromEntries(fmt.formatToParts(new Date(utc)).map(p => [p.type, p.value]));
     const visto = Date.UTC(+partes.year, +partes.month - 1, +partes.day, +partes.hour, +partes.minute);
-    utc += Date.UTC(year, month - 1, day, 16, 0) - visto;
+    utc += Date.UTC(year, month - 1, day, hora, 0) - visto;
   }
   return utc;
 }

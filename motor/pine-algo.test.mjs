@@ -127,9 +127,11 @@ assert.equal(algo.estado().algos.some(a => a.nombre === 'Smart Money Algo'), fal
 const hecho = await algo.intentar();
 assert.match(hecho.texto, /Profito Algoritmo instalado v2/);
 assert.equal(hecho.fase, 'listos');
-assert.equal(hecho.algos.length, 1);
+assert.equal(hecho.algos.length, 2);
+assert.deepEqual(hecho.algos.map(a => a.nombre), ['Profito Algoritmo', 'Gex - Put/Call Walls']);
 const estudios = vistos.filter(c => c.includes('pine-facade/save/new'));
-assert.equal(estudios.length, 1);
+assert.equal(estudios.length, 2);
+assert.equal(estudios.filter(c => c.includes('"nombre":"Gex - Put/Call Walls"')).length, 1);
 assert.equal(estudios.filter(c => c.includes('"nombre":"Profito Algoritmo"')).length, 1);
 assert.equal(estudios.filter(c => c.includes('Smart Money')).length, 0);
 assert.match(estudios[0], /formasEstudio/);
@@ -246,6 +248,7 @@ migra = crearAlgoTv({
       return { ok: true, mirar: true, enGrafico: 0, visible: null, studyId: '', viejos: 1, visibleViejo: false };
     }
     assert.equal(migra.estado().fase, 'instalando');
+    if (codigo.includes('"nombre":"Gex - Put/Call Walls"')) return { ok: true, estado: 'instalado', visible: true, studyId: 'gx1', scriptId: 'USER;gx', plan: 'instalar' };
     assert.match(codigo, /Ai Profit Camp Algo/);
     assert.match(codigo, /Profito Algoritmo/);
     assert.match(codigo, /formasEstudio/);

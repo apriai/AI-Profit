@@ -7,6 +7,7 @@ import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, co
 import { attachReporte } from './tv-reporte.mjs';
 import { fijarResumenTv, resumenTvActivo } from './resumen-tv.mjs';
 import { attachGex } from './gex.mjs';
+import { crearGexWalls, expresionAplicar } from './gex-walls.mjs';
 import { crearPaqueteLogs } from './descargar-logs.mjs';
 import { createVistaPrevia } from './tv-vista-previa.mjs';
 import { estrategiasPropias } from './estrategias-propias.mjs';
@@ -378,7 +379,7 @@ http.createServer((q, r) => manejar(q, r, {
       return out;
     },
   },
-  gex: { estado: () => gexApi ? gexApi.estado() : { ok: true, signo: null, gex: null } },
+  gex: { estado: () => ({ ...(gexApi ? gexApi.estado() : { ok: true, signo: null, gex: null }), walls: gexWalls ? gexWalls.estado() : null }) },
   descargarLogs: (j) => crearPaqueteLogs({
     dir: DIR,
     root: ROOT,
@@ -435,3 +436,19 @@ try {
   setTimeout(oirSenal, 5000);
   setInterval(oirSenal, 1500);
 } catch (e) { console.log('algo: no arrancó; el motor sigue.', e && e.message); }
+// «Gex - Put/Call Walls»: calcula los niveles 0DTE a las horas de gex-walls.mjs y los escribe en los inputs del estudio.
+// Con el panel de operar o un trade abierto no calcula ni aplica; lo pendiente corre al cerrarse.
+let gexWalls = null;
+try {
+  gexWalls = crearGexWalls({
+    dir: DIR,
+    bloqueado: () => panelHasta > Date.now() || colchon.status().state === 'running',
+    aplicar: async (valores) => {
+      const E = await cdpEvaluator(9222);
+      try { return await Promise.race([E.evaluate(expresionAplicar(valores)), sleep(20000).then(() => { throw new Error('tiempo agotado'); })]); }
+      finally { try { E.close(); } catch {} }
+    },
+  });
+  gexWalls.arrancar();
+  console.log('gex-walls: listo');
+} catch (e) { console.log('gex-walls: no arrancó; el motor sigue.', e && e.message); }

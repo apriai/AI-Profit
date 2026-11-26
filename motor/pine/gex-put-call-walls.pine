@@ -1,0 +1,211 @@
+//@version=6
+indicator("Gex - Put/Call Walls", shorttitle = "Gex - Put/Call Walls", overlay = true, max_boxes_count = 20, max_lines_count = 20, max_labels_count = 20)
+
+// ───────── Mode ─────────
+string mode    = input.string("Live ratio", "Mode", options = ["Live ratio", "Fixed NQ levels"], group = "Mode",
+     tooltip = "Live ratio: ETF strike x (NQ / ETF), updates with the chart. Fixed: uses the NQ prices below.")
+bool   useLive = mode == "Live ratio"
+
+// ───────── ETF strikes (0DTE). La granja los llena a las 8:00, 9:30, 9:50, 11:00 y 12:00 ET. 0 = sin nivel ─────────
+string gE = "ETF strikes (0DTE)"
+float qqqCW  = input.float(0.0,  "QQQ Call Wall",   step = 1.0,  group = gE)
+float qqqPW  = input.float(0.0,  "QQQ Put Wall",    step = 1.0,  group = gE)
+float qqqTop = input.float(0.0,  "QQQ Top GEX",     step = 1.0,  group = gE)
+float spyCW  = input.float(0.0,  "SPY Call Wall",   step = 1.0,  group = gE)
+float spyPW  = input.float(0.0,  "SPY Put Wall",    step = 1.0,  group = gE)
+float spyTop = input.float(0.0,  "SPY Top GEX",     step = 1.0,  group = gE)
+float qqqZG  = input.float(0.0, "QQQ Zero Gamma",  step = 0.01, group = gE, tooltip = "ETF price where 0DTE dealer gamma flips sign (not a strike).")
+float spyZG  = input.float(0.0, "SPY Zero Gamma",  step = 0.01, group = gE)
+
+// ───────── Fixed NQ levels (used in "Fixed NQ levels" mode) ─────────
+string gF = "Fixed NQ levels"
+float fxQqqCW  = input.float(0.0, "NQ: QQQ Call Wall",  step = 0.25, group = gF)
+float fxQqqPW  = input.float(0.0, "NQ: QQQ Put Wall",   step = 0.25, group = gF)
+float fxQqqTop = input.float(0.0, "NQ: QQQ Top GEX",    step = 0.25, group = gF)
+float fxSpyCW  = input.float(0.0, "NQ: SPY Call Wall",  step = 0.25, group = gF)
+float fxSpyPW  = input.float(0.0, "NQ: SPY Put Wall",   step = 0.25, group = gF)
+float fxSpyTop = input.float(0.0, "NQ: SPY Top GEX",    step = 0.25, group = gF)
+float fxQqqZG  = input.float(0.0, "NQ: QQQ Zero Gamma", step = 0.25, group = gF)
+float fxSpyZG  = input.float(0.0, "NQ: SPY Zero Gamma", step = 0.25, group = gF)
+
+// ───────── Fallback ratios (used if live ETF data is missing) ─────────
+string gR = "Fallback ratios"
+float qqqRatioIn = input.float(41.1792, "NQ / QQQ", step = 0.0001, group = gR)
+float spyRatioIn = input.float(36.4235, "NQ / SPY", step = 0.0001, group = gR)
+
+// ───────── Zones ─────────
+string gZ = "Zones"
+string widthMode = input.string("Fixed points", "Zone width", options = ["Fixed points", "Half strike spacing", "ATR %"], group = gZ,
+     tooltip = "Fixed points: ± the points below. Half strike spacing: ± half a strike converted to NQ (QQQ $1 ≈ 41 pts, SPY $1 ≈ 36 pts). ATR %: ± a % of the ATR on the timeframe below.")
+float fixedHW   = input.float(20.0, "Fixed: ± points", minval = 0.25, step = 0.25, group = gZ)
+float qqqStep   = input.float(1.0,  "QQQ strike spacing ($)", minval = 0.5, step = 0.5, group = gZ)
+float spyStep   = input.float(1.0,  "SPY strike spacing ($)", minval = 0.5, step = 0.5, group = gZ)
+float atrPct    = input.float(50.0, "ATR %: ± % of ATR", minval = 1.0, step = 5.0, group = gZ)
+int   atrLen    = input.int(14, "ATR length", minval = 1, group = gZ)
+string atrTf    = input.timeframe("5", "ATR timeframe", group = gZ)
+int   fillTr    = input.int(88, "Zone transparency (0-100)", minval = 0, maxval = 100, group = gZ, tooltip = "Higher = fainter.")
+bool  showBdr   = input.bool(false, "Thin zone border", group = gZ)
+bool  showMid   = input.bool(false, "Faint center line in zones", group = gZ)
+int   midTr     = input.int(70, "Center line transparency", minval = 0, maxval = 100, group = gZ)
+
+// ───────── Zero Gamma lines (thin, no band) ─────────
+string gG = "Zero Gamma"
+bool  showQZG = input.bool(true, "Show QQQ Zero γ (solid)",  group = gG)
+bool  showSZG = input.bool(true, "Show SPY Zero γ (dotted)", group = gG)
+color cQZG    = input.color(color.gray,  "QQQ Zero γ color", group = gG)
+color cSZG    = input.color(#B2B5BE,     "SPY Zero γ color", group = gG)
+
+// ───────── Style ─────────
+string gS = "Style"
+int   lblOff = input.int(5,  "Wall label offset (bars)",    minval = 0, group = gS)
+int   topOff = input.int(35, "Top GEX label offset (bars)", minval = 0, group = gS)
+color cQCall = input.color(color.lime,   "QQQ Call Wall", group = gS)
+color cSCall = input.color(#00BFA5,      "SPY Call Wall", group = gS)
+color cQPut  = input.color(color.red,    "QQQ Put Wall",  group = gS)
+color cSPut  = input.color(#FF6D00,      "SPY Put Wall",  group = gS)
+color cQTop  = input.color(color.purple, "QQQ Top GEX",   group = gS)
+color cSTop  = input.color(color.yellow, "SPY Top GEX",   group = gS)
+
+// ───────── Live ratio (regular session only, frozen when ETF is closed) ─────────
+float qqqPx = request.security(ticker.new("NASDAQ", "QQQ", session.regular), timeframe.period, close, gaps = barmerge.gaps_on)
+float spyPx = request.security(ticker.new("AMEX", "SPY", session.regular), timeframe.period, close, gaps = barmerge.gaps_on)
+
+var float qqqRatio = na
+var float spyRatio = na
+if not na(qqqPx) and qqqPx > 0
+    qqqRatio := close / qqqPx
+if not na(spyPx) and spyPx > 0
+    spyRatio := close / spyPx
+
+float qR = na(qqqRatio) ? qqqRatioIn : qqqRatio
+float sR = na(spyRatio) ? spyRatioIn : spyRatio
+
+conv(float etfLevel, float ratio) =>
+    etfLevel > 0 ? math.round_to_mintick(etfLevel * ratio) : na
+
+fixed(float nqLevel) =>
+    nqLevel > 0 ? nqLevel : na
+
+float yQCW  = useLive ? conv(qqqCW,  qR) : fixed(fxQqqCW)
+float yQPW  = useLive ? conv(qqqPW,  qR) : fixed(fxQqqPW)
+float yQTop = useLive ? conv(qqqTop, qR) : fixed(fxQqqTop)
+float ySCW  = useLive ? conv(spyCW,  sR) : fixed(fxSpyCW)
+float ySPW  = useLive ? conv(spyPW,  sR) : fixed(fxSpyPW)
+float ySTop = useLive ? conv(spyTop, sR) : fixed(fxSpyTop)
+float yQZG  = useLive ? conv(qqqZG,  qR) : fixed(fxQqqZG)
+float ySZG  = useLive ? conv(spyZG,  sR) : fixed(fxSpyZG)
+
+// ───────── Zone half-width (points) ─────────
+float atrVal = request.security(syminfo.tickerid, atrTf, ta.atr(atrLen))
+
+halfWidth(float strikeStep, float ratio) =>
+    float hw = fixedHW
+    if widthMode == "Half strike spacing"
+        hw := 0.5 * strikeStep * ratio
+    else if widthMode == "ATR %"
+        hw := na(atrVal) ? fixedHW : atrVal * atrPct / 100.0
+    hw
+
+float hwQ = halfWidth(qqqStep, qR)
+float hwS = halfWidth(spyStep, sR)
+
+// ───────── Merge Top GEX into a wall when they are the same level ─────────
+bool qTopIsPW = useLive ? qqqTop == qqqPW : fxQqqTop == fxQqqPW
+bool qTopIsCW = useLive ? qqqTop == qqqCW : fxQqqTop == fxQqqCW
+bool sTopIsPW = useLive ? spyTop == spyPW : fxSpyTop == fxSpyPW
+bool sTopIsCW = useLive ? spyTop == spyCW : fxSpyTop == fxSpyCW
+bool showQTop = not (qTopIsPW or qTopIsCW)
+bool showSTop = not (sTopIsPW or sTopIsCW)
+
+string nQCW = qTopIsCW ? "NQ Call Wall + Top GEX" : "NQ Call Wall"
+string nQPW = qTopIsPW ? "NQ Put Wall + Top GEX"  : "NQ Put Wall"
+string nSCW = sTopIsCW ? "SPY Call Wall + Top GEX" : "SPY Call Wall"
+string nSPW = sTopIsPW ? "SPY Put Wall + Top GEX"  : "SPY Put Wall"
+
+// ───────── Drawing helpers ─────────
+drawZone(box bx, float y, float hw, color c, bool show) =>
+    box res = bx
+    if not show or na(y)
+        box.delete(res)
+        res := na
+    else if na(res)
+        res := box.new(bar_index - 1, y + hw, bar_index, y - hw, border_color = showBdr ? color.new(c, 60) : color.new(c, 100),
+             border_width = 1, extend = extend.both, bgcolor = color.new(c, fillTr))
+    else
+        box.set_lefttop(res, bar_index - 1, y + hw)
+        box.set_rightbottom(res, bar_index, y - hw)
+    res
+
+drawLine(line ln, float y, color c, int transp, string st, bool show) =>
+    line res = ln
+    if not show or na(y)
+        line.delete(res)
+        res := na
+    else if na(res)
+        res := line.new(bar_index - 1, y, bar_index, y, extend = extend.both, color = color.new(c, transp), width = 1, style = st)
+    else
+        line.set_xy1(res, bar_index - 1, y)
+        line.set_xy2(res, bar_index, y)
+    res
+
+drawLabel(label lb, float y, string name, float strike, color c, int off, bool show) =>
+    string txt = name + " " + str.tostring(y, "#,##0.00") + "  (" + str.tostring(strike) + ")"
+    label res = lb
+    if not show or na(y)
+        label.delete(res)
+        res := na
+    else if na(res)
+        res := label.new(bar_index + off, y, txt, style = label.style_label_left, color = color.new(c, 100), textcolor = c, size = size.small)
+    else
+        label.set_xy(res, bar_index + off, y)
+        label.set_text(res, txt)
+    res
+
+var box   bxQCW  = na
+var box   bxQPW  = na
+var box   bxQTop = na
+var box   bxSCW  = na
+var box   bxSPW  = na
+var box   bxSTop = na
+var line  lnQCW  = na
+var line  lnQPW  = na
+var line  lnQTop = na
+var line  lnSCW  = na
+var line  lnSPW  = na
+var line  lnSTop = na
+var line  lnQZG  = na
+var line  lnSZG  = na
+var label lbQCW  = na
+var label lbQPW  = na
+var label lbQTop = na
+var label lbSCW  = na
+var label lbSPW  = na
+var label lbSTop = na
+var label lbQZG  = na
+var label lbSZG  = na
+
+if barstate.islast
+    bxQCW  := drawZone(bxQCW,  yQCW,  hwQ, cQCall, true)
+    bxQPW  := drawZone(bxQPW,  yQPW,  hwQ, cQPut,  true)
+    bxQTop := drawZone(bxQTop, yQTop, hwQ, cQTop,  showQTop)
+    bxSCW  := drawZone(bxSCW,  ySCW,  hwS, cSCall, true)
+    bxSPW  := drawZone(bxSPW,  ySPW,  hwS, cSPut,  true)
+    bxSTop := drawZone(bxSTop, ySTop, hwS, cSTop,  showSTop)
+
+    lnQCW  := drawLine(lnQCW,  yQCW,  cQCall, midTr, line.style_solid, showMid)
+    lnQPW  := drawLine(lnQPW,  yQPW,  cQPut,  midTr, line.style_solid, showMid)
+    lnQTop := drawLine(lnQTop, yQTop, cQTop,  midTr, line.style_solid, showMid and showQTop)
+    lnSCW  := drawLine(lnSCW,  ySCW,  cSCall, midTr, line.style_solid, showMid)
+    lnSPW  := drawLine(lnSPW,  ySPW,  cSPut,  midTr, line.style_solid, showMid)
+    lnSTop := drawLine(lnSTop, ySTop, cSTop,  midTr, line.style_solid, showMid and showSTop)
+    lnQZG  := drawLine(lnQZG,  yQZG,  cQZG,   0,     line.style_solid,  showQZG)
+    lnSZG  := drawLine(lnSZG,  ySZG,  cSZG,   0,     line.style_dotted, showSZG)
+
+    lbQCW  := drawLabel(lbQCW,  yQCW,  nQCW,          qqqCW,  cQCall, lblOff, true)
+    lbQPW  := drawLabel(lbQPW,  yQPW,  nQPW,          qqqPW,  cQPut,  lblOff, true)
+    lbQTop := drawLabel(lbQTop, yQTop, "NQ Top GEX", qqqTop, cQTop,  topOff, showQTop)
+    lbSCW  := drawLabel(lbSCW,  ySCW,  nSCW,          spyCW,  cSCall, lblOff, true)
+    lbSPW  := drawLabel(lbSPW,  ySPW,  nSPW,          spyPW,  cSPut,  lblOff, true)
+    lbSTop := drawLabel(lbSTop, ySTop, "SPY Top GEX", spyTop, cSTop,  topOff, showSTop)
+    lbQZG  := drawLabel(lbQZG,  yQZG,  "NQ Zero γ",  qqqZG,  cQZG,   topOff, showQZG)
+    lbSZG  := drawLabel(lbSZG,  ySZG,  "SPY Zero γ",  spyZG,  cSZG,   topOff, showSZG)

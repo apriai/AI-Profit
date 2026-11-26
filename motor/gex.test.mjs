@@ -7,6 +7,9 @@ import { aNq, aporteGex, calcularGex, crearGex, expresionLimpiar, gammaBS, insta
 const AHORA = Date.parse('2026-11-25T15:00:00.000Z');
 assert.equal(new Date(instanteExpira(2026, 11, 24)).toISOString(), '2026-11-24T21:00:00.000Z');
 assert.equal(new Date(instanteExpira(2026, 7, 16)).toISOString(), '2026-07-16T20:00:00.000Z');
+// Media sesión (día después de Thanksgiving, Nochebuena): vence a la 1:00 PM ET.
+assert.equal(new Date(instanteExpira(2026, 11, 27)).toISOString(), '2026-11-27T18:00:00.000Z');
+assert.equal(new Date(instanteExpira(2026, 12, 24)).toISOString(), '2026-12-24T18:00:00.000Z');
 assert.equal(parseOpcion('QQQ261219C00110000').strike, 110);
 assert.equal(parseOpcion('QQQ261219P00090000').tipo, 'P');
 

@@ -10,6 +10,18 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.68] — 2026-11-26
+### Añadido
+- **«Gex - Put/Call Walls» en el ojo**, justo debajo de Profito Algoritmo, con el mismo ojito para mostrarlo u ocultarlo. Empieza visible. Es un indicador de Pine que se instala solo, igual que Profito Algoritmo.
+- La granja baja las opciones de QQQ y SPY de CBOE a las **8:00, 9:30, 9:50, 11:00 y 12:00 (hora de Nueva York)**, solo en días de mercado, y una vez al arrancar. Usa solo las de vencimiento de hoy (0DTE) con open interest mayor que 0. Calcula Call Wall, Put Wall, Top GEX y Zero Gamma de cada una, y los escribe en el indicador. El indicador los pasa a NQ con el ratio en vivo y dibuja zonas de ±20 puntos, transparentes, y el Zero Gamma con líneas grises finas (NQ sólida, SPY punteada). Lo que sale de QQQ se llama «NQ …».
+- Cada vuelta anota en `gex.log` cuánto tardó: descarga de QQQ y de SPY, cálculo (y el Zero Gamma), aplicar en TradingView y total.
+### Cambiado
+- En el ojo, Profito Algoritmo dice «Instalado» en vez de «instalado v2».
+- En media sesión (como el día después de Thanksgiving) las opciones vencen a la 1:00 PM ET. El cálculo del GEX de la barra también lo usa.
+### Notas
+- Con el panel de operar abierto o un trade abierto no se calcula ni se cambia el indicador. Queda pendiente y corre en cuanto se cierra.
+- No cambia las órdenes. No se toca la barra de la mascota (`__tlViz`).
+
 ## [0.10.67] — 2026-11-25
 ### Corregido
 - **El color del Profito ya no se ve a través del sombrero** en la granja. Se tapa por dentro con un oclusor invisible y se baja un poco la punta del cuerpo, justo debajo del ala. La forma, los colores y la banda del sombrero no cambian.
