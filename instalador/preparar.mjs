@@ -6,7 +6,7 @@ export const MOTOR = [
   'tradinglink.mjs', 'colchon.mjs', 'account-size.mjs', 'busy.mjs',
   'estrategias-propias.mjs', 'negocio.mjs', 'orders.mjs', 'rutas.mjs', 'strategies.mjs',
   'tv-reporte.mjs', 'resumen-tv.mjs', 'descargar-logs.mjs', 'gex.mjs', 'gex-walls.mjs', 'tv-vista-previa.mjs', 'version-api.mjs', 'pnl-sesion.mjs', 'sesion-saldo.mjs',
-  'pine-algo.mjs', 'rutas-api.mjs', 'ajustar-profito.mjs', 'granja-flores.mjs', 'cuentas.mjs', 'agregar-promediar.mjs', 'eventos-ventana.mjs', 'pine/manifest.json', 'pine/ai-profit-camp-algo.pine', 'pine/gex-put-call-walls.pine', 'Granja-de-Cuentas-v2.html',
+  'pine-algo.mjs', 'rutas-api.mjs', 'ajustar-profito.mjs', 'granja-flores.mjs', 'cuentas.mjs', 'agregar-promediar.mjs', 'eventos-ventana.mjs', 'pine/manifest.json', 'pine/ai-profit-camp-algo.pine', 'pine/gex-put-call-walls.pine', 'pine/session-levels.pine', 'Granja-de-Cuentas-v2.html',
   'sonidos/clic-burbuja.wav', 'sonidos/despertar-wuhu.wav',
 ];
 const TV_MODULOS = ['chrome-remote-interface', 'ws', 'commander'];

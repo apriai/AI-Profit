@@ -9,5 +9,10 @@
     "nombre": "Gex - Put/Call Walls",
     "version": "1",
     "archivo": "gex-put-call-walls.pine"
+  },
+  {
+    "nombre": "Session Levels (High/Lows)",
+    "version": "1",
+    "archivo": "session-levels.pine"
   }
 ]

@@ -143,7 +143,10 @@ assert.match(lineaWalls({ at: 't', turno: 'x', error: 'e' }), /t walls x error: 
 
 // Manifiesto: «Gex - Put/Call Walls» va justo debajo de Profito Algoritmo.
 const man = JSON.parse(fs.readFileSync(new URL('./pine/manifest.json', import.meta.url), 'utf8'));
-assert.deepEqual(man.map(m => m.nombre), ['Profito Algoritmo', GEX_WALLS_NOMBRE]);
+assert.deepEqual(man.map(m => m.nombre), ['Profito Algoritmo', GEX_WALLS_NOMBRE, 'Session Levels (High/Lows)']);
+const sess = fs.readFileSync(new URL('./pine/' + man[2].archivo, import.meta.url), 'utf8');
+assert.match(sess, /indicator\("Session Levels \(High\/Lows\)"/);
+assert.doesNotMatch(sess, /indicator\("NQ Session Levels/);
 const pine = fs.readFileSync(new URL('./pine/' + man[1].archivo, import.meta.url), 'utf8');
 assert.match(pine, /indicator\("Gex - Put\/Call Walls", shorttitle = "Gex - Put\/Call Walls"/);
 assert.match(pine, /"Live ratio", "Mode"/);
@@ -157,6 +160,10 @@ assert.doesNotMatch(html, /'instalado v' \+/);
 const preparar = fs.readFileSync(new URL('../instalador/preparar.mjs', import.meta.url), 'utf8');
 assert.match(preparar, /'gex-walls\.mjs'/);
 assert.match(preparar, /'pine\/gex-put-call-walls\.pine'/);
+assert.match(preparar, /'pine\/session-levels\.pine'/);
+assert.match(html, /#tlAlgosPanel \.bajar\{[^}]*width:40%;max-width:40%/);
+assert.match(html, /#tlAlgosPanel \.bajar\{[^}]*font:600 11px/);
+assert.doesNotMatch(html, /#tlAlgosPanel \.bajar\{[^}]*width:100%/);
 const server = fs.readFileSync(new URL('./tradinglink.mjs', import.meta.url), 'utf8');
 assert.match(server, /crearGexWalls\(/);
 assert.match(server, /panelHasta > Date\.now\(\) \|\| colchon\.status\(\)\.state === 'running'/);

@@ -14,8 +14,10 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 ### Añadido
 - **«Gex - Put/Call Walls» en el ojo**, justo debajo de Profito Algoritmo, con el mismo ojito para mostrarlo u ocultarlo. Empieza visible. Es un indicador de Pine que se instala solo, igual que Profito Algoritmo.
 - La granja baja las opciones de QQQ y SPY de CBOE a las **8:00, 9:30, 9:50, 11:00 y 12:00 (hora de Nueva York)**, solo en días de mercado, y una vez al arrancar. Usa solo las de vencimiento de hoy (0DTE) con open interest mayor que 0. Calcula Call Wall, Put Wall, Top GEX y Zero Gamma de cada una, y los escribe en el indicador. El indicador los pasa a NQ con el ratio en vivo y dibuja zonas de ±20 puntos, transparentes, y el Zero Gamma con líneas grises finas (NQ sólida, SPY punteada). Lo que sale de QQQ se llama «NQ …».
+- **«Session Levels (High/Lows)» en el ojo**, justo debajo de Gex - Put/Call Walls, con el mismo ojito. Empieza visible. Es un indicador de Pine que se instala solo; no necesita datos de la granja.
 - Cada vuelta anota en `gex.log` cuánto tardó: descarga de QQQ y de SPY, cálculo (y el Zero Gamma), aplicar en TradingView y total.
 ### Cambiado
+- El botón «Descargar Logs y status» del ojo es más chico: ocupa cerca del 40 % del ancho del panel, queda a la izquierda y la letra es más pequeña.
 - En el ojo, Profito Algoritmo dice «Instalado» en vez de «instalado v2».
 - En media sesión (como el día después de Thanksgiving) las opciones vencen a la 1:00 PM ET. El cálculo del GEX de la barra también lo usa.
 ### Notas
