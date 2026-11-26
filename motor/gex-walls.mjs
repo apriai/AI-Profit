@@ -169,10 +169,19 @@ export function expresionAplicar(valores, { nombre = GEX_WALLS_NOMBRE, studyId =
     var J=${job};
     var api=window.TradingViewApi; if(!api||typeof api.activeChart!=='function') return {ok:false,motivo:'sin-tv'};
     var c=null; try{ c=api.activeChart(); }catch(e){} if(!c) return {ok:false,motivo:'sin-tv'};
-    var id=''; var lista=[]; try{ lista=c.getAllStudies()||[]; }catch(e){}
-    for(var i=0;i<lista.length;i++){ var s=lista[i]||{}; var n=String(s.name||s.title||s.description||'').trim().toLowerCase();
-      if((J.studyId && String(s.id)===J.studyId) || n===J.nombre.toLowerCase()){ id=String(s.id); break; } }
-    if(!id) return {ok:false,motivo:'no está en el gráfico'};
+    function buscar(){
+      var lista=[]; try{ lista=c.getAllStudies()||[]; }catch(e){}
+      for(var i=0;i<lista.length;i++){ var s=lista[i]||{}; var n=String(s.name||s.title||s.description||'').trim().toLowerCase();
+        if((J.studyId && String(s.id)===J.studyId) || n===J.nombre.toLowerCase()) return String(s.id); }
+      return '';
+    }
+    function lee(st){ try{ if(st&&typeof st.isVisible==='function') return st.isVisible()!==false; }catch(e){} return null; }
+    // TradingView puede devolver los decimales un poco distintos (float32): se compara con tolerancia de medio centavo.
+    function igual(a,b){
+      if(typeof b==='number'||typeof a==='number'){ var x=Number(a), y=Number(b); return isFinite(x)&&isFinite(y)&&Math.abs(x-y)<=0.005; }
+      return String(a)===String(b);
+    }
+    var id=buscar(); if(!id) return {ok:false,motivo:'no está en el gráfico'};
     var st=null; try{ st=c.getStudyById(id); }catch(e){}
     if(!st||typeof st.getInputValues!=='function'||typeof st.setInputValues!=='function') return {ok:false,motivo:'sin inputs'};
     var nombres={}; try{ var info=typeof st.getInputsInfo==='function'?st.getInputsInfo():[]; for(var k=0;k<info.length;k++){ var it=info[k]; if(it&&it.type!=='color'&&it.name&&!nombres[it.name]) nombres[it.name]=it.id; } }catch(e){}
@@ -184,12 +193,25 @@ export function expresionAplicar(valores, { nombre = GEX_WALLS_NOMBRE, studyId =
     for(var a=0;a<actual.length;a++){ if(Object.prototype.hasOwnProperty.call(quiero,actual[a].id)){ actual[a].value=quiero[actual[a].id]; vistos++; } }
     if(vistos<J.inputs.length+1) return {ok:false,motivo:'inputs distintos ('+vistos+')'};
     var antes=st.getInputValues()||[]; var iguales=0;
-    for(var q=0;q<antes.length;q++){ if(Object.prototype.hasOwnProperty.call(quiero,antes[q].id) && String(antes[q].value)===String(quiero[antes[q].id])) iguales++; }
-    if(iguales===vistos) return {ok:true, studyId:id, aplicados:iguales, cambio:false, motivo:''};
+    for(var q=0;q<antes.length;q++){ if(Object.prototype.hasOwnProperty.call(quiero,antes[q].id) && igual(antes[q].value,quiero[antes[q].id])) iguales++; }
+    if(iguales===vistos) return {ok:true, studyId:id, aplicados:iguales, cambio:false, visible:lee(st), motivo:''};
+    // El ojo manda: lo que tenía antes de escribir (visible u oculto) es lo que queda después.
+    var vis=lee(st);
     st.setInputValues(actual);
-    var despues=st.getInputValues()||[]; var bien=0;
-    for(var b=0;b<despues.length;b++){ if(Object.prototype.hasOwnProperty.call(quiero,despues[b].id) && String(despues[b].value)===String(quiero[despues[b].id])) bien++; }
-    return {ok:bien===vistos, studyId:id, aplicados:bien, cambio:true, motivo:bien===vistos?'':'no se confirmaron los inputs'};
+    await new Promise(function(r){ setTimeout(r,300); });
+    var id2=buscar()||id; var st2=null; try{ st2=c.getStudyById(id2); }catch(e){}
+    var restaurado=false;
+    if(vis!==null && st2 && lee(st2)!==vis){
+      try{ st2.setVisible(vis); restaurado=true; }catch(e){}
+      if(lee(st2)!==vis){ try{
+        var w=api._activeChartWidgetWV.value()._chartWidget; var mo=w.model(); var inner=mo.model?mo.model():mo; var all=inner.dataSources?inner.dataSources():[];
+        for(var z=0;z<all.length;z++){ var sid=''; try{ sid=all[z].id&&(typeof all[z].id==='function'?all[z].id():all[z].id); }catch(e){}
+          if(String(sid)===String(id2)){ var pv=all[z].properties&&all[z].properties().visible; if(pv&&typeof pv.setValue==='function'){ pv.setValue(vis); restaurado=true; } } }
+      }catch(e){} }
+    }
+    var despues=(st2&&st2.getInputValues&&st2.getInputValues())||[]; var bien=0;
+    for(var b=0;b<despues.length;b++){ if(Object.prototype.hasOwnProperty.call(quiero,despues[b].id) && igual(despues[b].value,quiero[despues[b].id])) bien++; }
+    return {ok:bien===vistos, studyId:id2, aplicados:bien, cambio:true, restaurado:restaurado, visible:lee(st2), motivo:bien===vistos?'':'no se confirmaron los inputs'};
   })()`;
 }
 
@@ -239,6 +261,7 @@ export function crearGexWalls(opts = {}) {
   let falloHasta = 0;
   let ultimoMotivo = '';
   let verificado = 0;
+  let aplicarFalloHasta = 0;
 
   async function calcular(turno) {
     const t0 = ahora();
@@ -291,16 +314,20 @@ export function crearGexWalls(opts = {}) {
         ultimo = r;
       }
       if (bloqueado()) { estadoTxt = 'pendiente. Espera a que cierres el panel de operar.'; return { saltado: 'panel' }; }
+      // Si aplicar falló, no se vuelve a escribir en el estudio en cada vuelta de 15 s: se espera (por defecto 2 min).
+      if (!toca && t < aplicarFalloHasta) return { espera: true };
       const tA = ahora();
       let res;
       try { res = await aplicar(ultimo.valores); } catch (e) { res = { ok: false, motivo: String(e && e.message || e) }; }
       const aplicarMs = ahora() - tA;
       const motivo = res && res.ok ? '' : `aplicar: ${(res && res.motivo) || 'error'}`;
-      const linea = lineaWalls({ ...ultimo, aplicarMs, totalMs: toca ? ahora() - ultimo.t0 : aplicarMs, error: motivo, nota: toca ? '' : 'reaplicado' });
+      const nota = [toca ? '' : 'reaplicado', res && res.restaurado ? 'ojo restaurado' : '', res && res.visible === false ? 'oculto' : ''].filter(Boolean).join(' · ');
+      const linea = lineaWalls({ ...ultimo, aplicarMs, totalMs: toca ? ahora() - ultimo.t0 : aplicarMs, error: motivo, nota });
       const cambio = !!(res && res.ok && res.cambio !== false);
       if (toca || motivo !== ultimoMotivo || cambio) anotar(opts.dir, linea);
       ultimoMotivo = motivo;
       verificado = ahora();
+      aplicarFalloHasta = res && res.ok ? 0 : ahora() + (opts.reintentoAplicarMs || 2 * 60 * 1000);
       if (res && res.ok) { aplicadoFirma = firma(ultimo); estadoTxt = 'instalado'; return { ok: true, cambio, linea }; }
       estadoTxt = `pendiente. ${(res && res.motivo) || 'error'}`;
       return { error: (res && res.motivo) || 'error', linea };

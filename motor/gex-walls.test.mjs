@@ -141,6 +141,30 @@ assert.equal((await err.correr()).espera, true);
 assert.equal(rota, 2); // QQQ y SPY en la primera vuelta, nada en la segunda
 assert.match(lineaWalls({ at: 't', turno: 'x', error: 'e' }), /t walls x error: e/);
 
+
+// Si aplicar falla, no reescribe el estudio en cada vuelta de 15 s: espera y reintenta pasado el plazo.
+{
+  let ahoraMs = Date.parse('2026-11-27T14:51:00Z');
+  let intentos = 0;
+  const d2 = fs.mkdtempSync(path.join(os.tmpdir(), 'gex-walls-fallo-'));
+  const f = crearGexWalls({
+    dir: d2,
+    ahora: () => ahoraMs,
+    bajar: async (sym) => ({ json: sym === 'QQQ' ? json : zgJson, bytes: 10, ms: 7 }),
+    aplicar: async () => { intentos++; return { ok: false, motivo: 'no se confirmaron los inputs' }; },
+  });
+  assert.ok((await f.correr()).error);
+  assert.equal(intentos, 1);
+  for (let i = 0; i < 6; i++) { ahoraMs += 15000; assert.equal((await f.correr()).espera, true); }
+  assert.equal(intentos, 1, 'en 90 s no vuelve a escribir');
+  ahoraMs += 60000;
+  await f.correr();
+  assert.equal(intentos, 2, 'pasados 2 min reintenta una vez');
+}
+// El código del aplicar compara con tolerancia y devuelve el ojo a como estaba.
+assert.match(expresionAplicar({ qqqCall: 650 }), /Math\.abs\(x-y\)<=0\.005/);
+assert.match(expresionAplicar({ qqqCall: 650 }), /restaurado/);
+
 // Manifiesto: «Gex - Put/Call Walls» va justo debajo de Profito Algoritmo.
 const man = JSON.parse(fs.readFileSync(new URL('./pine/manifest.json', import.meta.url), 'utf8'));
 assert.deepEqual(man.map(m => m.nombre), ['Profito Algoritmo', GEX_WALLS_NOMBRE, 'Session Levels (High/Lows)']);

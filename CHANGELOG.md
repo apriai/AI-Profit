@@ -10,6 +10,15 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.69] — 2026-11-26
+### Corregido
+- **El ojo de «Gex - Put/Call Walls»** ahora respeta lo que elijas. Al escribir los niveles en el indicador, la granja confirmaba con una comparación exacta de decimales; si TradingView devolvía un decimal un poco distinto, la confirmación fallaba y la granja reescribía el indicador cada 15 segundos, deshaciendo el ojo. Ahora: compara con tolerancia de medio centavo, no reescribe si ya está igual, espera 2 minutos antes de reintentar si falla, y deja el indicador visible u oculto como estaba antes de escribir.
+- Al apagar o prender un indicador del ojo, se comprueba que TradingView lo cambió de verdad (si la API no lo cambia, se usa el modelo del gráfico) y se cambian todas las copias con ese nombre. Si no se pudo, lo dice en vez de marcar que sí.
+- El servidor anota en su registro cada vez que se mueve un ojo (visible u oculto, por dónde y cuántas copias) y `gex.log` anota si el ojo se restauró al aplicar los niveles.
+### Notas
+- Los niveles anteriores se siguen mostrando si falla una descarga (no cambia). Session Levels y Profito Algoritmo no cambian.
+- No cambia las órdenes. No se toca la barra de la mascota (`__tlViz`).
+
 ## [0.10.68] — 2026-11-26
 ### Añadido
 - **«Gex - Put/Call Walls» en el ojo**, justo debajo de Profito Algoritmo, con el mismo ojito para mostrarlo u ocultarlo. Empieza visible. Es un indicador de Pine que se instala solo, igual que Profito Algoritmo.
