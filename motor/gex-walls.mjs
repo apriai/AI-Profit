@@ -1,7 +1,7 @@
 // «Gex - Put/Call Walls»: niveles 0DTE de QQQ y SPY para el indicador Pine del mismo nombre.
 // Fórmulas tal cual la especificación (GEX = gamma × OI × 100 × spot² × 0.01; calls +, puts −;
 // gamma de Black-Scholes con r = 0.04 si CBOE no la trae; Zero Gamma en una rejilla de ±5 % en pasos de 0.1 %).
-// La granja calcula a las HORAS_ET (más una vez al arrancar) y solo escribe los 8 niveles ETF en los
+// La granja calcula cada 30 minutos de 8:00 a 16:00 ET (HORAS_ET; más una vez al arrancar) y solo escribe los 8 niveles ETF en los
 // inputs del estudio. El estudio convierte a NQ con su «Live ratio» y dibuja. No envía órdenes.
 // Con el panel de operar abierto o un trade abierto no se calcula ni se aplica: queda pendiente y corre al cerrarse.
 import fs from 'node:fs';
@@ -9,8 +9,18 @@ import path from 'node:path';
 import { parseOpcion, instanteExpira, fechaClave, FERIADOS } from './gex.mjs';
 
 export const GEX_WALLS_NOMBRE = 'Gex - Put/Call Walls';
-// Fácil de cambiar: horas de Nueva York, días de mercado.
-export const HORAS_ET = ['08:00', '09:30', '09:50', '11:00', '12:00'];
+// Fácil de cambiar: de `desde` a `hasta`, cada `cadaMin` minutos, hora de Nueva York, días de mercado.
+export const HORARIO = { desde: '08:00', hasta: '16:00', cadaMin: 30 };
+export function horasEntre(desde, hasta, cadaMin) {
+  const [dh, dm] = String(desde).split(':').map(Number);
+  const [hh, hm] = String(hasta).split(':').map(Number);
+  const ini = dh * 60 + dm, fin = hh * 60 + hm, paso = Number(cadaMin);
+  if (!(paso > 0) || !Number.isFinite(ini) || !Number.isFinite(fin) || fin < ini) throw new Error('horario inválido');
+  const out = [];
+  for (let m = ini; m <= fin; m += paso) out.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`);
+  return out;
+}
+export const HORAS_ET = horasEntre(HORARIO.desde, HORARIO.hasta, HORARIO.cadaMin);
 export const URLS = {
   QQQ: 'https://cdn.cboe.com/api/global/delayed_quotes/options/QQQ.json',
   SPY: 'https://cdn.cboe.com/api/global/delayed_quotes/options/SPY.json',
@@ -374,7 +384,7 @@ export function crearGexWalls(opts = {}) {
       const toca = turno ? turno !== hecho : (arranque && (diaDeMercado(t) || !ultimo));
       const verificar = ultimo && aplicadoFirma === firma(ultimo) && t - verificado >= (opts.verificarMs || 2 * 60 * 1000);
       if (!toca && !verificar && (!ultimo || aplicadoFirma === firma(ultimo))) return { nada: true };
-      if (bloqueado()) { estadoTxt = 'pendiente. Espera a que cierres el panel de operar.'; return { saltado: 'panel' }; }
+      if (bloqueado()) { estadoTxt = 'pendiente. Espera a que cierres el panel de operar o el trade.'; return { saltado: 'panel' }; }
       if (toca) {
         if (t < falloHasta) return { espera: true };
         const r = await calcular(turno || 'arranque', { reserva: !ultimo });
@@ -389,7 +399,7 @@ export function crearGexWalls(opts = {}) {
         ultimo = r;
         guardar(opts.dir, ultimo);
       }
-      if (bloqueado()) { estadoTxt = 'pendiente. Espera a que cierres el panel de operar.'; return { saltado: 'panel' }; }
+      if (bloqueado()) { estadoTxt = 'pendiente. Espera a que cierres el panel de operar o el trade.'; return { saltado: 'panel' }; }
       // Si aplicar falló, no se vuelve a escribir en el estudio en cada vuelta de 15 s: se espera (por defecto 2 min).
       if (!toca && t < aplicarFalloHasta) return { espera: true };
       const tA = ahora();

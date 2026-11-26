@@ -6,7 +6,7 @@ string mode    = input.string("Live ratio", "Mode", options = ["Live ratio", "Fi
      tooltip = "Live ratio: ETF strike x (NQ / ETF), updates with the chart. Fixed: uses the NQ prices below.")
 bool   useLive = mode == "Live ratio"
 
-// ───────── ETF strikes (0DTE). La granja los llena a las 8:00, 9:30, 9:50, 11:00 y 12:00 ET. 0 = sin nivel ─────────
+// ───────── ETF strikes (0DTE). La granja los llena cada 30 minutos de 8:00 a 16:00 ET. 0 = sin nivel ─────────
 string gE = "ETF strikes (0DTE)"
 float qqqCW  = input.float(0.0,  "QQQ Call Wall",   step = 1.0,  group = gE)
 float qqqPW  = input.float(0.0,  "QQQ Put Wall",    step = 1.0,  group = gE)

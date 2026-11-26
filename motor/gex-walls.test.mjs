@@ -7,11 +7,18 @@ import { instanteExpira } from './gex.mjs';
 import {
   GEX_WALLS_NOMBRE, HORAS_ET, CABECERAS, URLS, gammaBS, gexDe, contratos0dte, nivelesEtf, zeroGamma, aNq,
   valoresInputs, turnoActual, diaDeMercado, expresionAplicar, crearGexWalls, lineaWalls,
-  proximoVencimiento, R,
+  proximoVencimiento, R, horasEntre, HORARIO,
 } from './gex-walls.mjs';
 
 // Horario, fácil de cambiar.
-assert.deepEqual(HORAS_ET, ['08:00', '09:30', '09:50', '11:00', '12:00']);
+assert.deepEqual(HORARIO, { desde: '08:00', hasta: '16:00', cadaMin: 30 });
+assert.deepEqual(HORAS_ET, horasEntre('08:00', '16:00', 30));
+assert.deepEqual(HORAS_ET[0], '08:00');
+assert.deepEqual(HORAS_ET[1], '08:30');
+assert.equal(HORAS_ET.at(-1), '16:00');
+assert.equal(HORAS_ET.length, 17);
+assert.ok(!HORAS_ET.includes('09:50'));
+assert.ok(!HORAS_ET.includes('16:30'));
 // Cabeceras de CBOE de la especificación.
 assert.match(CABECERAS['User-Agent'], /Chrome\/130/);
 assert.equal(CABECERAS.Referer, 'https://www.cboe.com/');
@@ -28,10 +35,13 @@ assert.equal(diaDeMercado(Date.parse('2026-11-28T15:00:00Z')), false); // sábad
 assert.equal(diaDeMercado(Date.parse('2026-11-27T15:00:00Z')), true);
 assert.equal(turnoActual(Date.parse('2026-11-27T12:59:00Z')), null); // 7:59 ET
 assert.equal(turnoActual(Date.parse('2026-11-27T13:00:00Z')), '2026-11-27 08:00');
+assert.equal(turnoActual(Date.parse('2026-11-27T13:30:00Z')), '2026-11-27 08:30');
 assert.equal(turnoActual(Date.parse('2026-11-27T14:35:00Z')), '2026-11-27 09:30');
-assert.equal(turnoActual(Date.parse('2026-11-27T14:50:00Z')), '2026-11-27 09:50');
+assert.equal(turnoActual(Date.parse('2026-11-27T14:50:00Z')), '2026-11-27 09:30'); // 9:50 ET ya no es un horario propio
 assert.equal(turnoActual(Date.parse('2026-11-27T16:10:00Z')), '2026-11-27 11:00');
 assert.equal(turnoActual(Date.parse('2026-11-27T17:00:00Z')), '2026-11-27 12:00');
+assert.equal(turnoActual(Date.parse('2026-11-27T21:00:00Z')), '2026-11-27 16:00');
+assert.equal(turnoActual(Date.parse('2026-11-27T21:20:00Z')), '2026-11-27 16:00'); // después de las 16:00 se queda el último
 assert.equal(turnoActual(Date.parse('2026-11-26T17:00:00Z')), null);
 
 // Black-Scholes de la especificación (r = 0.04).
@@ -128,9 +138,9 @@ assert.equal(uno.ok, true);
 assert.equal(bajadas, 2);
 assert.equal(aplicados.length, 1);
 assert.equal(aplicados[0].qqqCall, 105);
-assert.equal(w.estado().turno, '2026-11-27 09:50');
+assert.equal(w.estado().turno, '2026-11-27 09:30');
 const log = fs.readFileSync(path.join(dir, 'gex.log'), 'utf8');
-assert.match(log, /walls 2026-11-27 09:50 descarga QQQ 7 ms · SPY 7 ms · cálculo \d+ ms \(zero γ \d+ ms\) · aplicar \d+ ms · total \d+ ms/);
+assert.match(log, /walls 2026-11-27 09:30 descarga QQQ 7 ms · SPY 7 ms · cálculo \d+ ms \(zero γ \d+ ms\) · aplicar \d+ ms · total \d+ ms/);
 // Mismo turno: no vuelve a bajar.
 assert.equal((await w.correr()).nada, true);
 assert.equal(bajadas, 2);
@@ -143,6 +153,17 @@ panel = false;
 assert.equal((await w.correr()).ok, true);
 assert.equal(bajadas, 4);
 assert.equal(w.estado().turno, '2026-11-27 11:00');
+// 12:30 ET (media sesión, aún antes del vencimiento de la 1:00 PM) con el panel o un trade abierto: espera; al cerrarse corre una vez.
+reloj = Date.parse('2026-11-27T17:30:00Z');
+panel = true;
+assert.equal((await w.correr()).saltado, 'panel');
+assert.equal(bajadas, 4);
+panel = false;
+const tarde = await w.correr();
+assert.equal(tarde.ok, true, JSON.stringify(tarde));
+assert.equal(bajadas, 6);
+assert.equal(w.estado().turno, '2026-11-27 12:30');
+assert.equal((await w.correr()).nada, true);
 // Feriado sin niveles guardados: se calculan los del vencimiento más próximo y se guardan.
 const dirFer = fs.mkdtempSync(path.join(os.tmpdir(), 'gex-fer-nuevo-'));
 const aplicadosFer = [];
@@ -176,7 +197,7 @@ assert.equal((await reinicio.correr()).ok, true);
 assert.equal(bajo, 0);
 assert.equal(reaplicados.length, 1);
 assert.equal(reaplicados[0].qqqCall, 105);
-assert.equal(reinicio.estado().turno, '2026-11-27 11:00');
+assert.equal(reinicio.estado().turno, '2026-11-27 12:30');
 assert.equal((await reinicio.correr()).nada, true, 'ya aplicado: no vuelve a escribir');
 // Archivo roto o incompleto: se ignora y se calcula el vencimiento próximo (sin pegarle a CBOE de verdad).
 const dirLimpio = fs.mkdtempSync(path.join(os.tmpdir(), 'gex-fer-'));
@@ -210,9 +231,9 @@ assert.match(fs.readFileSync(path.join(dirLimpio, 'gex.log'), 'utf8'), /ultimo d
   assert.equal(wr.estado().turno, 'arranque');
   relojR = Date.parse('2026-11-27T14:51:00Z');
   assert.equal((await wr.correr()).ok, true);
-  assert.equal(wr.estado().turno, '2026-11-27 09:50');
+  assert.equal(wr.estado().turno, '2026-11-27 09:30');
   const lineas = fs.readFileSync(path.join(dirR, 'gex.log'), 'utf8').trim().split('\n');
-  assert.match(lineas[lineas.length - 1], /walls 2026-11-27 09:50/);
+  assert.match(lineas[lineas.length - 1], /walls 2026-11-27 09:30/);
   assert.doesNotMatch(lineas[lineas.length - 1], /ultimo dato/);
   assert.equal(aplicadosR[1].v.qqqCall, 105);
 }
