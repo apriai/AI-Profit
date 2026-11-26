@@ -17,7 +17,7 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **«Session Levels (High/Lows)» en el ojo**, justo debajo de Gex - Put/Call Walls, con el mismo ojito. Empieza visible. Es un indicador de Pine que se instala solo; no necesita datos de la granja.
 - Cada vuelta anota en `gex.log` cuánto tardó: descarga de QQQ y de SPY, cálculo (y el Zero Gamma), aplicar en TradingView y total.
 ### Cambiado
-- El botón «Descargar Logs y status» del ojo es más chico: ocupa cerca del 40 % del ancho del panel, queda a la izquierda y la letra es más pequeña.
+- El botón «Descargar Logs y status» del ojo es más chico, queda a la izquierda, la letra es de 10 px y el texto cabe en una sola línea.
 - En el ojo, Profito Algoritmo dice «Instalado» en vez de «instalado v2».
 - En media sesión (como el día después de Thanksgiving) las opciones vencen a la 1:00 PM ET. El cálculo del GEX de la barra también lo usa.
 ### Notas

@@ -161,9 +161,11 @@ const preparar = fs.readFileSync(new URL('../instalador/preparar.mjs', import.me
 assert.match(preparar, /'gex-walls\.mjs'/);
 assert.match(preparar, /'pine\/gex-put-call-walls\.pine'/);
 assert.match(preparar, /'pine\/session-levels\.pine'/);
-assert.match(html, /#tlAlgosPanel \.bajar\{[^}]*width:40%;max-width:40%/);
-assert.match(html, /#tlAlgosPanel \.bajar\{[^}]*font:600 11px/);
-assert.doesNotMatch(html, /#tlAlgosPanel \.bajar\{[^}]*width:100%/);
+assert.match(html, /#tlAlgosPanel \.bajar\{[^}]*width:auto/);
+assert.match(html, /#tlAlgosPanel \.bajar\{[^}]*white-space:nowrap/);
+assert.match(html, /#tlAlgosPanel \.bajar\{[^}]*font:600 10px/);
+assert.doesNotMatch(html, /#tlAlgosPanel \.bajar\{[^}]*width:40%/);
+assert.doesNotMatch(html, /#tlAlgosPanel \.bajar\{[^}]*(?<!max-)width:100%/);
 const server = fs.readFileSync(new URL('./tradinglink.mjs', import.meta.url), 'utf8');
 assert.match(server, /crearGexWalls\(/);
 assert.match(server, /panelHasta > Date\.now\(\) \|\| colchon\.status\(\)\.state === 'running'/);
