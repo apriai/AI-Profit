@@ -10,6 +10,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.67] — 2026-11-25
+### Corregido
+- **El color del Profito ya no se ve a través del sombrero** en la granja. Se tapa por dentro con un oclusor invisible y se baja un poco la punta del cuerpo, justo debajo del ala. La forma, los colores y la banda del sombrero no cambian.
+### Notas
+- No cambia las órdenes. No se toca la barra de la mascota (`__tlViz`) ni el muñequito que corre hacia el SL y el TP.
+
 ## [0.10.66] — 2026-11-25
 ### Añadido
 - **Resumen de trades en TradingView.** Al pasar de No a Sí se dibujan los cierres de hoy, el día de calendario de Nueva York (de las 00:00 a las 24:00), con todas las ejecuciones del bróker. Al pasar de Sí a No se quitan esos dibujos y no se tocan los del usuario. Si TradingView no está conectado, no se marcan como dibujados. No barre al arrancar.
