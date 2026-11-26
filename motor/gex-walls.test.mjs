@@ -239,12 +239,14 @@ assert.match(fs.readFileSync(path.join(dirLimpio, 'gex.log'), 'utf8'), /ultimo d
   assert.ok((await wd.correr()).error);
   assert.equal(avisos, 1);
   assert.deepEqual(pedidos, [true]);
-  relojD += 150000;
+  relojD += 5000;
+  assert.equal((await wd.correr()).espera, true, 'aún no pasan los 15 s: no insiste');
+  relojD += 11000;
   assert.ok((await wd.correr()).error); // aún no reinstalado
   assert.deepEqual(pedidos, [true, false], 'después de quitar una vez, ya no pide quitar');
   estadoEstudio = 'sano';
-  relojD += 150000;
-  assert.equal((await wd.correr()).ok, true);
+  relojD += 16000;
+  assert.equal((await wd.correr()).ok, true, 'reaplica 15 s después, sin esperar 2 min');
   assert.equal(avisos, 1);
 }
 // Error de CBOE: se anota y espera antes de reintentar.

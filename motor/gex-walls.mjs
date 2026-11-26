@@ -226,7 +226,8 @@ export function expresionAplicar(valores, { nombre = GEX_WALLS_NOMBRE, studyId =
     if(vistos<J.inputs.length+1) return {ok:false,motivo:'inputs distintos ('+vistos+')'};
     var cambios=[];
     for(var a2=0;a2<actual.length;a2++){ if(tiene(actual[a2].id) && !igual(actual[a2].value,quiero[actual[a2].id])) cambios.push({id:actual[a2].id, value:quiero[actual[a2].id]}); }
-    if(!cambios.length) return {ok:true, studyId:id, aplicados:vistos, cambio:false, visible:lee(st), motivo:''};
+    var ya=[]; for(var y=0;y<actual.length;y++){ if(tiene(actual[y].id)) ya.push(actual[y].id+'='+actual[y].value); }
+    if(!cambios.length) return {ok:true, studyId:id, aplicados:vistos, cambio:false, visible:lee(st), leidos:ya.join(' '), motivo:''};
     // El ojo manda: lo que tenía antes de escribir (visible u oculto) es lo que queda después.
     var vis=lee(st);
     st.setInputValues(cambios);
@@ -249,7 +250,8 @@ export function expresionAplicar(valores, { nombre = GEX_WALLS_NOMBRE, studyId =
       }catch(e){} }
     }
     var roto=bien===0 && danado(despues);
-    return {ok:bien===vistos, studyId:id2, aplicados:bien, cambio:true, restaurado:restaurado, visible:lee(st2), danado:roto||undefined, motivo:bien===vistos?'':(roto?'estudio dañado tras escribir':'no se confirmaron los inputs')};
+    var leidos=[]; for(var l=0;l<despues.length;l++){ if(tiene(despues[l].id)) leidos.push(despues[l].id+'='+despues[l].value); }
+    return {leidos:leidos.join(' '), ok:bien===vistos, studyId:id2, aplicados:bien, cambio:true, restaurado:restaurado, visible:lee(st2), danado:roto||undefined, motivo:bien===vistos?'':(roto?'estudio dañado tras escribir':'no se confirmaron los inputs')};
   })()`;
 }
 
@@ -395,13 +397,15 @@ export function crearGexWalls(opts = {}) {
       if (res && res.quitado) { reparado = true; if (opts.alQuitar) { try { opts.alQuitar(); } catch {} } }
       const aplicarMs = ahora() - tA;
       const motivo = res && res.ok ? '' : `aplicar: ${(res && res.motivo) || 'error'}`;
-      const nota = [toca ? (ultimo.nota || '') : 'reaplicado', res && res.restaurado ? 'ojo restaurado' : '', res && res.visible === false ? 'oculto' : ''].filter(Boolean).join(' · ');
+      const nota = [toca ? (ultimo.nota || '') : 'reaplicado', res && res.restaurado ? 'ojo restaurado' : '', res && res.visible === false ? 'oculto' : '', res && res.leidos ? `leído ${res.leidos}` : ''].filter(Boolean).join(' · ');
       const linea = lineaWalls({ ...ultimo, aplicarMs, totalMs: toca ? ahora() - ultimo.t0 : aplicarMs, error: motivo, nota });
       const cambio = !!(res && res.ok && res.cambio !== false);
       if (toca || motivo !== ultimoMotivo || cambio) anotar(opts.dir, linea);
       ultimoMotivo = motivo;
       verificado = ahora();
-      aplicarFalloHasta = res && res.ok ? 0 : ahora() + (opts.reintentoAplicarMs || 2 * 60 * 1000);
+      // Si el estudio se quitó para reinstalarlo o aún no está en el gráfico, se reintenta pronto (la reinstalación tarda segundos); si no, espera 2 min.
+      const sinEstudio = !!(res && (res.quitado || res.motivo === 'no está en el gráfico'));
+      aplicarFalloHasta = res && res.ok ? 0 : ahora() + (sinEstudio ? (opts.reintentoReinstalarMs || 15000) : (opts.reintentoAplicarMs || 2 * 60 * 1000));
       if (res && res.ok) { aplicadoFirma = firma(ultimo); estadoTxt = 'instalado'; return { ok: true, cambio, linea }; }
       estadoTxt = `pendiente. ${(res && res.motivo) || 'error'}`;
       return { error: (res && res.motivo) || 'error', linea };

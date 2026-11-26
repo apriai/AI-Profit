@@ -167,6 +167,7 @@ for (const [nombre, id] of [['Profito Algoritmo', 'p1'], ['Gex - Put/Call Walls'
   assert.deepEqual([...new Set(tv.ev.escritos)].sort(), ['in_1', 'in_2', 'in_3', 'in_4', 'in_5', 'in_6', 'in_7', 'in_8']);
   assert.equal(tv.estado[1].inputs.find(i => i.id === 'pineId').value, 'USER;abc');
   assert.equal(tv.estado[1].inputs.find(i => i.id === 'in_1').value, 650);
+  assert.match(r.leidos, /^in_0=Live ratio in_1=650 in_2=640 in_3=640 in_4=730 in_5=700 in_6=700 in_7=646\.3 in_8=719\.39$/, 'devuelve lo que leyó de vuelta, en orden');
   // Una segunda aplicación igual no escribe nada. Cambiar solo un nivel escribe solo ese.
   assert.equal((await tv.correr(expresionAplicar(valores))).cambio, false);
   const antes = tv.ev.escritos.length;
