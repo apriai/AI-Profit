@@ -1,0 +1,108 @@
+//@version=6
+indicator("Session Levels (High/Lows)", "NQ Sess Lvls", overlay = true, max_lines_count = 20, max_labels_count = 20)
+
+// Updates by itself every day. Lines start at the candle that made the high/low and extend to the right.
+// Yesterday = day session 9:30 AM-4:00 PM New York (solid orange).
+// Overnight = 6:00 PM-9:30 AM New York (dashed blue).
+
+string tz      = "America/New_York"
+string rthSess = input.session("0930-1600", "Day session (yesterday H/L)", group = "Sessions")
+string onSess  = input.session("1800-0930", "Overnight session",           group = "Sessions")
+
+bool   showPD  = input.bool(true, "Show yesterday high / low", group = "Show")
+bool   showON  = input.bool(true, "Show overnight high / low", group = "Show")
+
+color  cPD     = input.color(color.new(color.orange, 30), "Yesterday color", group = "Style")
+color  cON     = input.color(color.new(#2196F3, 30),      "Overnight color", group = "Style")
+int    lw      = input.int(1, "Line width", minval = 1, maxval = 4, group = "Style")
+string stPD    = input.string("Solid",  "Yesterday line style", options = ["Solid", "Dashed", "Dotted"], group = "Style")
+string stON    = input.string("Dashed", "Overnight line style", options = ["Solid", "Dashed", "Dotted"], group = "Style")
+bool   showLbl = input.bool(true, "Show labels", group = "Style")
+int    lblOff  = input.int(8, "Label offset (bars to the right)", minval = 0, group = "Style")
+
+styleOf(string s) =>
+    s == "Dashed" ? line.style_dashed : s == "Dotted" ? line.style_dotted : line.style_solid
+
+bool inRTH = not na(time(timeframe.period, rthSess, tz))
+bool inON  = not na(time(timeframe.period, onSess, tz))
+
+// running session highs/lows + time of the candle that made them
+var float rH  = na
+var float rL  = na
+var int   rHt = na
+var int   rLt = na
+var float oH  = na
+var float oL  = na
+var int   oHt = na
+var int   oLt = na
+
+if inRTH and not inRTH[1]
+    rH := high
+    rHt := time
+    rL := low
+    rLt := time
+else if inRTH
+    if high > rH
+        rH := high
+        rHt := time
+    if low < rL
+        rL := low
+        rLt := time
+
+if inON and not inON[1]
+    oH := high
+    oHt := time
+    oL := low
+    oLt := time
+else if inON
+    if high > oH
+        oH := high
+        oHt := time
+    if low < oL
+        oL := low
+        oLt := time
+
+// final levels
+var float pdh  = na
+var float pdl  = na
+var float onh  = na
+var float onl  = na
+
+var line lPDH = na
+var line lPDL = na
+var line lONH = na
+var line lONL = na
+
+drawLine(line old, float y, int t, color c, string st, bool show) =>
+    line.delete(old)
+    show and not na(y) ? line.new(t, y, t + 60000, y, xloc = xloc.bar_time, extend = extend.right, color = c, width = lw, style = styleOf(st)) : line(na)
+
+// day session just ended -> becomes "yesterday"
+if not inRTH and inRTH[1] and timeframe.isintraday
+    pdh := rH
+    pdl := rL
+    lPDH := drawLine(lPDH, rH, rHt, cPD, stPD, showPD)
+    lPDL := drawLine(lPDL, rL, rLt, cPD, stPD, showPD)
+
+// overnight just ended (9:30 open) -> lock overnight high/low
+if not inON and inON[1] and timeframe.isintraday
+    onh := oH
+    onl := oL
+    lONH := drawLine(lONH, oH, oHt, cON, stON, showON)
+    lONL := drawLine(lONL, oL, oLt, cON, stON, showON)
+
+// labels (text only, right side)
+var label bPDH = na
+var label bPDL = na
+var label bONH = na
+var label bONL = na
+
+drawLabel(label old, float y, string txt, color c, bool show) =>
+    label.delete(old)
+    show and showLbl and not na(y) ? label.new(bar_index + lblOff, y, txt + "  " + str.tostring(y, format.mintick), xloc = xloc.bar_index, style = label.style_none, textcolor = c, size = size.small) : label(na)
+
+if barstate.islast
+    bPDH := drawLabel(bPDH, pdh, "Yesterday High", cPD, showPD)
+    bPDL := drawLabel(bPDL, pdl, "Yesterday Low",  cPD, showPD)
+    bONH := drawLabel(bONH, onh, "Overnight High", cON, showON)
+    bONL := drawLabel(bONL, onl, "Overnight Low",  cON, showON)
