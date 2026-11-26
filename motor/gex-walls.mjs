@@ -240,6 +240,25 @@ export function lineaWalls(r) {
   return `${cab} ${t} · ${niv}${r.error ? ` · error: ${r.error}` : r.nota ? ` · ${r.nota}` : ''}`;
 }
 
+const GUARDADO = 'gex-niveles.json';
+function leerGuardado(dir) {
+  try {
+    const j = JSON.parse(fs.readFileSync(path.join(dir, GUARDADO), 'utf8'));
+    if (!j || !j.valores || typeof j.valores !== 'object' || !j.turno) return null;
+    const ok = INPUTS.every(([, k]) => Number.isFinite(Number(j.valores[k])));
+    if (!ok) return null;
+    return { turno: String(j.turno), at: String(j.at || ''), valores: j.valores, qqq: {}, spy: {}, qqqMs: 0, spyMs: 0, calculoMs: 0, zgMs: 0, t0: Date.now() };
+  } catch { return null; }
+}
+function guardar(dir, u) {
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    const tmp = path.join(dir, `${GUARDADO}.tmp-${process.pid}`);
+    fs.writeFileSync(tmp, JSON.stringify({ turno: u.turno, at: u.at, valores: u.valores }));
+    fs.renameSync(tmp, path.join(dir, GUARDADO));
+  } catch {}
+}
+
 function anotar(dir, texto) {
   try { fs.mkdirSync(dir, { recursive: true }); fs.appendFileSync(path.join(dir, LOG), texto + '\n'); } catch {}
 }
@@ -253,7 +272,8 @@ export function crearGexWalls(opts = {}) {
   const horas = opts.horas || HORAS_ET;
   let hecho = null; // turno ya calculado
   let arranque = true;
-  let ultimo = null; // { turno, at, valores, qqq, spy }
+  // Lo último calculado se guarda: tras un reinicio, una actualización del indicador o un feriado se vuelve a poner lo de antes.
+  let ultimo = leerGuardado(opts.dir); // { turno, at, valores, qqq, spy }
   let aplicadoFirma = '';
   let estadoTxt = 'pendiente';
   let ocupado = false;
@@ -312,6 +332,7 @@ export function crearGexWalls(opts = {}) {
           return { sin0dte: true, linea };
         }
         ultimo = r;
+        guardar(opts.dir, ultimo);
       }
       if (bloqueado()) { estadoTxt = 'pendiente. Espera a que cierres el panel de operar.'; return { saltado: 'panel' }; }
       // Si aplicar falló, no se vuelve a escribir en el estudio en cada vuelta de 15 s: se espera (por defecto 2 min).

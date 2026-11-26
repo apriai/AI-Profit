@@ -139,7 +139,8 @@ export function cargarManifiesto(dir) {
     const anterior = String(item && item.anterior || '').trim();
     if (!nombre || !version || !archivo) throw new Error('entrada incompleta en el manifiesto');
     if (archivo.includes('..') || path.isAbsolute(archivo)) throw new Error('ruta de indicador no permitida');
-    return { nombre, version, archivo, anterior };
+    const tambien = (Array.isArray(item && item.tambien) ? item.tambien : []).map(x => String(x || '').trim()).filter(Boolean);
+    return { nombre, version, archivo, anterior, tambien };
   });
 }
 
@@ -376,8 +377,10 @@ return {ok:true, quitados:n};
 })()`;
 }
 
-export function exprOjos({ nombres = [], accion = 'leer', nombre = '', visible = true, studyId = '' } = {}) {
-  const datos = JSON.stringify({ nombres, accion, nombre, visible: !!visible, studyId: String(studyId || '') });
+// `alias`: { nombreDelManifiesto: [otros nombres exactos del mismo indicador, p. ej. una copia puesta a mano] }.
+// El ojo muestra u oculta también esas copias. No toca ningún otro estudio.
+export function exprOjos({ nombres = [], accion = 'leer', nombre = '', visible = true, studyId = '', alias = {}, tambien = [] } = {}) {
+  const datos = JSON.stringify({ nombres, accion, nombre, visible: !!visible, studyId: String(studyId || ''), alias, tambien });
   return `(async function(){
 var D=${datos};
 function mismo(n,nombre){return String(n||'').trim().toLowerCase()===String(nombre||'').toLowerCase()}
@@ -421,11 +424,15 @@ if(D.accion==='leer'){
   var items=[];
   for(var i=0;i<D.nombres.length;i++){
     var hallados=de(D.nombres[i],'');
-    items.push({nombre:D.nombres[i], enGrafico:hallados.length, visible:hallados.length? !hallados[0].oculto : null, studyId:hallados[0]?hallados[0].id:''});
+    var extra=[]; var al=(D.alias&&D.alias[D.nombres[i]])||[];
+    for(var x=0;x<al.length;x++){ extra=extra.concat(de(al[x],'')); }
+    var visibleAlguno=hallados.concat(extra).some(function(h){return !h.oculto});
+    items.push({nombre:D.nombres[i], enGrafico:hallados.length, copiasExtra:extra.length, visible:(hallados.length||extra.length)? visibleAlguno : null, studyId:hallados[0]?hallados[0].id:(extra[0]?extra[0].id:'')});
   }
   return {ok:true, items:items};
 }
 var uno=de(D.nombre, D.studyId);
+for(var t=0;t<(D.tambien||[]).length;t++){ uno=uno.concat(de(D.tambien[t],'')); }
 if(!uno.length) return {ok:false, estado:'error', motivo:'no está en el gráfico'};
 var c=chart();
 var meta=!!D.visible;
@@ -460,8 +467,9 @@ ids.forEach(function(id){
   if(!hecho) fallos++;
   via.push(id+':'+(como||'no'));
 });
-if(fallos) return {ok:false, estado:'error', motivo:'no pude cambiar la visibilidad', via:via.join(',')};
-return {ok:true, visible:meta, studyId:uno[0].id, copias:ids.length, via:via.join(',')};
+var cercanos=[]; try{ todos().forEach(function(s){ var n=String(s.name||''); if(/gex|zones|walls|gamma/i.test(n)){ var k=s.id+'='+n.slice(0,60)+(s.oculto?'(oculto)':'(visible)'); if(cercanos.indexOf(k)<0) cercanos.push(k); } }); }catch(e5){}
+if(fallos) return {ok:false, estado:'error', motivo:'no pude cambiar la visibilidad', via:via.join(','), cercanos:cercanos.join(' | ')};
+return {ok:true, visible:meta, studyId:uno[0].id, copias:ids.length, via:via.join(','), cercanos:cercanos.join(' | ')};
 })()`;
 }
 
@@ -789,7 +797,7 @@ export function crearAlgoTv({
   }
   async function sincronizar() {
     try {
-      const r = await evaluar(exprOjos({ nombres: manifiesto.map(m => m.nombre), accion: 'leer' }));
+      const r = await evaluar(exprOjos({ nombres: manifiesto.map(m => m.nombre), accion: 'leer', alias: Object.fromEntries(manifiesto.filter(m => m.tambien && m.tambien.length).map(m => [m.nombre, m.tambien])) }));
       if (!r || !r.ok || !Array.isArray(r.items)) { memoria.conectado = false; memoria.texto = textoLista(vista()); try { guardarEstado(archivo, memoria); } catch {} return estado(); }
       memoria.conectado = true;
       for (const item of r.items) {
@@ -810,11 +818,11 @@ export function crearAlgoTv({
     if (!m) return { ok: false, motivo: 'desconocido', ...estado() };
     const prev = memoria.algos[m.nombre] || {};
     try {
-      const r = await evaluar(exprOjos({ accion: 'fijar', nombre: m.nombre, visible: !!visible, studyId: prev.studyId || '' }));
-      if (!r || !r.ok) { if (r && r.via) log('algo: ojo', m.nombre, 'no cambió', 'via ' + r.via); else memoria.conectado = false; return { ok: false, motivo: (r && r.motivo) || 'no se pudo', ...estado() }; }
+      const r = await evaluar(exprOjos({ accion: 'fijar', nombre: m.nombre, visible: !!visible, studyId: prev.studyId || '', tambien: m.tambien || [] }));
+      if (!r || !r.ok) { if (r && r.via) log('algo: ojo', m.nombre, 'no cambió', 'via ' + r.via, 'parecidos ' + (r.cercanos || '-')); else memoria.conectado = false; return { ok: false, motivo: (r && r.motivo) || 'no se pudo', ...estado() }; }
       memoria.conectado = true;
       memoria.algos[m.nombre] = { ...prev, nombre: m.nombre, visible: !!r.visible, studyId: r.studyId || prev.studyId || '' };
-      log('algo: ojo', m.nombre, r.visible ? 'visible' : 'oculto', 'via ' + (r.via || '?'), 'copias ' + (r.copias || 1));
+      log('algo: ojo', m.nombre, r.visible ? 'visible' : 'oculto', 'via ' + (r.via || '?'), 'copias ' + (r.copias || 1), 'parecidos ' + (r.cercanos || '-'));
       memoria.texto = textoLista(vista());
       try { guardarEstado(archivo, memoria); } catch (e) { log('algo: no pude guardar el estado', e && e.message); }
       return { ok: true, ...estado() };

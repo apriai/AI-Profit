@@ -131,8 +131,27 @@ assert.equal((await w.correr()).ok, true);
 assert.equal(bajadas, 4);
 assert.equal(w.estado().turno, '2026-11-27 11:00');
 // Feriado: no baja nada.
-const fer = crearGexWalls({ dir, ahora: () => Date.parse('2026-11-26T15:00:00Z'), bajar: async () => { throw new Error('no'); } });
+const dirLimpio = fs.mkdtempSync(path.join(os.tmpdir(), 'gex-fer-'));
+const fer = crearGexWalls({ dir: dirLimpio, ahora: () => Date.parse('2026-11-26T15:00:00Z'), bajar: async () => { throw new Error('no'); } });
 assert.equal((await fer.correr()).nada, true);
+// Lo último calculado se guarda y, tras un reinicio en feriado, se vuelve a poner en el estudio sin bajar nada.
+assert.ok(fs.existsSync(path.join(dir, 'gex-niveles.json')));
+const reaplicados = [];
+let bajo = 0;
+const reinicio = crearGexWalls({
+  dir, ahora: () => Date.parse('2026-11-26T15:00:00Z'),
+  bajar: async () => { bajo++; throw new Error('no'); },
+  aplicar: async (v) => { reaplicados.push(v); return { ok: true, cambio: true }; },
+});
+assert.equal((await reinicio.correr()).ok, true);
+assert.equal(bajo, 0);
+assert.equal(reaplicados.length, 1);
+assert.equal(reaplicados[0].qqqCall, 105);
+assert.equal(reinicio.estado().turno, '2026-11-27 11:00');
+assert.equal((await reinicio.correr()).nada, true, 'ya aplicado: no vuelve a escribir');
+// Archivo roto o incompleto: se ignora.
+fs.writeFileSync(path.join(dirLimpio, 'gex-niveles.json'), '{"turno":"x","valores":{"qqqCall":1}}');
+assert.equal((await crearGexWalls({ dir: dirLimpio, ahora: () => Date.parse('2026-11-26T15:00:00Z') }).correr()).nada, true);
 // Error de CBOE: se anota y espera antes de reintentar.
 let rota = 0;
 const err = crearGexWalls({ dir, ahora: () => reloj, bajar: async () => { rota++; throw new Error('QQQ HTTP 403'); } });
