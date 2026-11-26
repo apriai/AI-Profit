@@ -428,24 +428,41 @@ if(D.accion==='leer'){
 var uno=de(D.nombre, D.studyId);
 if(!uno.length) return {ok:false, estado:'error', motivo:'no está en el gráfico'};
 var c=chart();
-var aplicado=false;
-try{ var st=c.getStudyById&&c.getStudyById(uno[0].id); if(st&&typeof st.setVisible==='function'){ st.setVisible(!!D.visible); aplicado=true; } }catch(e){}
-if(!aplicado){
+var meta=!!D.visible;
+function fuente(id){
   try{
     var w=window.TradingViewApi._activeChartWidgetWV.value()._chartWidget;
     var model=w.model(); var inner=model.model?model.model():model;
     var all=inner.dataSources?inner.dataSources():[];
     for(var n=0;n<all.length;n++){
-      var src=all[n], id='';
-      try{ id=src.id&&(typeof src.id==='function'?src.id():src.id); }catch(e2){}
-      if(String(id)!==String(uno[0].id)) continue;
-      var vis=src.properties&&src.properties().visible;
-      if(vis&&typeof vis.setValue==='function'){ vis.setValue(!!D.visible); aplicado=true; }
+      var sid=''; try{ sid=all[n].id&&(typeof all[n].id==='function'?all[n].id():all[n].id); }catch(e2){}
+      if(String(sid)===String(id)) return all[n];
     }
   }catch(e3){}
+  return null;
 }
-if(!aplicado) return {ok:false, estado:'error', motivo:'no pude cambiar la visibilidad'};
-return {ok:true, visible:!!D.visible, studyId:uno[0].id};
+function leido(id){
+  try{ var st=c.getStudyById&&c.getStudyById(id); if(st&&typeof st.isVisible==='function') return st.isVisible()!==false; }catch(e){}
+  var src=fuente(id);
+  try{ if(src&&typeof src.isVisible==='function') return src.isVisible()!==false; }catch(e1){}
+  return null;
+}
+var ids=[]; uno.forEach(function(s){ if(ids.indexOf(s.id)<0) ids.push(s.id); });
+var fallos=0, via=[];
+ids.forEach(function(id){
+  var hecho=false, como='';
+  try{ var st=c.getStudyById&&c.getStudyById(id); if(st&&typeof st.setVisible==='function'){ st.setVisible(meta); hecho=true; como='api'; } }catch(e){}
+  if(hecho && leido(id)===(!meta)) hecho=false;
+  if(!hecho){
+    try{ var src=fuente(id); var vis=src&&src.properties&&src.properties().visible; if(vis&&typeof vis.setValue==='function'){ vis.setValue(meta); hecho=true; como='modelo'; } }catch(e4){}
+    if(hecho && leido(id)===(!meta)) hecho=false;
+  }
+  if(!hecho) fallos++;
+  via.push(id+':'+(como||'no'));
+});
+var cercanos=[]; try{ todos().forEach(function(s){ var n=String(s.name||''); if(/gex|zones|walls|gamma/i.test(n)){ var k=s.id+'='+n.slice(0,60)+(s.oculto?'(oculto)':'(visible)'); if(cercanos.indexOf(k)<0) cercanos.push(k); } }); }catch(e5){}
+if(fallos) return {ok:false, estado:'error', motivo:'no pude cambiar la visibilidad', via:via.join(','), cercanos:cercanos.join(' | ')};
+return {ok:true, visible:meta, studyId:uno[0].id, copias:ids.length, via:via.join(','), cercanos:cercanos.join(' | ')};
 })()`;
 }
 
@@ -795,9 +812,10 @@ export function crearAlgoTv({
     const prev = memoria.algos[m.nombre] || {};
     try {
       const r = await evaluar(exprOjos({ accion: 'fijar', nombre: m.nombre, visible: !!visible, studyId: prev.studyId || '' }));
-      if (!r || !r.ok) { memoria.conectado = false; return { ok: false, motivo: (r && r.motivo) || 'no se pudo', ...estado() }; }
+      if (!r || !r.ok) { if (r && r.via) log('algo: ojo', m.nombre, 'no cambió', 'via ' + r.via, 'parecidos ' + (r.cercanos || '-')); else memoria.conectado = false; return { ok: false, motivo: (r && r.motivo) || 'no se pudo', ...estado() }; }
       memoria.conectado = true;
       memoria.algos[m.nombre] = { ...prev, nombre: m.nombre, visible: !!r.visible, studyId: r.studyId || prev.studyId || '' };
+      log('algo: ojo', m.nombre, r.visible ? 'visible' : 'oculto', 'via ' + (r.via || '?'), 'copias ' + (r.copias || 1), 'parecidos ' + (r.cercanos || '-'));
       memoria.texto = textoLista(vista());
       try { guardarEstado(archivo, memoria); } catch (e) { log('algo: no pude guardar el estado', e && e.message); }
       return { ok: true, ...estado() };

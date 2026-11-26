@@ -7,10 +7,18 @@ import { instanteExpira } from './gex.mjs';
 import {
   GEX_WALLS_NOMBRE, HORAS_ET, CABECERAS, URLS, gammaBS, gexDe, contratos0dte, nivelesEtf, zeroGamma, aNq,
   valoresInputs, turnoActual, diaDeMercado, expresionAplicar, crearGexWalls, lineaWalls,
+  proximoVencimiento, R, horasEntre, HORARIO,
 } from './gex-walls.mjs';
 
 // Horario, fácil de cambiar.
-assert.deepEqual(HORAS_ET, ['08:00', '09:30', '09:50', '11:00', '12:00']);
+assert.deepEqual(HORARIO, { desde: '08:00', hasta: '16:00', cadaMin: 30 });
+assert.deepEqual(HORAS_ET, horasEntre('08:00', '16:00', 30));
+assert.deepEqual(HORAS_ET[0], '08:00');
+assert.deepEqual(HORAS_ET[1], '08:30');
+assert.equal(HORAS_ET.at(-1), '16:00');
+assert.equal(HORAS_ET.length, 17);
+assert.ok(!HORAS_ET.includes('09:50'));
+assert.ok(!HORAS_ET.includes('16:30'));
 // Cabeceras de CBOE de la especificación.
 assert.match(CABECERAS['User-Agent'], /Chrome\/130/);
 assert.equal(CABECERAS.Referer, 'https://www.cboe.com/');
@@ -27,10 +35,13 @@ assert.equal(diaDeMercado(Date.parse('2026-11-28T15:00:00Z')), false); // sábad
 assert.equal(diaDeMercado(Date.parse('2026-11-27T15:00:00Z')), true);
 assert.equal(turnoActual(Date.parse('2026-11-27T12:59:00Z')), null); // 7:59 ET
 assert.equal(turnoActual(Date.parse('2026-11-27T13:00:00Z')), '2026-11-27 08:00');
+assert.equal(turnoActual(Date.parse('2026-11-27T13:30:00Z')), '2026-11-27 08:30');
 assert.equal(turnoActual(Date.parse('2026-11-27T14:35:00Z')), '2026-11-27 09:30');
-assert.equal(turnoActual(Date.parse('2026-11-27T14:50:00Z')), '2026-11-27 09:50');
+assert.equal(turnoActual(Date.parse('2026-11-27T14:50:00Z')), '2026-11-27 09:30'); // 9:50 ET ya no es un horario propio
 assert.equal(turnoActual(Date.parse('2026-11-27T16:10:00Z')), '2026-11-27 11:00');
 assert.equal(turnoActual(Date.parse('2026-11-27T17:00:00Z')), '2026-11-27 12:00');
+assert.equal(turnoActual(Date.parse('2026-11-27T21:00:00Z')), '2026-11-27 16:00');
+assert.equal(turnoActual(Date.parse('2026-11-27T21:20:00Z')), '2026-11-27 16:00'); // después de las 16:00 se queda el último
 assert.equal(turnoActual(Date.parse('2026-11-26T17:00:00Z')), null);
 
 // Black-Scholes de la especificación (r = 0.04).
@@ -64,10 +75,16 @@ const put95 = gexDe(0.06, 2000, 100);
 const call105 = gexDe(0.08, 1000, 100);
 assert.equal(niv.top, [[105, call105], [95, put95], [98, put98], [102, gexDe(0.1, 300, 100)]].sort((a, b) => b[1] - a[1])[0][0]);
 assert.ok(niv.zeroGamma === null || (niv.zeroGamma >= 95 && niv.zeroGamma <= 105));
-// Sin 0DTE (Thanksgiving): nada.
-assert.equal(nivelesEtf(json, Date.parse('2026-11-26T15:00:00Z')).contratos, 0);
-// Después del vencimiento de media sesión (1:00 PM ET): nada.
+// Sin 0DTE (Thanksgiving): nada. El vencimiento más próximo es el 27 (media sesión).
+const THANKS = Date.parse('2026-11-26T15:00:00Z');
+assert.equal(nivelesEtf(json, THANKS).contratos, 0);
+assert.equal(proximoVencimiento(json, THANKS).clave, '2026-11-27');
+assert.equal(nivelesEtf(json, THANKS, R, '2026-11-27').contratos, 4);
+assert.equal(nivelesEtf(json, THANKS, R, '2026-11-27').call, 105);
+// Después del vencimiento de media sesión (1:00 PM ET): nada de 0DTE; el próximo es el 30.
 assert.equal(nivelesEtf(json, Date.parse('2026-11-27T18:01:00Z')).contratos, 0);
+assert.equal(proximoVencimiento(json, Date.parse('2026-11-27T18:01:00Z')).clave, '2026-11-30');
+assert.equal(proximoVencimiento(json, AHORA).clave, '2026-11-27');
 
 // Zero Gamma: cruce interpolado más cercano al spot, rejilla ±5 % en 0.1 %.
 const zgJson = { data: { current_price: 100, options: [
@@ -91,7 +108,13 @@ new vm.Script(expr);
 assert.match(expr, /setInputValues/);
 assert.match(expr, /Live ratio/);
 assert.match(expr, /Gex - Put\/Call Walls/);
-assert.doesNotMatch(expr, /placeOrder|closePosition|activeBroker|setSymbol|createShape|removeEntity/);
+assert.doesNotMatch(expr, /placeOrder|closePosition|activeBroker|setSymbol|createShape/);
+// Solo quita el estudio propio, solo si pide reparar y solo si está dañado (sin sus inputs in_N).
+assert.equal((expr.match(/removeEntity/g) || []).length, 2);
+assert.match(expr, /if\(vistos===0 && danado\(actual\)\)\{\s*if\(J\.reparar && typeof c\.removeEntity==='function'\)\{ try\{ c\.removeEntity\(id\)/);
+// Nunca vuelve a escribir la lista completa de getInputValues (incluye los inputs internos de Pine).
+assert.doesNotMatch(expr, /setInputValues\(actual\)/);
+assert.match(expr, /setInputValues\(cambios\)/);
 
 // Motor: con el panel de operar abierto no baja ni aplica; corre al cerrarse.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gex-walls-'));
@@ -115,9 +138,9 @@ assert.equal(uno.ok, true);
 assert.equal(bajadas, 2);
 assert.equal(aplicados.length, 1);
 assert.equal(aplicados[0].qqqCall, 105);
-assert.equal(w.estado().turno, '2026-11-27 09:50');
+assert.equal(w.estado().turno, '2026-11-27 09:30');
 const log = fs.readFileSync(path.join(dir, 'gex.log'), 'utf8');
-assert.match(log, /walls 2026-11-27 09:50 descarga QQQ 7 ms · SPY 7 ms · cálculo \d+ ms \(zero γ \d+ ms\) · aplicar \d+ ms · total \d+ ms/);
+assert.match(log, /walls 2026-11-27 09:30 descarga QQQ 7 ms · SPY 7 ms · cálculo \d+ ms \(zero γ \d+ ms\) · aplicar \d+ ms · total \d+ ms/);
 // Mismo turno: no vuelve a bajar.
 assert.equal((await w.correr()).nada, true);
 assert.equal(bajadas, 2);
@@ -130,9 +153,200 @@ panel = false;
 assert.equal((await w.correr()).ok, true);
 assert.equal(bajadas, 4);
 assert.equal(w.estado().turno, '2026-11-27 11:00');
-// Feriado: no baja nada.
-const fer = crearGexWalls({ dir, ahora: () => Date.parse('2026-11-26T15:00:00Z'), bajar: async () => { throw new Error('no'); } });
-assert.equal((await fer.correr()).nada, true);
+// 12:30 ET (media sesión, aún antes del vencimiento de la 1:00 PM) con el panel o un trade abierto: espera; al cerrarse corre una vez.
+reloj = Date.parse('2026-11-27T17:30:00Z');
+panel = true;
+assert.equal((await w.correr()).saltado, 'panel');
+assert.equal(bajadas, 4);
+panel = false;
+const tarde = await w.correr();
+assert.equal(tarde.ok, true, JSON.stringify(tarde));
+assert.equal(bajadas, 6);
+assert.equal(w.estado().turno, '2026-11-27 12:30');
+assert.equal((await w.correr()).nada, true);
+// Feriado sin niveles guardados: se calculan los del vencimiento más próximo y se guardan.
+const dirFer = fs.mkdtempSync(path.join(os.tmpdir(), 'gex-fer-nuevo-'));
+const aplicadosFer = [];
+let bajoFer = 0;
+const ferNuevo = crearGexWalls({
+  dir: dirFer,
+  ahora: () => Date.parse('2026-11-26T15:00:00Z'),
+  bajar: async (sym) => { bajoFer++; return { json: sym === 'QQQ' ? json : zgJson, bytes: 10, ms: 7 }; },
+  aplicar: async (v) => { aplicadosFer.push(v); return { ok: true, cambio: true }; },
+});
+const rFer = await ferNuevo.correr();
+assert.equal(rFer.ok, true);
+assert.equal(bajoFer, 2);
+assert.equal(aplicadosFer.length, 1);
+assert.equal(aplicadosFer[0].qqqCall, 105);
+assert.match(fs.readFileSync(path.join(dirFer, 'gex.log'), 'utf8'), /ultimo dato \(vencimiento 2026-11-27\)/);
+assert.ok(fs.existsSync(path.join(dirFer, 'gex-niveles.json')));
+assert.equal(ferNuevo.estado().turno, 'arranque');
+assert.equal((await ferNuevo.correr()).nada, true, 'ya aplicado: no vuelve a bajar en el feriado');
+assert.equal(bajoFer, 2);
+// Lo último calculado se guarda y, tras un reinicio en feriado, se vuelve a poner en el estudio sin bajar nada.
+assert.ok(fs.existsSync(path.join(dir, 'gex-niveles.json')));
+const reaplicados = [];
+let bajo = 0;
+const reinicio = crearGexWalls({
+  dir, ahora: () => Date.parse('2026-11-26T15:00:00Z'),
+  bajar: async () => { bajo++; throw new Error('no'); },
+  aplicar: async (v) => { reaplicados.push(v); return { ok: true, cambio: true }; },
+});
+assert.equal((await reinicio.correr()).ok, true);
+assert.equal(bajo, 0);
+assert.equal(reaplicados.length, 1);
+assert.equal(reaplicados[0].qqqCall, 105);
+assert.equal(reinicio.estado().turno, '2026-11-27 12:30');
+assert.equal((await reinicio.correr()).nada, true, 'ya aplicado: no vuelve a escribir');
+// Archivo roto o incompleto: se ignora y se calcula el vencimiento próximo (sin pegarle a CBOE de verdad).
+const dirLimpio = fs.mkdtempSync(path.join(os.tmpdir(), 'gex-fer-'));
+fs.writeFileSync(path.join(dirLimpio, 'gex-niveles.json'), '{"turno":"x","valores":{"qqqCall":1}}');
+const aplicadosRoto = [];
+let bajoRoto = 0;
+const roto = crearGexWalls({
+  dir: dirLimpio,
+  ahora: () => Date.parse('2026-11-26T15:00:00Z'),
+  bajar: async (sym) => { bajoRoto++; return { json: sym === 'QQQ' ? json : zgJson, bytes: 10, ms: 7 }; },
+  aplicar: async (v) => { aplicadosRoto.push(v); return { ok: true, cambio: true }; },
+});
+assert.equal((await roto.correr()).ok, true);
+assert.equal(bajoRoto, 2);
+assert.equal(aplicadosRoto[0].qqqCall, 105);
+assert.match(fs.readFileSync(path.join(dirLimpio, 'gex.log'), 'utf8'), /ultimo dato \(vencimiento 2026-11-27\)/);
+
+// En un día de mercado el horario normal sustituye el «ultimo dato» por los 0DTE del día.
+{
+  const dirR = fs.mkdtempSync(path.join(os.tmpdir(), 'gex-reemplazo-'));
+  let relojR = Date.parse('2026-11-26T15:00:00Z');
+  const aplicadosR = [];
+  const wr = crearGexWalls({
+    dir: dirR,
+    ahora: () => relojR,
+    bajar: async (sym) => ({ json: sym === 'QQQ' ? json : zgJson, bytes: 10, ms: 7 }),
+    aplicar: async (v) => { aplicadosR.push({ t: relojR, v }); return { ok: true, cambio: true }; },
+  });
+  assert.equal((await wr.correr()).ok, true);
+  assert.match(fs.readFileSync(path.join(dirR, 'gex.log'), 'utf8'), /ultimo dato \(vencimiento 2026-11-27\)/);
+  assert.equal(wr.estado().turno, 'arranque');
+  relojR = Date.parse('2026-11-27T14:51:00Z');
+  assert.equal((await wr.correr()).ok, true);
+  assert.equal(wr.estado().turno, '2026-11-27 09:30');
+  const lineas = fs.readFileSync(path.join(dirR, 'gex.log'), 'utf8').trim().split('\n');
+  assert.match(lineas[lineas.length - 1], /walls 2026-11-27 09:30/);
+  assert.doesNotMatch(lineas[lineas.length - 1], /ultimo dato/);
+  assert.equal(aplicadosR[1].v.qqqCall, 105);
+}
+
+// Estudio dañado: se pide quitarlo una sola vez por sesión; después de quitarlo se avisa para reinstalar y se reintenta pasado el plazo.
+{
+  const dirD = fs.mkdtempSync(path.join(os.tmpdir(), 'gex-danado-'));
+  let relojD = Date.parse('2026-11-27T14:51:00Z');
+  const pedidos = [];
+  let avisos = 0;
+  let estadoEstudio = 'danado';
+  const wd = crearGexWalls({
+    dir: dirD,
+    ahora: () => relojD,
+    alQuitar: () => { avisos++; },
+    bajar: async (sym) => ({ json: sym === 'QQQ' ? json : zgJson, bytes: 10, ms: 7 }),
+    aplicar: async (v, op) => {
+      pedidos.push(op && op.reparar);
+      if (estadoEstudio === 'danado') { estadoEstudio = 'quitado'; return { ok: false, motivo: 'estudio dañado: lo quité para reinstalarlo', quitado: true }; }
+      if (estadoEstudio === 'quitado') return { ok: false, motivo: 'no está en el gráfico' };
+      return { ok: true, cambio: true };
+    },
+  });
+  assert.ok((await wd.correr()).error);
+  assert.equal(avisos, 1);
+  assert.deepEqual(pedidos, [true]);
+  relojD += 2000;
+  assert.equal((await wd.correr()).espera, true, 'aún no pasan los 4 s: no insiste');
+  relojD += 3000;
+  assert.ok((await wd.correr()).error); // aún no reinstalado
+  assert.deepEqual(pedidos, [true, false], 'después de quitar una vez, ya no pide quitar');
+  estadoEstudio = 'sano';
+  relojD += 5000;
+  assert.equal((await wd.correr()).ok, true, 'reaplica a los pocos segundos, sin esperar 2 min');
+  assert.equal(avisos, 1);
+}
+
+// Ojo apagado: no baja ni calcula, ni al arrancar ni en un horario.
+{
+  const dirO = fs.mkdtempSync(path.join(os.tmpdir(), 'gex-ojo-off-'));
+  fs.writeFileSync(path.join(dirO, 'gex-niveles.json'), JSON.stringify({
+    turno: '2026-11-27 09:30', at: 't',
+    valores: { qqqCall: 105, qqqPut: 95, qqqTop: 105, spyCall: 0, spyPut: 0, spyTop: 0, qqqZG: 0, spyZG: 0 },
+  }));
+  let bajoO = 0, aplicadosO = [];
+  let ojo = false;
+  const wo = crearGexWalls({
+    dir: dirO,
+    ahora: () => Date.parse('2026-11-27T14:51:00Z'),
+    visible: () => ojo,
+    bajar: async () => { bajoO++; throw new Error('no debería bajar'); },
+    aplicar: async (v) => { aplicadosO.push(v); return { ok: true, cambio: true }; },
+  });
+  assert.equal((await wo.correr()).saltado, 'ojo');
+  assert.equal(bajoO, 0);
+  assert.equal(aplicadosO.length, 0);
+  assert.match(fs.readFileSync(path.join(dirO, 'gex.log'), 'utf8'), /ojo apagado: no calcula/);
+  assert.equal((await wo.correr()).saltado, 'ojo');
+  assert.equal(fs.readFileSync(path.join(dirO, 'gex.log'), 'utf8').trim().split('\n').length, 1, 'un solo aviso');
+  // Al prender: primero lo guardado (sin bajar), luego un cálculo nuevo que lo sustituye.
+  let fase = 'antes';
+  const dirP = fs.mkdtempSync(path.join(os.tmpdir(), 'gex-ojo-on-'));
+  fs.copyFileSync(path.join(dirO, 'gex-niveles.json'), path.join(dirP, 'gex-niveles.json'));
+  const aplicadosP = [];
+  let bajoP = 0;
+  const wp = crearGexWalls({
+    dir: dirP,
+    ahora: () => Date.parse('2026-11-27T14:51:00Z'),
+    visible: () => true,
+    bajar: async (sym) => {
+      assert.equal(fase, 'calcular', 'no baja hasta haber mostrado lo guardado');
+      assert.ok(aplicadosP.length >= 1, 'ya se escribió lo guardado');
+      assert.equal(aplicadosP[0].qqqCall, 105);
+      bajoP++;
+      return { json: sym === 'QQQ' ? json : zgJson, bytes: 10, ms: 7 };
+    },
+    aplicar: async (v) => { aplicadosP.push({ ...v }); return { ok: true, cambio: true }; },
+  });
+  fase = 'calcular';
+  const pr = await wp.prender();
+  assert.equal(pr.ok, true, JSON.stringify(pr));
+  assert.equal(bajoP, 2);
+  assert.ok(aplicadosP.length >= 2);
+  assert.equal(aplicadosP[0].qqqCall, 105);
+  const logP = fs.readFileSync(path.join(dirP, 'gex.log'), 'utf8');
+  assert.match(logP, /al prender · ultimo guardado/);
+  const lineasP = logP.trim().split('\n');
+  assert.ok(lineasP.length >= 2, 'primero lo guardado, luego el cálculo');
+  assert.match(lineasP[0], /ultimo guardado/);
+  assert.doesNotMatch(lineasP[lineasP.length - 1], /al prender · ultimo guardado/);
+  // Panel o trade abierto al prender: muestra lo guardado, no calcula; al cerrarse calcula una vez.
+  const dirB = fs.mkdtempSync(path.join(os.tmpdir(), 'gex-ojo-panel-'));
+  fs.copyFileSync(path.join(dirO, 'gex-niveles.json'), path.join(dirB, 'gex-niveles.json'));
+  let panelB = true, bajoB = 0, aplicadosB = [];
+  const wb = crearGexWalls({
+    dir: dirB,
+    ahora: () => Date.parse('2026-11-27T14:51:00Z'),
+    visible: () => true,
+    bloqueado: () => panelB,
+    bajar: async (sym) => { bajoB++; return { json: sym === 'QQQ' ? json : zgJson, bytes: 10, ms: 7 }; },
+    aplicar: async (v) => { aplicadosB.push(v); return { ok: true, cambio: true }; },
+  });
+  const pb = await wb.prender();
+  assert.equal(pb.saltado, 'panel');
+  assert.equal(pb.mostrado, true);
+  assert.equal(bajoB, 0);
+  assert.equal(aplicadosB.length, 1);
+  assert.equal(aplicadosB[0].qqqCall, 105);
+  panelB = false;
+  assert.equal((await wb.correr()).ok, true);
+  assert.equal(bajoB, 2);
+}
+
 // Error de CBOE: se anota y espera antes de reintentar.
 let rota = 0;
 const err = crearGexWalls({ dir, ahora: () => reloj, bajar: async () => { rota++; throw new Error('QQQ HTTP 403'); } });
@@ -140,6 +354,30 @@ assert.match((await err.correr()).linea, /error: QQQ HTTP 403/);
 assert.equal((await err.correr()).espera, true);
 assert.equal(rota, 2); // QQQ y SPY en la primera vuelta, nada en la segunda
 assert.match(lineaWalls({ at: 't', turno: 'x', error: 'e' }), /t walls x error: e/);
+
+
+// Si aplicar falla, no reescribe el estudio en cada vuelta de 15 s: espera y reintenta pasado el plazo.
+{
+  let ahoraMs = Date.parse('2026-11-27T14:51:00Z');
+  let intentos = 0;
+  const d2 = fs.mkdtempSync(path.join(os.tmpdir(), 'gex-walls-fallo-'));
+  const f = crearGexWalls({
+    dir: d2,
+    ahora: () => ahoraMs,
+    bajar: async (sym) => ({ json: sym === 'QQQ' ? json : zgJson, bytes: 10, ms: 7 }),
+    aplicar: async () => { intentos++; return { ok: false, motivo: 'no se confirmaron los inputs' }; },
+  });
+  assert.ok((await f.correr()).error);
+  assert.equal(intentos, 1);
+  for (let i = 0; i < 6; i++) { ahoraMs += 15000; assert.equal((await f.correr()).espera, true); }
+  assert.equal(intentos, 1, 'en 90 s no vuelve a escribir');
+  ahoraMs += 60000;
+  await f.correr();
+  assert.equal(intentos, 2, 'pasados 2 min reintenta una vez');
+}
+// El código del aplicar compara con tolerancia y devuelve el ojo a como estaba.
+assert.match(expresionAplicar({ qqqCall: 650 }), /Math\.abs\(x-y\)<=0\.005/);
+assert.match(expresionAplicar({ qqqCall: 650 }), /restaurado/);
 
 // Manifiesto: «Gex - Put/Call Walls» va justo debajo de Profito Algoritmo.
 const man = JSON.parse(fs.readFileSync(new URL('./pine/manifest.json', import.meta.url), 'utf8'));
@@ -169,6 +407,10 @@ assert.doesNotMatch(html, /#tlAlgosPanel \.bajar\{[^}]*(?<!max-)width:100%/);
 const server = fs.readFileSync(new URL('./tradinglink.mjs', import.meta.url), 'utf8');
 assert.match(server, /crearGexWalls\(/);
 assert.match(server, /panelHasta > Date\.now\(\) \|\| colchon\.status\(\)\.state === 'running'/);
+assert.match(server, /visible: \(\) =>/);
+assert.match(server, /GEX_WALLS_NOMBRE/);
+assert.match(server, /gexWalls\.prender\(\)/);
+
 assert.doesNotMatch(fs.readFileSync(new URL('./orders.mjs', import.meta.url), 'utf8'), /gex-walls/);
 
 console.log('gex-walls ok');

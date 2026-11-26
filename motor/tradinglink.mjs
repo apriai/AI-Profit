@@ -7,7 +7,7 @@ import { colchon, colchonHooks, CFG as colchonCFG, readAccounts, buildReport, co
 import { attachReporte } from './tv-reporte.mjs';
 import { fijarResumenTv, resumenTvActivo } from './resumen-tv.mjs';
 import { attachGex } from './gex.mjs';
-import { crearGexWalls, expresionAplicar } from './gex-walls.mjs';
+import { crearGexWalls, expresionAplicar, GEX_WALLS_NOMBRE } from './gex-walls.mjs';
 import { crearPaqueteLogs } from './descargar-logs.mjs';
 import { createVistaPrevia } from './tv-vista-previa.mjs';
 import { estrategiasPropias } from './estrategias-propias.mjs';
@@ -398,6 +398,7 @@ const guardarHist = () => { for (const d of new Set([diaFarm(), diaFarm(Date.now
 setInterval(guardarHist, 3 * 60 * 1000);
 setTimeout(guardarHist, 15000);
 
+let reinstalarAlgo = () => {};
 let algoTv = { estado: () => ({ conectado: false, algos: [], texto: '', senal: { seq: 0, barra: null, lado: null } }), intentar: async () => algoTv.estado(), sincronizar: async () => algoTv.estado(), fijar: async () => ({ ok: false, ...algoTv.estado() }), oirSenal: async () => algoTv.estado(), lecturaProfito: () => null, anotarAjuste: () => {} };
 try {
   algoTv = crearAlgoTv({
@@ -431,6 +432,7 @@ try {
   const oirSenal = () => algoTv.oirSenal().catch(() => {});
   setTimeout(pasarAlgo, 20000);
   setInterval(pasarAlgo, 10 * 60 * 1000);
+  reinstalarAlgo = () => setTimeout(pasarAlgo, 3000);
   setTimeout(verOjos, 25000);
   setInterval(verOjos, 30000);
   setTimeout(oirSenal, 5000);
@@ -443,12 +445,29 @@ try {
   gexWalls = crearGexWalls({
     dir: DIR,
     bloqueado: () => panelHasta > Date.now() || colchon.status().state === 'running',
-    aplicar: async (valores) => {
+    // Si el ojo está apagado no se baja ni se calcula. visible null (aún no sincronizado) cuenta como prendido (el default).
+    visible: () => {
+      try {
+        const a = (algoTv.estado().algos || []).find(x => String(x.nombre) === GEX_WALLS_NOMBRE);
+        return !a || a.visible !== false;
+      } catch { return true; }
+    },
+    // Si el estudio quedó dañado en TradingView, se quita y pasarAlgo lo reinstala limpio.
+    alQuitar: () => { console.log('gex-walls: estudio dañado quitado; se reinstala'); reinstalarAlgo(); },
+    aplicar: async (valores, op = {}) => {
       const E = await cdpEvaluator(9222);
-      try { return await Promise.race([E.evaluate(expresionAplicar(valores)), sleep(20000).then(() => { throw new Error('tiempo agotado'); })]); }
+      try { return await Promise.race([E.evaluate(expresionAplicar(valores, { reparar: !!op.reparar })), sleep(20000).then(() => { throw new Error('tiempo agotado'); })]); }
       finally { try { E.close(); } catch {} }
     },
   });
   gexWalls.arrancar();
+  const fijarOjo = algoTv.fijar.bind(algoTv);
+  algoTv.fijar = async (nombre, vis) => {
+    const out = await fijarOjo(nombre, vis);
+    if (out && out.ok && vis && String(nombre || '').trim().toLowerCase() === GEX_WALLS_NOMBRE.toLowerCase()) {
+      gexWalls.prender().catch(e => console.log('gex-walls:', e && e.message));
+    }
+    return out;
+  };
   console.log('gex-walls: listo');
 } catch (e) { console.log('gex-walls: no arrancó; el motor sigue.', e && e.message); }

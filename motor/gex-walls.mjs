@@ -1,16 +1,27 @@
 // «Gex - Put/Call Walls»: niveles 0DTE de QQQ y SPY para el indicador Pine del mismo nombre.
 // Fórmulas tal cual la especificación (GEX = gamma × OI × 100 × spot² × 0.01; calls +, puts −;
 // gamma de Black-Scholes con r = 0.04 si CBOE no la trae; Zero Gamma en una rejilla de ±5 % en pasos de 0.1 %).
-// La granja calcula a las HORAS_ET (más una vez al arrancar) y solo escribe los 8 niveles ETF en los
+// La granja calcula cada 30 minutos de 8:00 a 16:00 ET (HORAS_ET; más una vez al arrancar) y solo escribe los 8 niveles ETF en los
 // inputs del estudio. El estudio convierte a NQ con su «Live ratio» y dibuja. No envía órdenes.
 // Con el panel de operar abierto o un trade abierto no se calcula ni se aplica: queda pendiente y corre al cerrarse.
+// Si el ojo está apagado no se baja ni se calcula. Al prenderlo se muestran antes los últimos niveles guardados y luego se calcula uno nuevo.
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseOpcion, instanteExpira, fechaClave, FERIADOS } from './gex.mjs';
 
 export const GEX_WALLS_NOMBRE = 'Gex - Put/Call Walls';
-// Fácil de cambiar: horas de Nueva York, días de mercado.
-export const HORAS_ET = ['08:00', '09:30', '09:50', '11:00', '12:00'];
+// Fácil de cambiar: de `desde` a `hasta`, cada `cadaMin` minutos, hora de Nueva York, días de mercado.
+export const HORARIO = { desde: '08:00', hasta: '16:00', cadaMin: 30 };
+export function horasEntre(desde, hasta, cadaMin) {
+  const [dh, dm] = String(desde).split(':').map(Number);
+  const [hh, hm] = String(hasta).split(':').map(Number);
+  const ini = dh * 60 + dm, fin = hh * 60 + hm, paso = Number(cadaMin);
+  if (!(paso > 0) || !Number.isFinite(ini) || !Number.isFinite(fin) || fin < ini) throw new Error('horario inválido');
+  const out = [];
+  for (let m = ini; m <= fin; m += paso) out.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`);
+  return out;
+}
+export const HORAS_ET = horasEntre(HORARIO.desde, HORARIO.hasta, HORARIO.cadaMin);
 export const URLS = {
   QQQ: 'https://cdn.cboe.com/api/global/delayed_quotes/options/QQQ.json',
   SPY: 'https://cdn.cboe.com/api/global/delayed_quotes/options/SPY.json',
@@ -70,18 +81,17 @@ export function gammaBS(S, K, iv, T, r = R) {
 }
 export function gexDe(gamma, oi, spot) { return gamma * oi * 100 * spot * spot * 0.01; }
 
-// Solo los contratos que vencen hoy (YYMMDD = hoy ET), con OI > 0, antes del vencimiento (1 PM en media sesión).
-export function contratos0dte(json, ahora) {
+// Contratos de un vencimiento (clave YYYY-MM-DD), con OI > 0, antes de que expire (1 PM en media sesión).
+export function contratosDeVencimiento(json, ahora, clave) {
   const data = json && json.data;
   const spot = data && Number(data.current_price);
   const lista = data && Array.isArray(data.options) ? data.options : null;
   if (!(spot > 0) || !lista) throw new Error('JSON inválido');
-  const hoy = hoyET(ahora);
   const out = [];
   let vence = null;
   for (const crudo of lista) {
     const op = parseOpcion(crudo && crudo.option);
-    if (!op || fechaClave(op.year, op.month, op.day) !== hoy) continue;
+    if (!op || fechaClave(op.year, op.month, op.day) !== clave) continue;
     const oi = Number(crudo.open_interest);
     if (!(oi > 0)) continue;
     vence = instanteExpira(op.year, op.month, op.day);
@@ -92,6 +102,28 @@ export function contratos0dte(json, ahora) {
     out.push({ tipo: op.tipo, strike: op.strike, oi, gamma: g > 0 ? g : 0, iv: iv > 0 ? iv : 0, T });
   }
   return { spot, contratos: out, vence };
+}
+
+// Solo los contratos que vencen hoy (YYMMDD = hoy ET).
+export function contratos0dte(json, ahora) {
+  return contratosDeVencimiento(json, ahora, hoyET(ahora));
+}
+
+// El vencimiento más próximo que aún no expiró, con algún contrato de OI > 0.
+export function proximoVencimiento(json, ahora) {
+  const lista = json && json.data && Array.isArray(json.data.options) ? json.data.options : null;
+  if (!lista) throw new Error('JSON inválido');
+  let mejor = null;
+  for (const crudo of lista) {
+    const op = parseOpcion(crudo && crudo.option);
+    if (!op) continue;
+    if (!(Number(crudo.open_interest) > 0)) continue;
+    const vence = instanteExpira(op.year, op.month, op.day);
+    if (!(vence > ahora)) continue;
+    const clave = fechaClave(op.year, op.month, op.day);
+    if (!mejor || vence < mejor.vence) mejor = { clave, vence };
+  }
+  return mejor;
 }
 
 function mejor(mapa, valor) {
@@ -125,8 +157,8 @@ export function zeroGamma(contratos, spot, r = R) {
   return elegido;
 }
 
-export function nivelesEtf(json, ahora, r = R) {
-  const { spot, contratos, vence } = contratos0dte(json, ahora);
+export function nivelesEtf(json, ahora, r = R, claveVence) {
+  const { spot, contratos, vence } = contratosDeVencimiento(json, ahora, claveVence || hoyET(ahora));
   if (!contratos.length) return { spot, contratos: 0, call: null, put: null, top: null, zeroGamma: null, zgMs: 0, vence };
   const porStrike = new Map();
   for (const c of contratos) {
@@ -163,33 +195,74 @@ export function valoresInputs(q, s) {
 }
 
 // Escribe los 8 niveles (y Mode = Live ratio) en el estudio «Gex - Put/Call Walls» del gráfico activo.
-export function expresionAplicar(valores, { nombre = GEX_WALLS_NOMBRE, studyId = '' } = {}) {
-  const job = JSON.stringify({ nombre, studyId: String(studyId || ''), valores, inputs: INPUTS });
+// Solo se escriben los inputs que cambian (nunca la lista completa que devuelve getInputValues): esa lista trae también
+// los inputs internos de Pine («text», «pineId», «pineVersion», «pineFeatures») y escribirlos de vuelta, ya sin su envoltorio
+// {v, f, t}, deja el estudio dañado en TradingView («runtime error» / no se puede leer el Pine).
+// Si el estudio ya está dañado (TradingView lo dejó sin inputs) y `reparar` es true, se quita del gráfico para que la granja lo reinstale.
+export function expresionAplicar(valores, { nombre = GEX_WALLS_NOMBRE, studyId = '', reparar = false } = {}) {
+  const job = JSON.stringify({ nombre, studyId: String(studyId || ''), valores, inputs: INPUTS, reparar: !!reparar });
   return `(async function(){
     var J=${job};
     var api=window.TradingViewApi; if(!api||typeof api.activeChart!=='function') return {ok:false,motivo:'sin-tv'};
     var c=null; try{ c=api.activeChart(); }catch(e){} if(!c) return {ok:false,motivo:'sin-tv'};
-    var id=''; var lista=[]; try{ lista=c.getAllStudies()||[]; }catch(e){}
-    for(var i=0;i<lista.length;i++){ var s=lista[i]||{}; var n=String(s.name||s.title||s.description||'').trim().toLowerCase();
-      if((J.studyId && String(s.id)===J.studyId) || n===J.nombre.toLowerCase()){ id=String(s.id); break; } }
-    if(!id) return {ok:false,motivo:'no está en el gráfico'};
+    function buscar(){
+      var lista=[]; try{ lista=c.getAllStudies()||[]; }catch(e){}
+      for(var i=0;i<lista.length;i++){ var s=lista[i]||{}; var n=String(s.name||s.title||s.description||'').trim().toLowerCase();
+        if((J.studyId && String(s.id)===J.studyId) || n===J.nombre.toLowerCase()) return String(s.id); }
+      return '';
+    }
+    function lee(st){ try{ if(st&&typeof st.isVisible==='function') return st.isVisible()!==false; }catch(e){} return null; }
+    // TradingView puede devolver los decimales un poco distintos (float32): se compara con tolerancia de medio centavo.
+    function igual(a,b){
+      if(typeof b==='number'||typeof a==='number'){ var x=Number(a), y=Number(b); return isFinite(x)&&isFinite(y)&&Math.abs(x-y)<=0.005; }
+      return String(a)===String(b);
+    }
+    var id=buscar(); if(!id) return {ok:false,motivo:'no está en el gráfico'};
     var st=null; try{ st=c.getStudyById(id); }catch(e){}
     if(!st||typeof st.getInputValues!=='function'||typeof st.setInputValues!=='function') return {ok:false,motivo:'sin inputs'};
     var nombres={}; try{ var info=typeof st.getInputsInfo==='function'?st.getInputsInfo():[]; for(var k=0;k<info.length;k++){ var it=info[k]; if(it&&it.type!=='color'&&it.name&&!nombres[it.name]) nombres[it.name]=it.id; } }catch(e){}
     var ids={}; ids.mode=nombres['Mode']||'in_0';
     for(var m=0;m<J.inputs.length;m++){ ids[J.inputs[m][1]]=nombres[J.inputs[m][0]]||('in_'+(m+1)); }
-    var actual=st.getInputValues()||[]; var quiero={}; quiero[ids.mode]='Live ratio';
+    var quiero={}; quiero[ids.mode]='Live ratio';
     for(var m2=0;m2<J.inputs.length;m2++){ var clave=J.inputs[m2][1]; quiero[ids[clave]]=J.valores[clave]; }
-    var vistos=0;
-    for(var a=0;a<actual.length;a++){ if(Object.prototype.hasOwnProperty.call(quiero,actual[a].id)){ actual[a].value=quiero[actual[a].id]; vistos++; } }
+    function tiene(k){ return Object.prototype.hasOwnProperty.call(quiero,k); }
+    var actual=st.getInputValues()||[];
+    var vistos=0; for(var a=0;a<actual.length;a++){ if(tiene(actual[a].id)) vistos++; }
+    // Estudio dañado: TradingView lo dejó sin sus inputs (ninguno de los in_N). Se quita para que la granja lo reinstale limpio.
+    function danado(lista){ if(!lista.length) return true; for(var d=0;d<lista.length;d++){ if(/^in_\\d+$/.test(String(lista[d].id))) return false; } return true; }
+    if(vistos===0 && danado(actual)){
+      if(J.reparar && typeof c.removeEntity==='function'){ try{ c.removeEntity(id); return {ok:false, motivo:'estudio dañado: lo quité para reinstalarlo', danado:true, quitado:true, studyId:id}; }catch(e){} }
+      return {ok:false, motivo:'estudio dañado', danado:true, studyId:id};
+    }
     if(vistos<J.inputs.length+1) return {ok:false,motivo:'inputs distintos ('+vistos+')'};
-    var antes=st.getInputValues()||[]; var iguales=0;
-    for(var q=0;q<antes.length;q++){ if(Object.prototype.hasOwnProperty.call(quiero,antes[q].id) && String(antes[q].value)===String(quiero[antes[q].id])) iguales++; }
-    if(iguales===vistos) return {ok:true, studyId:id, aplicados:iguales, cambio:false, motivo:''};
-    st.setInputValues(actual);
-    var despues=st.getInputValues()||[]; var bien=0;
-    for(var b=0;b<despues.length;b++){ if(Object.prototype.hasOwnProperty.call(quiero,despues[b].id) && String(despues[b].value)===String(quiero[despues[b].id])) bien++; }
-    return {ok:bien===vistos, studyId:id, aplicados:bien, cambio:true, motivo:bien===vistos?'':'no se confirmaron los inputs'};
+    var cambios=[];
+    for(var a2=0;a2<actual.length;a2++){ if(tiene(actual[a2].id) && !igual(actual[a2].value,quiero[actual[a2].id])) cambios.push({id:actual[a2].id, value:quiero[actual[a2].id]}); }
+    var ya=[]; for(var y=0;y<actual.length;y++){ if(tiene(actual[y].id)) ya.push(actual[y].id+'='+actual[y].value); }
+    if(!cambios.length) return {ok:true, studyId:id, aplicados:vistos, cambio:false, visible:lee(st), leidos:ya.join(' '), motivo:''};
+    // El ojo manda: lo que tenía antes de escribir (visible u oculto) es lo que queda después.
+    var vis=lee(st);
+    st.setInputValues(cambios);
+    // Cada input reejecuta el Pine: se espera a que TradingView termine (hasta ~6 s) y se confirma leyendo de nuevo.
+    var id2=id, st2=st, bien=0, despues=[];
+    for(var w=0;w<20;w++){
+      await new Promise(function(r){ setTimeout(r,300); });
+      id2=buscar()||id2; try{ st2=c.getStudyById(id2)||st2; }catch(e){}
+      despues=(st2&&st2.getInputValues&&st2.getInputValues())||[]; bien=0;
+      for(var b2=0;b2<despues.length;b2++){ if(tiene(despues[b2].id) && igual(despues[b2].value,quiero[despues[b2].id])) bien++; }
+      if(bien===vistos) break;
+    }
+    var restaurado=false;
+    if(vis!==null && st2 && lee(st2)!==vis){
+      try{ st2.setVisible(vis); restaurado=true; }catch(e){}
+      if(lee(st2)!==vis){ try{
+        var w2=api._activeChartWidgetWV.value()._chartWidget; var mo=w2.model(); var inner=mo.model?mo.model():mo; var all=inner.dataSources?inner.dataSources():[];
+        for(var z=0;z<all.length;z++){ var sid=''; try{ sid=all[z].id&&(typeof all[z].id==='function'?all[z].id():all[z].id); }catch(e){}
+          if(String(sid)===String(id2)){ var pv=all[z].properties&&all[z].properties().visible; if(pv&&typeof pv.setValue==='function'){ pv.setValue(vis); restaurado=true; } } }
+      }catch(e){} }
+    }
+    var roto=bien===0 && danado(despues);
+    var leidos=[]; for(var l=0;l<despues.length;l++){ if(tiene(despues[l].id)) leidos.push(despues[l].id+'='+despues[l].value); }
+    return {leidos:leidos.join(' '), ok:bien===vistos, studyId:id2, aplicados:bien, cambio:true, restaurado:restaurado, visible:lee(st2), danado:roto||undefined, motivo:bien===vistos?'':(roto?'estudio dañado tras escribir':'no se confirmaron los inputs')};
   })()`;
 }
 
@@ -218,6 +291,25 @@ export function lineaWalls(r) {
   return `${cab} ${t} · ${niv}${r.error ? ` · error: ${r.error}` : r.nota ? ` · ${r.nota}` : ''}`;
 }
 
+const GUARDADO = 'gex-niveles.json';
+function leerGuardado(dir) {
+  try {
+    const j = JSON.parse(fs.readFileSync(path.join(dir, GUARDADO), 'utf8'));
+    if (!j || !j.valores || typeof j.valores !== 'object' || !j.turno) return null;
+    const ok = INPUTS.every(([, k]) => Number.isFinite(Number(j.valores[k])));
+    if (!ok) return null;
+    return { turno: String(j.turno), at: String(j.at || ''), valores: j.valores, qqq: {}, spy: {}, qqqMs: 0, spyMs: 0, calculoMs: 0, zgMs: 0, t0: Date.now() };
+  } catch { return null; }
+}
+function guardar(dir, u) {
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    const tmp = path.join(dir, `${GUARDADO}.tmp-${process.pid}`);
+    fs.writeFileSync(tmp, JSON.stringify({ turno: u.turno, at: u.at, valores: u.valores }));
+    fs.renameSync(tmp, path.join(dir, GUARDADO));
+  } catch {}
+}
+
 function anotar(dir, texto) {
   try { fs.mkdirSync(dir, { recursive: true }); fs.appendFileSync(path.join(dir, LOG), texto + '\n'); } catch {}
 }
@@ -226,12 +318,14 @@ export function crearGexWalls(opts = {}) {
   if (!opts.dir) throw new Error('gex-walls: falta dir');
   const ahora = opts.ahora || (() => Date.now());
   const bloqueado = opts.bloqueado || (() => false); // panel de operar o trade abierto
+  const visible = opts.visible || (() => true); // el ojo: apagado = no baja ni calcula
   const bajar = opts.bajar || (sym => bajarEtf(sym, opts.fetch));
   const aplicar = opts.aplicar || (async () => ({ ok: false, motivo: 'sin-tv' }));
   const horas = opts.horas || HORAS_ET;
   let hecho = null; // turno ya calculado
   let arranque = true;
-  let ultimo = null; // { turno, at, valores, qqq, spy }
+  // Lo último calculado se guarda: tras un reinicio, una actualización del indicador o un feriado se vuelve a poner lo de antes.
+  let ultimo = leerGuardado(opts.dir); // { turno, at, valores, qqq, spy }
   let aplicadoFirma = '';
   let estadoTxt = 'pendiente';
   let ocupado = false;
@@ -239,8 +333,16 @@ export function crearGexWalls(opts = {}) {
   let falloHasta = 0;
   let ultimoMotivo = '';
   let verificado = 0;
+  let aplicarFalloHasta = 0;
+  let rapidos = 0; // reintentos rápidos seguidos con el estudio ausente (tope: después vuelve a la espera de 2 min)
+  let reparado = false; // un estudio dañado se quita una sola vez por sesión (no entra en bucle)
+  let forzarCalculo = false; // al prender el ojo: mostrar lo guardado y calcular uno fresco
+  let anoteOjo = false;
 
-  async function calcular(turno) {
+  function ojoOn() { try { return visible() !== false; } catch { return true; } }
+
+
+  async function calcular(turno, { reserva = false } = {}) {
     const t0 = ahora();
     const at = new Date(t0).toISOString();
     let qqqP, spyP;
@@ -253,10 +355,22 @@ export function crearGexWalls(opts = {}) {
       return { error: String(e && e.message || e), linea };
     }
     const tC = ahora();
-    let qqq, spy, zgMs = 0;
+    let qqq, spy, zgMs = 0, nota = '';
     try {
       qqq = nivelesEtf(qqqP.json, t0);
       spy = nivelesEtf(spyP.json, t0);
+      if (!qqq.contratos && !spy.contratos && reserva) {
+        const candidatos = [];
+        try { const p = proximoVencimiento(qqqP.json, t0); if (p) candidatos.push(p); } catch {}
+        try { const p = proximoVencimiento(spyP.json, t0); if (p) candidatos.push(p); } catch {}
+        candidatos.sort((a, b) => a.vence - b.vence);
+        const elegido = candidatos[0];
+        if (elegido) {
+          qqq = nivelesEtf(qqqP.json, t0, R, elegido.clave);
+          spy = nivelesEtf(spyP.json, t0, R, elegido.clave);
+          nota = `ultimo dato (vencimiento ${elegido.clave})`;
+        }
+      }
       zgMs = (qqq.zgMs || 0) + (spy.zgMs || 0);
     } catch (e) {
       const linea = lineaWalls({ at, turno, qqqMs: qqqP.ms, spyMs: spyP.ms, calculoMs: ahora() - tC, zgMs: 0, totalMs: ahora() - t0, error: String(e && e.message || e) });
@@ -264,7 +378,31 @@ export function crearGexWalls(opts = {}) {
       return { error: String(e && e.message || e), linea };
     }
     const calculoMs = ahora() - tC;
-    return { at, turno, t0, qqq, spy, qqqMs: qqqP.ms, spyMs: spyP.ms, calculoMs, zgMs, valores: valoresInputs(qqq, spy) };
+    return { at, turno, t0, qqq, spy, qqqMs: qqqP.ms, spyMs: spyP.ms, calculoMs, zgMs, valores: valoresInputs(qqq, spy), nota };
+  }
+
+  async function escribir(notaBase, { totalMs } = {}) {
+    const tA = ahora();
+    let res;
+    try { res = await aplicar(ultimo.valores, { reparar: !reparado }); } catch (e) { res = { ok: false, motivo: String(e && e.message || e) }; }
+    if (res && res.quitado) { reparado = true; if (opts.alQuitar) { try { opts.alQuitar(); } catch {} } }
+    const aplicarMs = ahora() - tA;
+    const motivo = res && res.ok ? '' : `aplicar: ${(res && res.motivo) || 'error'}`;
+    const nota = [notaBase, res && res.restaurado ? 'ojo restaurado' : '', res && res.visible === false ? 'oculto' : '', res && res.leidos ? `leído ${res.leidos}` : ''].filter(Boolean).join(' · ');
+    const linea = lineaWalls({ ...ultimo, aplicarMs, totalMs: totalMs != null ? totalMs : aplicarMs, error: motivo, nota });
+    const cambio = !!(res && res.ok && res.cambio !== false);
+    if (notaBase || motivo !== ultimoMotivo || cambio) anotar(opts.dir, linea);
+    ultimoMotivo = motivo;
+    verificado = ahora();
+    const sinEstudio = !!(res && (res.quitado || res.motivo === 'no está en el gráfico'));
+    aplicarFalloHasta = res && res.ok ? 0 : ahora() + (sinEstudio && rapidos < 15 ? (opts.reintentoReinstalarMs || 4000) : (opts.reintentoAplicarMs || 2 * 60 * 1000));
+    if (res && res.ok) rapidos = 0; else if (sinEstudio) rapidos++;
+    if (res && res.ok) { aplicadoFirma = firma(ultimo); estadoTxt = 'instalado'; }
+    else {
+      estadoTxt = `pendiente. ${(res && res.motivo) || 'error'}`;
+      if (sinEstudio && rapidos < 15 && timer && opts.pronto !== false) { const t2 = setTimeout(() => { correr().catch(() => {}); }, (opts.reintentoReinstalarMs || 4000) + 200); if (t2.unref) t2.unref(); }
+    }
+    return { res, aplicarMs, linea, cambio, ok: !!(res && res.ok) };
   }
 
   async function correr() {
@@ -272,14 +410,30 @@ export function crearGexWalls(opts = {}) {
     ocupado = true;
     try {
       const t = ahora();
+      if (!ojoOn()) {
+        forzarCalculo = false;
+        estadoTxt = 'ojo apagado';
+        if (!anoteOjo) { anotar(opts.dir, `${new Date(t).toISOString()} walls ojo apagado: no calcula`); anoteOjo = true; }
+        return { saltado: 'ojo' };
+      }
+      anoteOjo = false;
       const turno = turnoActual(t, horas);
-      const toca = turno ? turno !== hecho : (arranque && diaDeMercado(t));
-      const verificar = ultimo && aplicadoFirma === firma(ultimo) && t - verificado >= (opts.verificarMs || 2 * 60 * 1000);
+      const forzar = forzarCalculo;
+      // En un feriado o al instalar por primera vez, si no hay niveles guardados, se calculan los del vencimiento más próximo.
+      const toca = forzar || (turno ? turno !== hecho : (arranque && (diaDeMercado(t) || !ultimo)));
+      const verificar = !forzar && ultimo && aplicadoFirma === firma(ultimo) && t - verificado >= (opts.verificarMs || 2 * 60 * 1000);
       if (!toca && !verificar && (!ultimo || aplicadoFirma === firma(ultimo))) return { nada: true };
-      if (bloqueado()) { estadoTxt = 'pendiente. Espera a que cierres el panel de operar.'; return { saltado: 'panel' }; }
+      // Al prender el ojo: se muestran ya los últimos niveles, aunque el panel o un trade esté abierto.
+      if (forzar && ultimo) {
+        const previo = await escribir('al prender · ultimo guardado');
+        if (bloqueado()) { estadoTxt = 'pendiente. Espera a que cierres el panel de operar o el trade.'; return { saltado: 'panel', mostrado: true, linea: previo.linea }; }
+      }
+      if (bloqueado()) { estadoTxt = 'pendiente. Espera a que cierres el panel de operar o el trade.'; return { saltado: 'panel' }; }
       if (toca) {
         if (t < falloHasta) return { espera: true };
-        const r = await calcular(turno || 'arranque');
+        // Antes de bajar, si el estudio aún no tiene lo guardado, se pone para que no se vea vacío mientras calcula.
+        if (ultimo && aplicadoFirma !== firma(ultimo)) await escribir('ultimo guardado');
+        const r = await calcular(turno || 'arranque', { reserva: !ultimo });
         if (r.error) { falloHasta = ahora() + (opts.reintentoMs || 2 * 60 * 1000); return r; }
         hecho = turno; arranque = false;
         if (!r.qqq.contratos && !r.spy.contratos) {
@@ -289,26 +443,22 @@ export function crearGexWalls(opts = {}) {
           return { sin0dte: true, linea };
         }
         ultimo = r;
+        guardar(opts.dir, ultimo);
+        forzarCalculo = false;
       }
-      if (bloqueado()) { estadoTxt = 'pendiente. Espera a que cierres el panel de operar.'; return { saltado: 'panel' }; }
-      const tA = ahora();
-      let res;
-      try { res = await aplicar(ultimo.valores); } catch (e) { res = { ok: false, motivo: String(e && e.message || e) }; }
-      const aplicarMs = ahora() - tA;
-      const motivo = res && res.ok ? '' : `aplicar: ${(res && res.motivo) || 'error'}`;
-      const linea = lineaWalls({ ...ultimo, aplicarMs, totalMs: toca ? ahora() - ultimo.t0 : aplicarMs, error: motivo, nota: toca ? '' : 'reaplicado' });
-      const cambio = !!(res && res.ok && res.cambio !== false);
-      if (toca || motivo !== ultimoMotivo || cambio) anotar(opts.dir, linea);
-      ultimoMotivo = motivo;
-      verificado = ahora();
-      if (res && res.ok) { aplicadoFirma = firma(ultimo); estadoTxt = 'instalado'; return { ok: true, cambio, linea }; }
-      estadoTxt = `pendiente. ${(res && res.motivo) || 'error'}`;
-      return { error: (res && res.motivo) || 'error', linea };
+      if (bloqueado()) { estadoTxt = 'pendiente. Espera a que cierres el panel de operar o el trade.'; return { saltado: 'panel' }; }
+      // Si aplicar falló, no se vuelve a escribir en el estudio en cada vuelta de 15 s: se espera (por defecto 2 min).
+      if (!toca && !forzar && t < aplicarFalloHasta) return { espera: true };
+      const out = await escribir(toca ? (ultimo.nota || '') : 'reaplicado', { totalMs: toca && ultimo.t0 ? ahora() - ultimo.t0 : undefined });
+      if (out.ok) return { ok: true, cambio: out.cambio, linea: out.linea };
+      return { error: (out.res && out.res.motivo) || 'error', linea: out.linea };
     } finally { ocupado = false; }
   }
   function firma(u) { return u ? `${u.turno}|${JSON.stringify(u.valores)}` : ''; }
   // Si el estudio se reinstaló o TradingView se reabrió, se vuelve a aplicar lo último.
   function olvidarAplicado() { aplicadoFirma = ''; }
+  // El ojo se acaba de prender: muestra lo guardado ya y calcula uno nuevo (o lo deja pendiente si hay panel o trade abierto).
+  function prender() { forzarCalculo = true; return correr(); }
   function arrancar() {
     correr().catch(() => {});
     timer = setInterval(() => { correr().catch(() => {}); }, opts.cadaMs || 15000);
@@ -316,8 +466,8 @@ export function crearGexWalls(opts = {}) {
   }
   function detener() { if (timer) clearInterval(timer); timer = null; }
   function estado() {
-    return { ok: true, turno: ultimo ? ultimo.turno : null, at: ultimo ? ultimo.at : null, valores: ultimo ? ultimo.valores : null, aplicado: !!aplicadoFirma && aplicadoFirma === firma(ultimo), texto: estadoTxt };
+    return { ok: true, turno: ultimo ? ultimo.turno : null, at: ultimo ? ultimo.at : null, valores: ultimo ? ultimo.valores : null, aplicado: !!aplicadoFirma && aplicadoFirma === firma(ultimo), texto: estadoTxt, ojo: ojoOn() };
   }
-  const api = { correr, arrancar, detener, estado, olvidarAplicado };
+  const api = { correr, arrancar, detener, estado, olvidarAplicado, prender };
   return api;
 }
