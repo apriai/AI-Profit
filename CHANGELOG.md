@@ -10,6 +10,13 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Cada pull request debe subir el archivo `VERSION` y agregar una entrada en este `CHANGELOG.md`** (arriba, con la fecha). También hay que actualizar el texto de respaldo `vX.Y.Z` que se ve en la esquina de la granja (`motor/Granja-de-Cuentas-v2.html`, el bloque `tl-version`).
 - La versión actual está en el archivo `VERSION` y se muestra, pequeña, en la esquina inferior derecha de la granja.
 
+## [0.10.70] — 2026-11-26
+### Cambiado
+- **El botón de algoritmos del menú** deja de ser el ojo y pasa a ✨ (sigue midiendo 34×34 y abre o cierra el panel igual). Cerrado se ve como una esfera 3D con tinte iris. Al abrir el panel queda presionado suave, con un anillo iris fino detrás (verde Profito `#c8e810`, violeta y cian) y una transición de unos 0,4 s.
+- El título del panel pasa a **ALGORITMOS DE PROFITO**. El indicador de la fila sigue llamándose **Profito Algoritmo**.
+### Notas
+- No cambia las órdenes. No se toca la barra de la mascota (`__tlViz`).
+
 ## [0.10.69] — 2026-11-26
 ### Corregido
 - **El ojo de «Gex - Put/Call Walls»** ahora respeta lo que elijas. Al escribir los niveles en el indicador, la granja confirmaba con una comparación exacta de decimales; si TradingView devolvía un decimal un poco distinto, la confirmación fallaba y la granja reescribía el indicador cada 15 segundos, deshaciendo el ojo. Ahora: compara con tolerancia de medio centavo, no reescribe si ya está igual, espera 2 minutos antes de reintentar si falla, y deja el indicador visible u oculto como estaba antes de escribir.
