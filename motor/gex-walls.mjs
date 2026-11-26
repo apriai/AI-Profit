@@ -322,6 +322,7 @@ export function crearGexWalls(opts = {}) {
   let ultimoMotivo = '';
   let verificado = 0;
   let aplicarFalloHasta = 0;
+  let rapidos = 0; // reintentos rápidos seguidos con el estudio ausente (tope: después vuelve a la espera de 2 min)
   let reparado = false; // un estudio dañado se quita una sola vez por sesión (no entra en bucle)
 
   async function calcular(turno, { reserva = false } = {}) {
@@ -405,9 +406,12 @@ export function crearGexWalls(opts = {}) {
       verificado = ahora();
       // Si el estudio se quitó para reinstalarlo o aún no está en el gráfico, se reintenta pronto (la reinstalación tarda segundos); si no, espera 2 min.
       const sinEstudio = !!(res && (res.quitado || res.motivo === 'no está en el gráfico'));
-      aplicarFalloHasta = res && res.ok ? 0 : ahora() + (sinEstudio ? (opts.reintentoReinstalarMs || 15000) : (opts.reintentoAplicarMs || 2 * 60 * 1000));
+      aplicarFalloHasta = res && res.ok ? 0 : ahora() + (sinEstudio && rapidos < 15 ? (opts.reintentoReinstalarMs || 4000) : (opts.reintentoAplicarMs || 2 * 60 * 1000));
+      if (res && res.ok) rapidos = 0; else if (sinEstudio) rapidos++;
       if (res && res.ok) { aplicadoFirma = firma(ultimo); estadoTxt = 'instalado'; return { ok: true, cambio, linea }; }
       estadoTxt = `pendiente. ${(res && res.motivo) || 'error'}`;
+      // Con el estudio quitado o aún sin instalar se vuelve a probar a los pocos segundos (no a la siguiente vuelta de 15 s).
+      if (sinEstudio && rapidos < 15 && timer && opts.pronto !== false) { const t2 = setTimeout(() => { correr().catch(() => {}); }, (opts.reintentoReinstalarMs || 4000) + 200); if (t2.unref) t2.unref(); }
       return { error: (res && res.motivo) || 'error', linea };
     } finally { ocupado = false; }
   }
